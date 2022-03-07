@@ -54,10 +54,8 @@ def main(args):
       #Train samples %d
       #Val samples %d
       #Test samples %d""" %
-          (n_edges, n_classes,
-              train_mask.int().sum().item(),
-              val_mask.int().sum().item(),
-              test_mask.int().sum().item()))
+          (n_edges, n_classes, train_mask.int().sum().item(),
+           val_mask.int().sum().item(), test_mask.int().sum().item()))
 
     # add self loop
     if args.self_loop:
@@ -74,12 +72,7 @@ def main(args):
     g.ndata['norm'] = norm.unsqueeze(1)
 
     # create GCN model
-    model = GCN(g,
-                in_feats,
-                args.n_hidden,
-                n_classes,
-                args.n_layers,
-                F.relu,
+    model = GCN(g, in_feats, args.n_hidden, n_classes, args.n_layers, F.relu,
                 args.dropout)
 
     if cuda:
@@ -110,8 +103,8 @@ def main(args):
 
         acc = evaluate(model, features, labels, val_mask)
         print("Epoch {:05d} | Time(s) {:.4f} | Loss {:.4f} | Accuracy {:.4f} | "
-              "ETputs(KTEPS) {:.2f}". format(epoch, np.mean(dur), loss.item(),
-                                             acc, n_edges / np.mean(dur) / 1000))
+              "ETputs(KTEPS) {:.2f}".format(epoch, np.mean(dur), loss.item(),
+                                            acc, n_edges / np.mean(dur) / 1000))
 
     print()
     acc = evaluate(model, features, labels, test_mask)
@@ -120,23 +113,34 @@ def main(args):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='GCN')
-    parser.add_argument("--dataset", type=str, default="cora",
+    parser.add_argument("--dataset",
+                        type=str,
+                        default="cora",
                         help="Dataset name ('cora', 'citeseer', 'pubmed').")
-    parser.add_argument("--dropout", type=float, default=0.5,
+    parser.add_argument("--dropout",
+                        type=float,
+                        default=0.5,
                         help="dropout probability")
-    parser.add_argument("--gpu", type=int, default=-1,
-                        help="gpu")
-    parser.add_argument("--lr", type=float, default=1e-2,
-                        help="learning rate")
-    parser.add_argument("--n-epochs", type=int, default=200,
+    parser.add_argument("--gpu", type=int, default=-1, help="gpu")
+    parser.add_argument("--lr", type=float, default=1e-2, help="learning rate")
+    parser.add_argument("--n-epochs",
+                        type=int,
+                        default=200,
                         help="number of training epochs")
-    parser.add_argument("--n-hidden", type=int, default=16,
+    parser.add_argument("--n-hidden",
+                        type=int,
+                        default=16,
                         help="number of hidden gcn units")
-    parser.add_argument("--n-layers", type=int, default=1,
+    parser.add_argument("--n-layers",
+                        type=int,
+                        default=1,
                         help="number of hidden gcn layers")
-    parser.add_argument("--weight-decay", type=float, default=5e-4,
+    parser.add_argument("--weight-decay",
+                        type=float,
+                        default=5e-4,
                         help="Weight for L2 loss")
-    parser.add_argument("--self-loop", action='store_true',
+    parser.add_argument("--self-loop",
+                        action='store_true',
                         help="graph self-loop (default=False)")
     parser.set_defaults(self_loop=False)
     args = parser.parse_args()
