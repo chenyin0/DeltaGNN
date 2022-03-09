@@ -6,6 +6,7 @@ import torch.nn.functional as F
 import dgl
 from dgl.data import CoraGraphDataset, CiteseerGraphDataset, PubmedGraphDataset
 
+import util
 import copy
 
 from gcn import GCN
@@ -13,8 +14,7 @@ from gcn import GCN
 #from gcn_spmv import GCN
 
 
-def train(model, features, n_edges, train_mask, val_mask, labels, loss_fcn,
-          optimizer):
+def train(model, features, n_edges, train_mask, val_mask, labels, loss_fcn, optimizer):
     # initialize graph
     dur = []
     for epoch in range(args.n_epochs):
@@ -45,8 +45,7 @@ def train(model, features, n_edges, train_mask, val_mask, labels, loss_fcn,
 
         acc = evaluate(model, features, labels, val_mask)
         print("Epoch {:05d} | Time(s) {:.4f} | Loss {:.4f} | Accuracy {:.4f} | "
-              "ETputs(KTEPS) {:.2f}".format(epoch, np.mean(dur), loss.item(),
-                                            acc, n_edges / np.mean(dur) / 1000))
+              "ETputs(KTEPS) {:.2f}".format(epoch, np.mean(dur), loss.item(), acc, n_edges / np.mean(dur) / 1000))
 
 
 def evaluate(model, features, labels, mask):
@@ -87,14 +86,29 @@ def main(args):
     in_feats = features.shape[1]
     n_classes = data.num_labels
     n_edges = data.graph.number_of_edges()
-    print("""----Data statistics------'
+    print(
+        """----Data statistics------'
       #Edges %d
       #Classes %d
       #Train samples %d
       #Val samples %d
       #Test samples %d""" %
-          (n_edges, n_classes, train_mask.int().sum().item(),
-           val_mask.int().sum().item(), test_mask.int().sum().item()))
+        (n_edges, n_classes, train_mask.int().sum().item(), val_mask.int().sum().item(), test_mask.int().sum().item()))
+
+    ##
+    """ Construct evolve graph """
+    g_csr = g.adj_sparse('csr')
+    root_node_q = util.gen_root_node_queue(g)
+    node_q = util.bfs_traverse(g_csr, root_node_q)
+
+    init_node_rate = 0.5
+    init_node_num = round(len(node_q) * init_node_rate)
+    init_nodes = node_q[0:init_node_num]
+    
+    g_evo, features_evo, labels_evo, train_mask_evo, val_mask_evo, test_mask_evo = util.graph_evolve(
+        init_nodes, g_csr, g)
+    
+    ##
 
     # add self loop
     if args.self_loop:
@@ -111,8 +125,7 @@ def main(args):
     g.ndata['norm'] = norm.unsqueeze(1)
 
     # create GCN model
-    model = GCN(g, in_feats, args.n_hidden, n_classes, args.n_layers, F.relu,
-                args.dropout)
+    model = GCN(g, in_feats, args.n_hidden, n_classes, args.n_layers, F.relu, args.dropout)
 
     if cuda:
         model.cuda()
@@ -122,9 +135,7 @@ def main(args):
     loss_fcn = torch.nn.CrossEntropyLoss()
 
     # use optimizer
-    optimizer = torch.optim.Adam(model.parameters(),
-                                 lr=args.lr,
-                                 weight_decay=args.weight_decay)
+    optimizer = torch.optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
 
     # for name, param in model.named_parameters(): # View optimizable parameter
     #     if param.requires_grad:
@@ -149,8 +160,7 @@ def main(args):
 
         acc = evaluate(model, features, labels, val_mask)
         print("Epoch {:05d} | Time(s) {:.4f} | Loss {:.4f} | Accuracy {:.4f} | "
-              "ETputs(KTEPS) {:.2f}".format(epoch, np.mean(dur), loss.item(),
-                                            acc, n_edges / np.mean(dur) / 1000))
+              "ETputs(KTEPS) {:.2f}".format(epoch, np.mean(dur), loss.item(), acc, n_edges / np.mean(dur) / 1000))
 
     print()
     print(">>> Accuracy on original graph: ")
@@ -173,9 +183,9 @@ def main(args):
         print('>> Add edge-batch @ iter = %d', i)
         add_edge_num = i * edge_batch
         src_nodes = torch.randint(0, n_nodes, (add_edge_num, ))
-        dest_nodes = torch.randint(0, n_nodes, (add_edge_num, ))
-        model.g.add_edges(src_nodes, dest_nodes)
-        model_evolve.g.add_edges(src_nodes, dest_nodes)
+        dst_nodes = torch.randint(0, n_nodes, (add_edge_num, ))
+        model.g.add_edges(src_nodes, dst_nodes)
+        model_evolve.g.add_edges(src_nodes, dst_nodes)
 
         acc = evaluate(model, features, labels, test_mask)
         print("Test accuracy @ add {:d} edges {:.2%}".format(add_edge_num, acc))
@@ -231,17 +241,11 @@ def main(args):
         accuracy[i][2] = acc * 100
 
     if args.dataset == 'cora':
-        np.savetxt('./results/cora_add_edge.txt',
-                   accuracy,
-                   fmt='%d, %.2f, %.2f')
+        np.savetxt('./results/cora_add_edge.txt', accuracy, fmt='%d, %.2f, %.2f')
     elif args.dataset == 'citeseer':
-        np.savetxt('./results/citeseer_add_edge.txt',
-                   accuracy,
-                   fmt='%d, %.2f, %.2f')
+        np.savetxt('./results/citeseer_add_edge.txt', accuracy, fmt='%d, %.2f, %.2f')
     elif args.dataset == 'pubmed':
-        np.savetxt('./results/pubmed_add_edge.txt',
-                   accuracy,
-                   fmt='%d, %.2f, %.2f')
+        np.savetxt('./results/pubmed_add_edge.txt', accuracy, fmt='%d, %.2f, %.2f')
     else:
         raise ValueError('Unknown dataset: {}'.format(args.dataset))
 
@@ -303,35 +307,15 @@ def main(args):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='GCN')
-    parser.add_argument("--dataset",
-                        type=str,
-                        default="cora",
-                        help="Dataset name ('cora', 'citeseer', 'pubmed').")
-    parser.add_argument("--dropout",
-                        type=float,
-                        default=0.5,
-                        help="dropout probability")
+    parser.add_argument("--dataset", type=str, default="cora", help="Dataset name ('cora', 'citeseer', 'pubmed').")
+    parser.add_argument("--dropout", type=float, default=0.5, help="dropout probability")
     parser.add_argument("--gpu", type=int, default=-1, help="gpu")
     parser.add_argument("--lr", type=float, default=1e-2, help="learning rate")
-    parser.add_argument("--n-epochs",
-                        type=int,
-                        default=200,
-                        help="number of training epochs")
-    parser.add_argument("--n-hidden",
-                        type=int,
-                        default=16,
-                        help="number of hidden gcn units")
-    parser.add_argument("--n-layers",
-                        type=int,
-                        default=1,
-                        help="number of hidden gcn layers")
-    parser.add_argument("--weight-decay",
-                        type=float,
-                        default=5e-4,
-                        help="Weight for L2 loss")
-    parser.add_argument("--self-loop",
-                        action='store_true',
-                        help="graph self-loop (default=False)")
+    parser.add_argument("--n-epochs", type=int, default=200, help="number of training epochs")
+    parser.add_argument("--n-hidden", type=int, default=16, help="number of hidden gcn units")
+    parser.add_argument("--n-layers", type=int, default=1, help="number of hidden gcn layers")
+    parser.add_argument("--weight-decay", type=float, default=5e-4, help="Weight for L2 loss")
+    parser.add_argument("--self-loop", action='store_true', help="graph self-loop (default=False)")
     parser.set_defaults(self_loop=False)
     args = parser.parse_args()
     print(args)
