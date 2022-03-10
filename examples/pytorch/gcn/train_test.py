@@ -114,11 +114,17 @@ def main(args):
     node_map_orig2evo = dict()
     node_map_evo2orig = dict()
 
-    g_evo, features_evo, labels_evo, train_mask_evo, val_mask_evo, test_mask_evo = util.graph_evolve(
-        init_nodes, g_csr, g, node_map_orig2evo, node_map_evo2orig)
+    g_evo = util.graph_evolve(init_nodes, g_csr, g, node_map_orig2evo,
+                              node_map_evo2orig)
     ##
 
-    in_feats = features_evo.shape[1]
+    features = g_evo.ndata['feat']
+    labels = g_evo.ndata['label']
+    train_mask = g_evo.ndata['train_mask']
+    val_mask = g_evo.ndata['val_mask']
+    test_mask = g_evo.ndata['test_mask']
+
+    in_feats = features.shape[1]
     n_classes = data.num_labels
 
     # add self loop
@@ -169,8 +175,8 @@ def main(args):
         if epoch >= 3:
             t0 = time.time()
         # forward
-        logits = model(features_evo)
-        loss = loss_fcn(logits[train_mask_evo], labels_evo[train_mask_evo])
+        logits = model(features)
+        loss = loss_fcn(logits[train_mask], labels[train_mask])
 
         optimizer.zero_grad()
         loss.backward()
@@ -179,14 +185,14 @@ def main(args):
         if epoch >= 3:
             dur.append(time.time() - t0)
 
-        acc = evaluate(model, features_evo, labels_evo, val_mask_evo)
+        acc = evaluate(model, features, labels, val_mask)
         print("Epoch {:05d} | Time(s) {:.4f} | Loss {:.4f} | Accuracy {:.4f} | "
               "ETputs(KTEPS) {:.2f}".format(epoch, np.mean(dur), loss.item(),
                                             acc, n_edges / np.mean(dur) / 1000))
 
     print()
     print(">>> Accuracy on original graph: ")
-    acc = evaluate(model, features_evo, labels_evo, test_mask_evo)
+    acc = evaluate(model, features, labels, test_mask)
     print("Test accuracy {:.2%}".format(acc))
 
     # Evolve graph
@@ -198,11 +204,12 @@ def main(args):
 
     # Add new edges
     n_nodes = model.g.number_of_nodes()
-    iter = 8
-    node_batch = 100
+    # iter = 8
+    i = 0
+    node_batch = round(g.number_of_nodes() / 20)  # Limit execution round to 20
     # edge_epoch = np.arange(0, iter * edge_batch, edge_batch)
-    accuracy = np.zeros((iter, 3))
-    for i in range(iter):
+    accuracy = list()
+    while len(node_q) > 0:
         print('\n>> Add node-batch @ iter = {:d}'.format(i))
         print('>> node_q size: {:d}'.format(len(node_q)))
         add_node_num = i * node_batch
@@ -213,70 +220,45 @@ def main(args):
             add_nodes = node_q
             node_q.clear()
 
-        g_evo, features_evo, labels_evo, train_mask_evo, val_mask_evo, test_mask_evo = util.graph_evolve(
-            add_nodes, g_csr, g, node_map_orig2evo, node_map_evo2orig, model.g)
+        util.graph_evolve(add_nodes, g_csr, g, node_map_orig2evo,
+                          node_map_evo2orig, model.g)
 
-        acc = evaluate(model, features_evo, labels_evo, test_mask_evo)
+        features = model.g.ndata['feat']
+        labels = model.g.ndata['label']
+        train_mask = model.g.ndata['train_mask']
+        val_mask = model.g.ndata['val_mask']
+        test_mask = model.g.ndata['test_mask']
+
+        acc = evaluate(model, features, labels, test_mask)
         print("Test accuracy of non-retrain @ {:d} nodes {:.2%}".format(
             model.g.number_of_nodes(), acc))
-        accuracy[i][0] = add_node_num
-        accuracy[i][1] = acc * 100
+        # accuracy[i][0] = add_node_num
+        acc_non_retrain = acc * 100
 
         # Retrain
         # train(model_evolve, features, model_evolve.g.number_of_edges(),
         #       train_mask, val_mask, labels, loss_fcn_evolve, optimizer_evolve)
 
-        g_evo, features_evo, labels_evo, train_mask_evo, val_mask_evo, test_mask_evo = util.graph_evolve(
-            add_nodes, g_csr, g, node_map_orig2evo, node_map_evo2orig,
-            model_retrain.g)
+        util.graph_evolve(add_nodes, g_csr, g, node_map_orig2evo,
+                          node_map_evo2orig, model_retrain.g)
 
-        train(model_retrain, features_evo, model_retrain.g.number_of_edges(),
-              train_mask_evo, val_mask_evo, labels_evo, loss_fcn_retrain,
-              optimizer_retrain)
+        features = model_retrain.g.ndata['feat']
+        labels = model_retrain.g.ndata['label']
+        train_mask = model_retrain.g.ndata['train_mask']
+        val_mask = model_retrain.g.ndata['val_mask']
+        test_mask = model_retrain.g.ndata['test_mask']
 
-        # dur = []
-        # for epoch in range(args.n_epochs):
-        #     model.train()
-        #     if epoch >= 3:
-        #         t0 = time.time()
-        #     # forward
-        #     logits = model(features)
-        #     loss = loss_fcn(logits[train_mask], labels[train_mask])
-
-        #     # w1 = copy.deepcopy(model.layers[0].weight)
-        #     print('\n>> Before train:')
-        #     for param in model.parameters():
-        #         print(param)
-
-        #     optimizer.zero_grad()
-        #     loss.backward()
-        #     optimizer.step()
-
-        #     print('\n>> After train:')
-        #     for param in model.parameters():
-        #         print(param)
-
-        #     # w2 = model.layers[0].weight
-        #     # print(w1.equal(w2))
-
-        #     if epoch >= 3:
-        #         dur.append(time.time() - t0)
-
-        #     acc = evaluate(model, features, labels, val_mask)
-        # print("Epoch {:05d} | Time(s) {:.4f} | Loss {:.4f} | Accuracy {:.4f} | "
-        # "ETputs(KTEPS) {:.2f}".format(epoch, np.mean(dur), loss.item(),
-        #                             acc, n_edges / np.mean(dur) / 1000))
-
-        # w1 = model.layers[0].weight
-        # w11 = model_evolve.layers[0].weight
-        # print('>> Training result: ')
-        # print(w1.equal(w11))
+        train(model_retrain, features, model_retrain.g.number_of_edges(),
+              train_mask, val_mask, labels, loss_fcn_retrain, optimizer_retrain)
 
         # Evaluate retrain acc
-        acc = evaluate(model_retrain, features_evo, labels_evo, test_mask_evo)
+        acc = evaluate(model_retrain, features, labels, test_mask)
         print("Test accuracy of retrain @ {:d} nodes {:.2%}".format(
             model_retrain.g.number_of_nodes(), acc))
-        accuracy[i][2] = acc * 100
+        acc_retrain = acc * 100
+
+        accuracy.append([add_node_num, acc_non_retrain, acc_retrain])
+        i += 1
 
     if args.dataset == 'cora':
         np.savetxt('./results/cora_add_edge.txt',
@@ -296,57 +278,6 @@ def main(args):
     # plot.plt_edge_epoch()
 
     # plot.plt_edge_epoch(edge_epoch, result)
-
-    # ## Test diff-graph
-    # print()
-    # print(">>> Accuracy on different graph: ")
-    # data = CiteseerGraphDataset()
-    # # data = CoraGraphDataset()
-    # g_t = data[0]
-
-    # print(g_t.nodes())
-    # print(g_t.edges())
-
-    # # g_t.ndata['feat'] = g_t.ndata['feat'][:features.size()[0], :features.size()[1]]
-    # features_t = g_t.ndata['feat']
-    # features_t = features_t[:features.size()[0], :features.size()[1]]
-
-    # # g_t.ndata['label'] = g_t.ndata['label'][:labels.size()[0]]
-    # labels_t = g_t.ndata['label']
-    # labels_t=labels_t[:labels.size()[0]]
-
-    # # train_mask = g.ndata['train_mask']
-    # # val_mask = g.ndata['val_mask']
-    # # test_mask = g.ndata['test_mask']
-    # # in_feats = features.shape[1]
-    # # n_classes = data.num_labels
-    # # n_edges = data.graph.number_of_edges()
-
-    # # Initial for g_t
-    # # add self loop
-    # if args.self_loop:
-    #     g_t = dgl.remove_self_loop(g_t)
-    #     g_t = dgl.add_self_loop(g_t)
-    # n_edges = g_t.number_of_edges()
-
-    # # normalization
-    # degs = g_t.in_degrees().float()
-    # norm = torch.pow(degs, -0.5)
-    # norm[torch.isinf(norm)] = 0
-    # if cuda:
-    #     norm = norm.cuda()
-    # g_t.ndata['norm'] = norm.unsqueeze(1)
-
-    # # create GCN model
-    # model_diff = GCN(g_t, in_feats, args.n_hidden, n_classes, args.n_layers,
-    #                  F.relu, args.dropout)
-
-    # # Update diff_model weight
-    # model_diff.layers[0].weight = model.layers[0].weight
-    # model_diff.layers[1].weight = model.layers[1].weight
-
-    # acc = evaluate(model_diff, features_t, labels_t, test_mask)
-    # print("Test accuracy {:.2%}".format(acc))
 
 
 if __name__ == '__main__':

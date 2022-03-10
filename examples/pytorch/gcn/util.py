@@ -74,8 +74,6 @@ def graph_evolve(new_nodes,
     edge_src_nodes = list()
     edge_dst_nodes = list()
     for node in new_nodes:
-        # e_dest_nodes = indices[indptr[node]:indptr[node + 1]]
-        # e_src_nodes = th.linspace(node, node, edge_dest_nodes.size()[0])
         e_src_nodes = indices[indptr[node]:indptr[node + 1]]
         e_dst_nodes = th.linspace(node, node, len(e_src_nodes))
         edge_dst_nodes.extend(e_src_nodes.numpy().tolist())
@@ -108,10 +106,8 @@ def graph_evolve(new_nodes,
 
     # print('\n>> g_evo', g_evo)
 
-    features_evo, labels_evo, train_mask_evo, val_mask_evo, test_mask_evo = update_g_evo(
-        g_evo, g_orig, node_map_evo2orig)
-
-    return g_evo, features_evo, labels_evo, train_mask_evo, val_mask_evo, test_mask_evo
+    update_g_evo(g_evo, g_orig, node_map_evo2orig)
+    return g_evo
 
 
 def node_reindex(node_map, node_id_old):
@@ -136,22 +132,12 @@ def update_g_evo(g_evo, g_orig, node_map):
         nodes_orig_index.append(node_map[node])
 
     features = g_orig.ndata['feat'][nodes_orig_index, :]
-    # if 'feat' in g_evo.ndata:
-    #     feat = g_evo.ndata['feat']
-    #     features = th.cat((feat, feat_new), 0)
-    # else:
-    #     features = feat_new
     g_evo.ndata['feat'] = features
 
     labels = g_orig.ndata['label'][nodes_orig_index]
-    # if 'label' in g_evo.ndata:
-    #     label = g_evo.ndata['label']
-    #     labels = th.cat((label, label_new), 0)
-    # else:
-    #     labels = label_new
     g_evo.ndata['label'] = labels
 
-    train_ratio = 0.6
+    train_ratio = 0.4
     val_ratio = 0.2
     test_ratio = 0.2
 
@@ -170,9 +156,8 @@ def update_g_evo(g_evo, g_orig, node_map):
     # g_evo.ndata['test_mask'] = test_mask
 
     loc_list = range(labels.size()[0])
-    idx_test = random.sample(loc_list, math.floor(labels.size()[0] * test_ratio))
+    idx_test = random.sample(loc_list,
+                             math.floor(labels.size()[0] * test_ratio))
     idx_test = idx_test.sort()
     test_mask = generate_mask_tensor(_sample_mask(idx_test, labels.shape[0]))
     g_evo.ndata['test_mask'] = test_mask
-
-    return features, labels, train_mask, val_mask, test_mask
