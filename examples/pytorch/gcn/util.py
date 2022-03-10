@@ -1,7 +1,12 @@
 from collections import Counter
+from numpy import int64
 # from msilib import sequence
 import torch as th
 import dgl
+from dgl.data.utils import generate_mask_tensor
+from dgl.data.citation_graph import _sample_mask
+import math
+import random
 
 
 def gen_root_node_queue(g):
@@ -48,12 +53,17 @@ def bfs_traverse(g_csr, root_node_q):
         # Pop nodes in root_node_q which have been visited
         while len(root_node_q) > 0 and root_node_q[0] in seen:
             root_node_q.pop(0)
-        print('>> seen size: ', len(seen), 'seq size: ', len(sequence))
+        # print('>> seen size: ', len(seen), 'seq size: ', len(sequence))
 
     return sequence
 
 
-def graph_evolve(new_nodes, g_orig_csr, g_orig, g_evo=None):
+def graph_evolve(new_nodes,
+                 g_orig_csr,
+                 g_orig,
+                 node_map_orig2evo,
+                 node_map_evo2orig,
+                 g_evo=None):
     """
     Construct evolve graph from an orginal static graph
     """
@@ -71,23 +81,98 @@ def graph_evolve(new_nodes, g_orig_csr, g_orig, g_evo=None):
         edge_dst_nodes.extend(e_src_nodes.numpy().tolist())
         edge_src_nodes.extend(e_dst_nodes.numpy().tolist())
 
-    edge_dst_nodes = th.tensor(edge_dst_nodes)
-    edge_src_nodes = th.tensor(edge_src_nodes)
+    # Remapping node_id from g_orig -> g_evo, and record mapping from g_evo -> g_orig
+    edge_src_nodes_reindex = []
+    edge_dst_nodes_reindex = []
+    for node in edge_src_nodes:
+        node_id_evo = node_reindex(node_map_orig2evo, node)
+        edge_src_nodes_reindex.append(node_id_evo)
+        if node_id_evo not in node_map_evo2orig:
+            node_map_evo2orig[node_id_evo] = node
 
-    edge_src_nodes = th.ones(edge_dst_nodes.size()[0])
+    for node in edge_dst_nodes:
+        node_id_evo = node_reindex(node_map_orig2evo, node)
+        edge_dst_nodes_reindex.append(node_id_evo)
+        if node_id_evo not in node_map_evo2orig:
+            node_map_evo2orig[node_id_evo] = node
+
+    edge_src_nodes_reindex = th.tensor(edge_src_nodes_reindex, dtype=th.int64)
+    edge_dst_nodes_reindex = th.tensor(edge_dst_nodes_reindex, dtype=th.int64)
 
     if g_evo is None:
         # Construct a new graph
-        g_evo = dgl.graph((edge_src_nodes, edge_dst_nodes))
+        g_evo = dgl.graph((edge_src_nodes_reindex, edge_dst_nodes_reindex))
     else:
-        g_evo.add_edges(th.tensor(edge_src_nodes), th.tensor(edge_dst_nodes))
+        g_evo.add_edges(th.tensor(edge_src_nodes_reindex),
+                        th.tensor(edge_dst_nodes_reindex))
 
-    features_evo, labels_evo, train_mask_evo, val_mask_evo, test_mask_evo = update_g_evo(g_evo, g_orig, new_nodes)
+    # print('\n>> g_evo', g_evo)
 
-    return features_evo, labels_evo, train_mask_evo, val_mask_evo, test_mask_evo
+    features_evo, labels_evo, train_mask_evo, val_mask_evo, test_mask_evo = update_g_evo(
+        g_evo, g_orig, node_map_evo2orig)
+
+    return g_evo, features_evo, labels_evo, train_mask_evo, val_mask_evo, test_mask_evo
 
 
-def update_g_evo(g_evo, g_orig, new_nodes):
+def node_reindex(node_map, node_id_old):
+    """
+    node_id(g_orig) -> node_id(g_evo)
+    """
+    if node_id_old in node_map:
+        node_id_new = node_map[node_id_old]
+    else:
+        node_id_new = len(node_map)
+        node_map[node_id_old] = node_id_new
+
+    return node_id_new
+
+
+def update_g_evo(g_evo, g_orig, node_map):
     """
     Update feature and train/eval/test mask
     """
+    nodes_orig_index = []
+    for node in g_evo.nodes().tolist():
+        nodes_orig_index.append(node_map[node])
+
+    features = g_orig.ndata['feat'][nodes_orig_index, :]
+    # if 'feat' in g_evo.ndata:
+    #     feat = g_evo.ndata['feat']
+    #     features = th.cat((feat, feat_new), 0)
+    # else:
+    #     features = feat_new
+    g_evo.ndata['feat'] = features
+
+    labels = g_orig.ndata['label'][nodes_orig_index]
+    # if 'label' in g_evo.ndata:
+    #     label = g_evo.ndata['label']
+    #     labels = th.cat((label, label_new), 0)
+    # else:
+    #     labels = label_new
+    g_evo.ndata['label'] = labels
+
+    train_ratio = 0.6
+    val_ratio = 0.2
+    test_ratio = 0.2
+
+    idx_train = range(math.floor(labels.size()[0] * train_ratio))
+    train_mask = generate_mask_tensor(_sample_mask(idx_train, labels.shape[0]))
+    g_evo.ndata['train_mask'] = train_mask
+
+    idx_val = range(len(idx_train),
+                    len(idx_train) + math.floor(labels.size()[0] * val_ratio))
+    val_mask = generate_mask_tensor(_sample_mask(idx_val, labels.shape[0]))
+    g_evo.ndata['val_mask'] = val_mask
+
+    # idx_test = range(len(idx_val),
+    #                  len(idx_val) + math.floor(labels.size()[0] * test_ratio))
+    # test_mask = generate_mask_tensor(_sample_mask(idx_test, labels.shape[0]))
+    # g_evo.ndata['test_mask'] = test_mask
+
+    loc_list = range(labels.size()[0])
+    idx_test = random.sample(loc_list, math.floor(labels.size()[0] * test_ratio))
+    idx_test = idx_test.sort()
+    test_mask = generate_mask_tensor(_sample_mask(idx_test, labels.shape[0]))
+    g_evo.ndata['test_mask'] = test_mask
+
+    return features, labels, train_mask, val_mask, test_mask
