@@ -123,13 +123,14 @@ def node_reindex(node_map, node_id_old):
     return node_id_new
 
 
-def update_g_evo(g_evo, g_orig, node_map):
+def update_g_evo(g_evo, g_orig, node_map_evo2orig):
     """
     Update feature and train/eval/test mask
     """
+    # Get orig_node_index from evo_node_index
     nodes_orig_index = []
     for node in g_evo.nodes().tolist():
-        nodes_orig_index.append(node_map[node])
+        nodes_orig_index.append(node_map_evo2orig[node])
 
     features = g_orig.ndata['feat'][nodes_orig_index, :]
     g_evo.ndata['feat'] = features
@@ -137,16 +138,30 @@ def update_g_evo(g_evo, g_orig, node_map):
     labels = g_orig.ndata['label'][nodes_orig_index]
     g_evo.ndata['label'] = labels
 
-    train_ratio = 0.4
-    val_ratio = 0.2
-    test_ratio = 0.2
+    train_ratio = 0.06
+    val_ratio = 0.15
+    test_ratio = 0.3
 
-    idx_train = range(math.floor(labels.size()[0] * train_ratio))
+    # idx_train = range(math.floor(labels.size()[0] * train_ratio))
+    # train_mask = generate_mask_tensor(_sample_mask(idx_train, labels.shape[0]))
+    # g_evo.ndata['train_mask'] = train_mask
+
+    loc_list = range(labels.size()[0])
+    idx_train = random.sample(loc_list,
+                              math.floor(labels.size()[0] * train_ratio))
+    idx_train.sort()
     train_mask = generate_mask_tensor(_sample_mask(idx_train, labels.shape[0]))
     g_evo.ndata['train_mask'] = train_mask
 
-    idx_val = range(len(idx_train),
-                    len(idx_train) + math.floor(labels.size()[0] * val_ratio))
+    # idx_val = range(len(idx_train),
+    #                 len(idx_train) + math.floor(labels.size()[0] * val_ratio))
+    # val_mask = generate_mask_tensor(_sample_mask(idx_val, labels.shape[0]))
+    # g_evo.ndata['val_mask'] = val_mask
+    
+    loc_list = range(labels.size()[0])
+    idx_val = random.sample(loc_list,
+                              math.floor(labels.size()[0] * train_ratio))
+    idx_val.sort()
     val_mask = generate_mask_tensor(_sample_mask(idx_val, labels.shape[0]))
     g_evo.ndata['val_mask'] = val_mask
 
@@ -158,6 +173,6 @@ def update_g_evo(g_evo, g_orig, node_map):
     loc_list = range(labels.size()[0])
     idx_test = random.sample(loc_list,
                              math.floor(labels.size()[0] * test_ratio))
-    idx_test = idx_test.sort()
+    idx_test.sort()
     test_mask = generate_mask_tensor(_sample_mask(idx_test, labels.shape[0]))
     g_evo.ndata['test_mask'] = test_mask

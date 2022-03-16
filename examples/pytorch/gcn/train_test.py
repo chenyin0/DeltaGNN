@@ -124,6 +124,21 @@ def main(args):
     val_mask = g_evo.ndata['val_mask']
     test_mask = g_evo.ndata['test_mask']
 
+    # features = g.ndata['feat']
+    # labels = g.ndata['label']
+    # train_mask = g.ndata['train_mask']
+    # val_mask = g.ndata['val_mask']
+    # test_mask = g.ndata['test_mask']
+
+    # print('\n>>> Mask')
+    # print(train_mask, val_mask, test_mask)
+    # cnt = 0
+    # for i in test_mask:
+    #     if i == True:
+    #         cnt+=1
+
+    # print(cnt)
+
     in_feats = features.shape[1]
     n_classes = data.num_labels
 
@@ -142,8 +157,8 @@ def main(args):
     g_evo.ndata['norm'] = norm.unsqueeze(1)
 
     # create GCN model
-    model = GCN(g_evo, in_feats, args.n_hidden, n_classes, args.n_layers,
-                F.relu, args.dropout)
+    model = GCN(g_evo, in_feats, args.n_hidden, n_classes, args.n_layers, F.relu,
+                args.dropout)
     model_retrain = GCN(g_evo, in_feats, args.n_hidden, n_classes,
                         args.n_layers, F.relu, args.dropout)
 
@@ -206,16 +221,16 @@ def main(args):
     n_nodes = model.g.number_of_nodes()
     # iter = 8
     i = 0
-    node_batch = round(g.number_of_nodes() / 20)  # Limit execution round to 20
+    node_batch = round(g.number_of_nodes() / 10)  # Limit execution round to 20
     # edge_epoch = np.arange(0, iter * edge_batch, edge_batch)
     accuracy = list()
     while len(node_q) > 0:
         print('\n>> Add node-batch @ iter = {:d}'.format(i))
         print('>> node_q size: {:d}'.format(len(node_q)))
-        add_node_num = i * node_batch
-        if add_node_num < len(node_q):
-            add_nodes = node_q[:add_node_num]
-            node_q = node_q[add_node_num:]
+        # add_node_num = i * node_batch
+        if node_batch < len(node_q):
+            add_nodes = node_q[:node_batch]
+            node_q = node_q[node_batch:]
         else:
             add_nodes = node_q
             node_q.clear()
@@ -257,7 +272,7 @@ def main(args):
             model_retrain.g.number_of_nodes(), acc))
         acc_retrain = acc * 100
 
-        accuracy.append([add_node_num, acc_non_retrain, acc_retrain])
+        accuracy.append([i * node_batch, acc_non_retrain, acc_retrain])
         i += 1
 
     if args.dataset == 'cora':
@@ -284,7 +299,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='GCN')
     parser.add_argument("--dataset",
                         type=str,
-                        default="cora",
+                        default="pubmed",
                         help="Dataset name ('cora', 'citeseer', 'pubmed').")
     parser.add_argument("--dropout",
                         type=float,
