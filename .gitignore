@@ -164,3 +164,6 @@ config.cmake
 
 # model file
 *.pth
+
+# results
+results/
