@@ -1,0 +1,293 @@
+import matplotlib.pyplot as plt
+import numpy as np
+import copy
+
+# Computation
+
+
+def comp_per_layer(feat_dim, v_num, e_num):
+    """
+        X_k+1 = A*X_k*W
+        Aggregate: delta = A*X
+        Combination: delta*W
+    """
+    aggr = e_num
+    comb = v_num * feat_dim
+    comp = aggr + comb
+    return comp
+
+
+def access_per_layer(feat_dim, e_num):
+    access = e_num * feat_dim / (4 * 1024 * 1024)  # MB
+    return access
+
+
+def norm(li, base):
+    for i in range(len(li)):
+        li[i] = round(li[i] / base, 2)
+
+
+def accumulate(li):
+    sum = 0
+    for i in range(len(li)):
+        li[i] += sum
+        sum += li[i]
+
+
+def plt_retrain_comp():
+    cora = np.loadtxt('./results/cora_add_edge.txt', delimiter=',')
+    citeseer = np.loadtxt('./results/citeseer_add_edge.txt', delimiter=',')
+    pubmed = np.loadtxt('./results/pubmed_add_edge.txt', delimiter=',')
+
+    v_cora = cora[:, 0]
+    e_cora = cora[:, 1]
+
+    v_citeseer = citeseer[:, 0]
+    e_citeseer = citeseer[:, 1]
+
+    v_pubmed = pubmed[:, 0]
+    e_pubmed = pubmed[:, 1]
+
+    comp_cora = []
+    comp_citeseer = []
+    comp_pubmed = []
+    mem_cora = []
+    mem_citeseer = []
+    mem_pubmed = []
+
+    layer_num = 2
+    feat_dim = 16
+
+    for i in range(len(cora)):
+        comp = comp_per_layer(feat_dim, v_cora[i], e_cora[i])
+        comp_cora.append(layer_num * comp)
+        mem = access_per_layer(feat_dim, e_cora[i])
+        mem_cora.append(layer_num * mem)
+
+    for i in range(len(citeseer)):
+        comp = comp_per_layer(feat_dim, v_citeseer[i], e_citeseer[i])
+        comp_citeseer.append(layer_num * comp)
+        mem = access_per_layer(feat_dim, e_citeseer[i])
+        mem_citeseer.append(layer_num * mem)
+
+    for i in range(len(pubmed)):
+        comp = comp_per_layer(feat_dim, v_pubmed[i], e_pubmed[i])
+        comp_pubmed.append(layer_num * comp)
+        mem = access_per_layer(feat_dim, e_pubmed[i])
+        mem_pubmed.append(layer_num * mem)
+
+    accumulate(comp_cora)
+    accumulate(comp_citeseer)
+    accumulate(comp_pubmed)
+    accumulate(mem_cora)
+    accumulate(mem_citeseer)
+    accumulate(mem_pubmed)
+
+    # normalize
+    norm(comp_cora, comp_cora[0])
+    norm(comp_citeseer, comp_citeseer[0])
+    norm(comp_pubmed, comp_pubmed[0])
+    norm(mem_cora, mem_cora[0])
+    norm(mem_citeseer, mem_citeseer[0])
+    norm(mem_pubmed, mem_pubmed[0])
+
+    # x1 = range(len(cora))
+    # x2 = range(len(citeseer))
+    # x3 = range(len(pubmed))
+
+    import seaborn as sns
+    import matplotlib.ticker as mtick
+
+    labels = [
+        'Orig', 'Time 1', 'Time 2', 'Time 3', 'Time 4', 'Time 5', 'Time 6',
+        'Time 7', 'Time 8'
+    ]
+    items = ['Cora', 'Citeseer', 'Pubmed']
+    """
+    Computation
+    """
+    data = [comp_cora, comp_citeseer, comp_pubmed]
+    # Group size in each label
+    group_size = len(items)
+
+    total_width = 1.5
+    label_num = len(labels)
+    width = total_width / label_num
+    # Bar offset
+    offset = -width / 2 * (group_size - 1)
+    # Bar interval
+    space = 0
+
+    x = np.arange(label_num)  # the label locations
+    x = x - ((group_size - 1) / 2) * width
+
+    color = sns.cubehelix_palette(start=2.8,
+                                  rot=-.1,
+                                  n_colors=len(items),
+                                  dark=0,
+                                  light=0.65)
+
+    fig, ax1 = plt.subplots(figsize=(11, 3), dpi=600)
+    # ax1 = plt.subplot(1, 3, 1)
+
+    rects = [0 for n in range(len(items))]
+    for i in range(len(items)):
+        rects[i] = ax1.bar(x + i * (width + space) + offset,
+                           data[i],
+                           width=width,
+                           alpha=.99,
+                           edgecolor='w',
+                           label=items[i],
+                           zorder=2,
+                           color=color[i])
+
+    plt.grid(axis='y', zorder=1)
+
+    # Plot图例
+    plt.legend(fontsize=8)
+
+    def autolabel(rects):
+        """Attach a text label above each bar in *rects*, displaying its height."""
+        for rect in rects:
+            height = round(rect.get_height(), 1)
+            ax1.annotate(
+                '{}'.format(height),
+                fontsize=10,
+                xy=(rect.get_x() + rect.get_width() / 2, height),
+                xytext=(0, 3),  # 3 points vertical offset
+                textcoords="offset points",
+                ha='center',
+                va='bottom',
+                rotation=90)
+
+    for i in range(len(items)):
+        autolabel(rects[i])
+
+    ax1.set_xticks(x)
+    ax1.set_xticklabels(labels, va="center", position=(0, -0.05), fontsize=14)
+    # ax1.xaxis.set_visible(False)
+    # ax1.xaxis.set_tick_params(direction='in')
+    # ax1.axes.get_xaxis().set_visible(False)
+
+    # plt.yticks(size=10)
+    # plt.xticks(size = 10)
+
+    # ax1.set_ylim([0, 100])
+    ax1.set_yscale('log')
+
+    # my_y_ticks = np.arange(0, 120, 20)
+    # plt.yticks(my_y_ticks)
+
+    plt.legend(labelspacing=0, handlelength=1, fontsize=14, loc="best")
+    # ax1.get_legend().remove()
+
+    #plt.axhline(y=1, color='k', linestyle='-', linewidth=0.8)
+    # fmt = '%.f%%'
+    # yticks = mtick.FormatStrFormatter(fmt)
+    # ax1.yaxis.set_major_formatter(yticks)
+
+    fontsize = 16
+    #plt.xlabel('Unroll number',fontsize = fontsize)
+    plt.ylabel('Computation\n(norm to non-retrain)', fontsize=fontsize)
+
+    plt.tight_layout()
+    plt.savefig('./figure/retrain_comp.pdf',
+                dpi=600,
+                bbox_inches="tight",
+                pad_inches=0)
+    """
+    Mem access
+    """
+
+    data = [mem_cora, mem_citeseer, mem_pubmed]
+    # Group size in each label
+    group_size = len(items)
+
+    total_width = 1.5
+    label_num = len(labels)
+    width = total_width / label_num
+    # Bar offset
+    offset = -width / 2 * (group_size - 1)
+    # Bar interval
+    space = 0
+
+    x = np.arange(label_num)  # the label locations
+    x = x - ((group_size - 1) / 2) * width
+
+    color = sns.cubehelix_palette(start=0,
+                                  rot=-.4,
+                                  n_colors=len(items),
+                                  dark=0,
+                                  light=0.65)
+
+    fig, ax1 = plt.subplots(figsize=(11, 3), dpi=600)
+    # ax1 = plt.subplot(1, 3, 1)
+
+    rects = [0 for n in range(len(items))]
+    for i in range(len(items)):
+        rects[i] = ax1.bar(x + i * (width + space) + offset,
+                           data[i],
+                           width=width,
+                           alpha=.99,
+                           edgecolor='w',
+                           label=items[i],
+                           zorder=2,
+                           color=color[i])
+
+    plt.grid(axis='y', zorder=1)
+
+    def autolabel(rects):
+        """Attach a text label above each bar in *rects*, displaying its height."""
+        for rect in rects:
+            height = round(rect.get_height(), 1)
+            ax1.annotate(
+                '{}'.format(height),
+                fontsize=10,
+                xy=(rect.get_x() + rect.get_width() / 2, height),
+                xytext=(0, 3),  # 3 points vertical offset
+                textcoords="offset points",
+                ha='center',
+                va='bottom',
+                rotation=90)
+
+    for i in range(len(items)):
+        autolabel(rects[i])
+
+    # Plot图例
+    plt.legend(fontsize=8)
+
+    ax1.set_xticks(x)
+    ax1.set_xticklabels(labels, va="center", position=(0, -0.05), fontsize=14)
+    # ax1.xaxis.set_visible(False)
+    # ax1.xaxis.set_tick_params(direction='in')
+    # ax1.axes.get_xaxis().set_visible(False)
+
+    # plt.yticks(size=10)
+    # plt.xticks(size = 10)
+
+    # ax1.set_ylim([0, 100])
+    ax1.set_yscale('log')
+
+    # my_y_ticks = np.arange(0, 120, 20)
+    # plt.yticks(my_y_ticks)
+
+    plt.legend(labelspacing=0, handlelength=1, fontsize=14, loc="best")
+    # ax1.get_legend().remove()
+
+    #plt.axhline(y=1, color='k', linestyle='-', linewidth=0.8)
+    # fmt = '%.f%%'
+    # yticks = mtick.FormatStrFormatter(fmt)
+    # ax1.yaxis.set_major_formatter(yticks)
+
+    fontsize = 16
+    #plt.xlabel('Unroll number',fontsize = fontsize)
+    plt.ylabel('Memory access\n(norm to non-retrain)', fontsize=fontsize)
+
+    plt.tight_layout()
+    plt.savefig('./figure/retrain_mem.pdf',
+                dpi=600,
+                bbox_inches="tight",
+                pad_inches=0)
+
+
+plt_retrain_comp()

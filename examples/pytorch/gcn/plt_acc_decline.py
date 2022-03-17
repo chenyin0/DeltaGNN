@@ -1,5 +1,3 @@
-from pydoc import locate
-from tkinter import CENTER
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -19,27 +17,27 @@ def plt_edge_epoch():
     plt.figure(figsize=(10, 3), dpi=100)
 
     ax1 = plt.subplot(1, 3, 1)
-    plt.plot(x1, cora[:, 2], 'v-', color='g', label="Retrain")
-    plt.plot(x1, cora[:, 1], 'o-', color='r', label="W/O Retrain")
-    plt.legend(prop={'size': 16})
+    plt.plot(x1, cora[:, -1], 'v-', color='g', label="Re-training")
+    plt.plot(x1, cora[:, -2], 'o-', color='r', label="W/O Retrain")
+    plt.legend(prop={'size': 12})
     plt.ylabel('Accuracy (%)', fontsize=16)
     plt.title('Cora', fontsize=16)
 
     ax2 = plt.subplot(1, 3, 2)
-    plt.plot(x2, citeseer[:, 2], 'v-', color='g', label="Retrain")
-    plt.plot(x2, citeseer[:, 1], 'o-', color='r', label="W/O Retrain")
-    plt.legend(prop={'size': 16})
+    plt.plot(x2, citeseer[:, -1], 'v-', color='g', label="Re-training")
+    plt.plot(x2, citeseer[:, -2], 'o-', color='r', label="W/O Retrain")
+    plt.legend(prop={'size': 12})
     # plt.ylabel('Accuracy (%)', fontsize=16)
     plt.title('Citeseer', fontsize=16)
 
     ax3 = plt.subplot(1, 3, 3)
-    plt.plot(x3, pubmed[:, 2], 'v-', color='g', label="Retrain")
-    plt.plot(x3, pubmed[:, 1], 'o-', color='r', label="W/O Retrain")
-    plt.legend(prop={'size': 16})
+    plt.plot(x3, pubmed[:, -1], 'v-', color='g', label="Re-training")
+    plt.plot(x3, pubmed[:, -2], 'o-', color='r', label="W/O Retrain")
+    plt.legend(prop={'size': 12})
     # plt.ylabel('Accuracy (%)', fontsize=16)
     plt.title('Pubmed', fontsize=16)
 
-    plt.suptitle('Evolving nodes/edges proportion', fontsize=16)
+    plt.suptitle('Accuracy with graph evolving', fontsize=16)
 
     # ax1.set_ylim([0, 100])
     # ax2.set_ylim([0, 100])
