@@ -157,8 +157,8 @@ def main(args):
     g_evo.ndata['norm'] = norm.unsqueeze(1)
 
     # create GCN model
-    model = GCN(g_evo, in_feats, args.n_hidden, n_classes, args.n_layers, F.relu,
-                args.dropout)
+    model = GCN(g_evo, in_feats, args.n_hidden, n_classes, args.n_layers,
+                F.relu, args.dropout)
     model_retrain = GCN(g_evo, in_feats, args.n_hidden, n_classes,
                         args.n_layers, F.relu, args.dropout)
 
@@ -272,21 +272,24 @@ def main(args):
             model_retrain.g.number_of_nodes(), acc))
         acc_retrain = acc * 100
 
-        accuracy.append([i * node_batch, acc_non_retrain, acc_retrain])
+        accuracy.append([
+            model.g.number_of_nodes(),
+            model.g.number_of_edges(), acc_non_retrain, acc_retrain
+        ])
         i += 1
 
     if args.dataset == 'cora':
         np.savetxt('./results/cora_add_edge.txt',
                    accuracy,
-                   fmt='%d, %.2f, %.2f')
+                   fmt='%d, %d, %.2f, %.2f')
     elif args.dataset == 'citeseer':
         np.savetxt('./results/citeseer_add_edge.txt',
                    accuracy,
-                   fmt='%d, %.2f, %.2f')
+                   fmt='%d, %d, %.2f, %.2f')
     elif args.dataset == 'pubmed':
         np.savetxt('./results/pubmed_add_edge.txt',
                    accuracy,
-                   fmt='%d, %.2f, %.2f')
+                   fmt='%d, %d, %.2f, %.2f')
     else:
         raise ValueError('Unknown dataset: {}'.format(args.dataset))
 
@@ -299,7 +302,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='GCN')
     parser.add_argument("--dataset",
                         type=str,
-                        default="pubmed",
+                        default="cora",
                         help="Dataset name ('cora', 'citeseer', 'pubmed').")
     parser.add_argument("--dropout",
                         type=float,
@@ -329,5 +332,7 @@ if __name__ == '__main__':
     parser.set_defaults(self_loop=False)
     args = parser.parse_args()
     print(args)
+
+    args.dataset = 'cora'
 
     main(args)

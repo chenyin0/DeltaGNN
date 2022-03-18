@@ -51,13 +51,7 @@ class NodeApplyModule(nn.Module):
 
 
 class GCNLayer(nn.Module):
-    def __init__(self,
-                 g,
-                 in_feats,
-                 out_feats,
-                 activation,
-                 dropout,
-                 bias=True):
+    def __init__(self, g, in_feats, out_feats, activation, dropout, bias=True):
         super(GCNLayer, self).__init__()
         self.g = g
         self.weight = nn.Parameter(torch.Tensor(in_feats, out_feats))
@@ -80,14 +74,9 @@ class GCNLayer(nn.Module):
         h = self.g.ndata.pop('h')
         return h
 
+
 class GCN(nn.Module):
-    def __init__(self,
-                 g,
-                 in_feats,
-                 n_hidden,
-                 n_classes,
-                 n_layers,
-                 activation,
+    def __init__(self, g, in_feats, n_hidden, n_classes, n_layers, activation,
                  dropout):
         super(GCN, self).__init__()
         self.layers = nn.ModuleList()
@@ -95,7 +84,8 @@ class GCN(nn.Module):
         self.layers.append(GCNLayer(g, in_feats, n_hidden, activation, dropout))
         # hidden layers
         for i in range(n_layers - 1):
-            self.layers.append(GCNLayer(g, n_hidden, n_hidden, activation, dropout))
+            self.layers.append(
+                GCNLayer(g, n_hidden, n_hidden, activation, dropout))
         # output layer
         self.layers.append(GCNLayer(g, n_hidden, n_classes, None, dropout))
 
@@ -104,6 +94,7 @@ class GCN(nn.Module):
         for layer in self.layers:
             h = layer(h)
         return h
+
 
 def evaluate(model, features, labels, mask):
     model.eval()
@@ -114,6 +105,7 @@ def evaluate(model, features, labels, mask):
         _, indices = torch.max(logits, dim=1)
         correct = torch.sum(indices == labels)
         return correct.item() * 1.0 / len(labels)
+
 
 def main(args):
     # load and preprocess dataset
@@ -147,10 +139,8 @@ def main(args):
       #Train samples %d
       #Val samples %d
       #Test samples %d""" %
-          (n_edges, n_classes,
-              train_mask.int().sum().item(),
-              val_mask.int().sum().item(),
-              test_mask.int().sum().item()))
+          (n_edges, n_classes, train_mask.int().sum().item(),
+           val_mask.int().sum().item(), test_mask.int().sum().item()))
 
     # add self loop
     g = dgl.remove_self_loop(g)
@@ -166,12 +156,7 @@ def main(args):
     g.ndata['norm'] = norm.unsqueeze(1)
 
     # create GCN model
-    model = GCN(g,
-                in_feats,
-                args.n_hidden,
-                n_classes,
-                args.n_layers,
-                F.relu,
+    model = GCN(g, in_feats, args.n_hidden, n_classes, args.n_layers, F.relu,
                 args.dropout)
 
     if cuda:
@@ -202,8 +187,8 @@ def main(args):
 
         acc = evaluate(model, features, labels, val_mask)
         print("Epoch {:05d} | Time(s) {:.4f} | Loss {:.4f} | Accuracy {:.4f} | "
-              "ETputs(KTEPS) {:.2f}". format(epoch, np.mean(dur), loss.item(),
-                                             acc, n_edges / np.mean(dur) / 1000))
+              "ETputs(KTEPS) {:.2f}".format(epoch, np.mean(dur), loss.item(),
+                                            acc, n_edges / np.mean(dur) / 1000))
 
     print()
     acc = evaluate(model, features, labels, test_mask)
@@ -213,20 +198,28 @@ def main(args):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='GCN')
     register_data_args(parser)
-    parser.add_argument("--dropout", type=float, default=0.5,
-            help="dropout probability")
-    parser.add_argument("--gpu", type=int, default=-1,
-            help="gpu")
-    parser.add_argument("--lr", type=float, default=1e-2,
-            help="learning rate")
-    parser.add_argument("--n-epochs", type=int, default=200,
-            help="number of training epochs")
-    parser.add_argument("--n-hidden", type=int, default=16,
-            help="number of hidden gcn units")
-    parser.add_argument("--n-layers", type=int, default=1,
-            help="number of hidden gcn layers")
-    parser.add_argument("--weight-decay", type=float, default=5e-4,
-            help="Weight for L2 loss")
+    parser.add_argument("--dropout",
+                        type=float,
+                        default=0.5,
+                        help="dropout probability")
+    parser.add_argument("--gpu", type=int, default=-1, help="gpu")
+    parser.add_argument("--lr", type=float, default=1e-2, help="learning rate")
+    parser.add_argument("--n-epochs",
+                        type=int,
+                        default=200,
+                        help="number of training epochs")
+    parser.add_argument("--n-hidden",
+                        type=int,
+                        default=16,
+                        help="number of hidden gcn units")
+    parser.add_argument("--n-layers",
+                        type=int,
+                        default=1,
+                        help="number of hidden gcn layers")
+    parser.add_argument("--weight-decay",
+                        type=float,
+                        default=5e-4,
+                        help="Weight for L2 loss")
     args = parser.parse_args()
     print(args)
 
