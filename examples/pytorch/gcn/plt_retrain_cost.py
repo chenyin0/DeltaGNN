@@ -30,8 +30,16 @@ def norm(li, base):
 def accumulate(li):
     sum = 0
     for i in range(len(li)):
+        tmp = li[i]
         li[i] += sum
-        sum += li[i]
+        sum += tmp
+
+
+# def accumulate_delta(li):
+#     sum = 0
+#     for i in range(len(li)):
+#         li[i] += sum
+#         sum += li[i]
 
 
 def plt_retrain_comp():
@@ -75,6 +83,49 @@ def plt_retrain_comp():
         comp_pubmed.append(layer_num * comp)
         mem = access_per_layer(feat_dim, e_pubmed[i])
         mem_pubmed.append(layer_num * mem)
+    """
+    Delta computation and memory access    
+    """
+    ##
+    comp_cora_delta = []
+    comp_citeseer_delta = []
+    comp_pubmed_delta = []
+    mem_cora_delta = []
+    mem_citeseer_delta = []
+    mem_pubmed_delta = []
+
+    v_base = 0
+    e_base = 0
+    for i in range(len(cora)):
+        comp = comp_per_layer(feat_dim, v_cora[i] - v_base, e_cora[i] - e_base)
+        comp_cora_delta.append(layer_num * comp)
+        mem = access_per_layer(feat_dim, e_cora[i] - e_base)
+        mem_cora_delta.append(layer_num * mem)
+        v_base = v_cora[i]
+        e_base = e_cora[i]
+
+    v_base = 0
+    e_base = 0
+    for i in range(len(citeseer)):
+        comp = comp_per_layer(feat_dim, v_citeseer[i] - v_base,
+                              e_citeseer[i] - e_base)
+        comp_citeseer_delta.append(layer_num * comp)
+        mem = access_per_layer(feat_dim, e_citeseer[i] - e_base)
+        mem_citeseer_delta.append(layer_num * mem)
+        v_base = v_citeseer[i]
+        e_base = e_citeseer[i]
+
+    v_base = 0
+    e_base = 0
+    for i in range(len(pubmed)):
+        comp = comp_per_layer(feat_dim, v_pubmed[i] - v_base,
+                              e_pubmed[i] - e_base)
+        comp_pubmed_delta.append(layer_num * comp)
+        mem = access_per_layer(feat_dim, e_pubmed[i] - e_base)
+        mem_pubmed_delta.append(layer_num * mem)
+        v_base = v_pubmed[i]
+        e_base = e_pubmed[i]
+    ##
 
     accumulate(comp_cora)
     accumulate(comp_citeseer)
@@ -91,9 +142,21 @@ def plt_retrain_comp():
     norm(mem_citeseer, mem_citeseer[0])
     norm(mem_pubmed, mem_pubmed[0])
 
-    # x1 = range(len(cora))
-    # x2 = range(len(citeseer))
-    # x3 = range(len(pubmed))
+    ## delta
+    accumulate(comp_cora_delta)
+    accumulate(comp_citeseer_delta)
+    accumulate(comp_pubmed_delta)
+    accumulate(mem_cora_delta)
+    accumulate(mem_citeseer_delta)
+    accumulate(mem_pubmed_delta)
+
+    # normalize
+    norm(comp_cora_delta, comp_cora_delta[0])
+    norm(comp_citeseer_delta, comp_citeseer_delta[0])
+    norm(comp_pubmed_delta, comp_pubmed_delta[0])
+    norm(mem_cora_delta, mem_cora_delta[0])
+    norm(mem_citeseer_delta, mem_citeseer_delta[0])
+    norm(mem_pubmed_delta, mem_pubmed_delta[0])
 
     import seaborn as sns
     import matplotlib.ticker as mtick
@@ -102,15 +165,23 @@ def plt_retrain_comp():
         'Orig', 'Time 1', 'Time 2', 'Time 3', 'Time 4', 'Time 5', 'Time 6',
         'Time 7', 'Time 8'
     ]
-    items = ['Cora', 'Citeseer', 'Pubmed']
+    items = [
+        'Cora', 'Citeseer', 'Pubmed', 'Cora_delta', 'Citeseer_delta',
+        'Pubmed_delta'
+    ]
     """
     Computation
     """
-    data = [comp_cora, comp_citeseer, comp_pubmed]
+    # data = [comp_cora, comp_citeseer, comp_pubmed]
+    data = [
+        comp_cora, comp_citeseer, comp_pubmed, comp_cora_delta,
+        comp_citeseer_delta, comp_pubmed_delta
+    ]
+
     # Group size in each label
     group_size = len(items)
 
-    total_width = 1.5
+    total_width = 1.2
     label_num = len(labels)
     width = total_width / label_num
     # Bar offset
@@ -121,25 +192,42 @@ def plt_retrain_comp():
     x = np.arange(label_num)  # the label locations
     x = x - ((group_size - 1) / 2) * width
 
-    color = sns.cubehelix_palette(start=2.8,
-                                  rot=-.1,
-                                  n_colors=len(items),
-                                  dark=0,
-                                  light=0.65)
+    set_size = 2
+    color_1 = sns.cubehelix_palette(start=2.8,
+                                    rot=-.1,
+                                    n_colors=len(items) / set_size,
+                                    dark=0.2,
+                                    light=0.65)
+
+    color_2 = sns.cubehelix_palette(start=1,
+                                    rot=-.1,
+                                    n_colors=len(items) / set_size,
+                                    dark=0.2,
+                                    light=0.65)
 
     fig, ax1 = plt.subplots(figsize=(11, 3), dpi=600)
     # ax1 = plt.subplot(1, 3, 1)
 
     rects = [0 for n in range(len(items))]
     for i in range(len(items)):
-        rects[i] = ax1.bar(x + i * (width + space) + offset,
-                           data[i],
-                           width=width,
-                           alpha=.99,
-                           edgecolor='w',
-                           label=items[i],
-                           zorder=2,
-                           color=color[i])
+        if i < len(items) / set_size:
+            rects[i] = ax1.bar(x + i * (width + space) + offset,
+                               data[i],
+                               width=width,
+                               alpha=.99,
+                               edgecolor='w',
+                               label=items[i],
+                               zorder=2,
+                               color=color_1[i])
+        else:
+            rects[i] = ax1.bar(x + i * (width + space) + offset,
+                               data[i],
+                               width=width,
+                               alpha=.99,
+                               edgecolor='w',
+                               label=items[i],
+                               zorder=2,
+                               color=color_2[i - 3])
 
     plt.grid(axis='y', zorder=1)
 
@@ -173,12 +261,12 @@ def plt_retrain_comp():
     # plt.xticks(size = 10)
 
     # ax1.set_ylim([0, 100])
-    ax1.set_yscale('log')
+    # ax1.set_yscale('log')
 
     # my_y_ticks = np.arange(0, 120, 20)
     # plt.yticks(my_y_ticks)
 
-    plt.legend(labelspacing=0, handlelength=1, fontsize=14, loc="best")
+    plt.legend(ncol=2, labelspacing=0, handlelength=1, fontsize=14, loc="best")
     # ax1.get_legend().remove()
 
     #plt.axhline(y=1, color='k', linestyle='-', linewidth=0.8)
@@ -199,11 +287,16 @@ def plt_retrain_comp():
     Mem access
     """
 
-    data = [mem_cora, mem_citeseer, mem_pubmed]
+    # data = [mem_cora, mem_citeseer, mem_pubmed]
+    data = [
+        mem_cora, mem_citeseer, mem_pubmed, mem_cora_delta, mem_citeseer_delta,
+        mem_pubmed_delta
+    ]
+
     # Group size in each label
     group_size = len(items)
 
-    total_width = 1.5
+    total_width = 1.2
     label_num = len(labels)
     width = total_width / label_num
     # Bar offset
@@ -214,25 +307,41 @@ def plt_retrain_comp():
     x = np.arange(label_num)  # the label locations
     x = x - ((group_size - 1) / 2) * width
 
-    color = sns.cubehelix_palette(start=0,
-                                  rot=-.4,
-                                  n_colors=len(items),
-                                  dark=0,
-                                  light=0.65)
+    color_1 = sns.cubehelix_palette(start=0,
+                                    rot=-.4,
+                                    n_colors=len(items) / set_size,
+                                    dark=0.2,
+                                    light=0.65)
+
+    color_2 = sns.cubehelix_palette(start=1,
+                                    rot=-.1,
+                                    n_colors=len(items) / set_size,
+                                    dark=0.2,
+                                    light=0.65)
 
     fig, ax1 = plt.subplots(figsize=(11, 3), dpi=600)
     # ax1 = plt.subplot(1, 3, 1)
 
     rects = [0 for n in range(len(items))]
     for i in range(len(items)):
-        rects[i] = ax1.bar(x + i * (width + space) + offset,
-                           data[i],
-                           width=width,
-                           alpha=.99,
-                           edgecolor='w',
-                           label=items[i],
-                           zorder=2,
-                           color=color[i])
+        if i < len(items) / set_size:
+            rects[i] = ax1.bar(x + i * (width + space) + offset,
+                               data[i],
+                               width=width,
+                               alpha=.99,
+                               edgecolor='w',
+                               label=items[i],
+                               zorder=2,
+                               color=color_1[i])
+        else:
+            rects[i] = ax1.bar(x + i * (width + space) + offset,
+                               data[i],
+                               width=width,
+                               alpha=.99,
+                               edgecolor='w',
+                               label=items[i],
+                               zorder=2,
+                               color=color_2[i - 3])
 
     plt.grid(axis='y', zorder=1)
 
@@ -266,12 +375,12 @@ def plt_retrain_comp():
     # plt.xticks(size = 10)
 
     # ax1.set_ylim([0, 100])
-    ax1.set_yscale('log')
+    # ax1.set_yscale('log')
 
     # my_y_ticks = np.arange(0, 120, 20)
     # plt.yticks(my_y_ticks)
 
-    plt.legend(labelspacing=0, handlelength=1, fontsize=14, loc="best")
+    plt.legend(ncol=2, labelspacing=0, handlelength=1, fontsize=14, loc="best")
     # ax1.get_legend().remove()
 
     #plt.axhline(y=1, color='k', linestyle='-', linewidth=0.8)

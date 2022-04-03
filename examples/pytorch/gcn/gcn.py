@@ -12,7 +12,8 @@ from graphconv_block import GraphConv_block
 
 
 class GCN(nn.Module):
-    def __init__(self, g, in_feats, n_hidden, n_classes, n_layers, activation, dropout):
+    def __init__(self, g, in_feats, n_hidden, n_classes, n_layers, activation,
+                 dropout):
         super(GCN, self).__init__()
         self.g = g
         self.layers = nn.ModuleList()
@@ -20,7 +21,8 @@ class GCN(nn.Module):
         self.layers.append(GraphConv(in_feats, n_hidden, activation=activation))
         # hidden layers
         for i in range(n_layers - 1):
-            self.layers.append(GraphConv(n_hidden, n_hidden, activation=activation))
+            self.layers.append(
+                GraphConv(n_hidden, n_hidden, activation=activation))
         # output layer
         self.layers.append(GraphConv(n_hidden, n_classes))
         self.dropout = nn.Dropout(p=dropout)
@@ -32,9 +34,6 @@ class GCN(nn.Module):
             if i != 0:
                 h = self.dropout(h)
             h = layer(self.g, h)
-
-            # h1 = torch.matmul(h1, layer.weight)
-            # print(h.equal(h1))
         return h
 
 
@@ -44,15 +43,18 @@ class GCN_evolve(nn.Module):
             g: subgraph of original graph
             in_feats: feature matrix of current subgraph
     """
-    def __init__(self, g, in_feats, n_hidden, n_classes, n_layers, activation, dropout):
+    def __init__(self, g, in_feats, n_hidden, n_classes, n_layers, activation,
+                 dropout):
         super(GCN, self).__init__()
         self.g = g
         self.layers = nn.ModuleList()
         # input layer
-        self.layers.append(GraphConv_block(in_feats, n_hidden, activation=activation))
+        self.layers.append(
+            GraphConv_block(in_feats, n_hidden, activation=activation))
         # hidden layers
         for i in range(n_layers - 1):
-            self.layers.append(GraphConv_block(n_hidden, n_hidden, activation=activation))
+            self.layers.append(
+                GraphConv_block(n_hidden, n_hidden, activation=activation))
         # output layer
         self.layers.append(GraphConv_block(n_hidden, n_classes))
         self.dropout = nn.Dropout(p=dropout)

@@ -8,6 +8,7 @@ from dgl.data import CoraGraphDataset, CiteseerGraphDataset, PubmedGraphDataset
 
 import util
 import copy
+import plt_graph
 
 from gcn import GCN
 #from gcn_mp import GCN
@@ -130,15 +131,6 @@ def main(args):
     # val_mask = g.ndata['val_mask']
     # test_mask = g.ndata['test_mask']
 
-    # print('\n>>> Mask')
-    # print(train_mask, val_mask, test_mask)
-    # cnt = 0
-    # for i in test_mask:
-    #     if i == True:
-    #         cnt+=1
-
-    # print(cnt)
-
     in_feats = features.shape[1]
     n_classes = data.num_labels
 
@@ -161,6 +153,11 @@ def main(args):
                 F.relu, args.dropout)
     model_retrain = GCN(g_evo, in_feats, args.n_hidden, n_classes,
                         args.n_layers, F.relu, args.dropout)
+    model_delta = GCN(g_evo, in_feats, args.n_hidden, n_classes, args.n_layers,
+                      F.relu, args.dropout)
+
+    # for param in model.parameters():
+    #     print(param)
 
     if cuda:
         model.cuda()
@@ -168,8 +165,6 @@ def main(args):
         model.cpu()
 
     loss_fcn = torch.nn.CrossEntropyLoss()
-
-    # use optimizer
     optimizer = torch.optim.Adam(model.parameters(),
                                  lr=args.lr,
                                  weight_decay=args.weight_decay)
@@ -178,6 +173,11 @@ def main(args):
     optimizer_retrain = torch.optim.Adam(model_retrain.parameters(),
                                          lr=args.lr,
                                          weight_decay=args.weight_decay)
+
+    loss_fcn_delta = torch.nn.CrossEntropyLoss()
+    optimizer_delta = torch.optim.Adam(model_delta.parameters(),
+                                       lr=args.lr,
+                                       weight_decay=args.weight_decay)
 
     # for name, param in model.named_parameters(): # View optimizable parameter
     #     if param.requires_grad:
@@ -212,10 +212,6 @@ def main(args):
 
     # Evolve graph
     print(">>> Accuracy on evolove graph: ")
-    # model_evolve = copy.deepcopy(model)
-    # model_evolve.cpu()
-    # loss_fcn_evolve = copy.deepcopy(loss_fcn)
-    # optimizer_evolve = copy.deepcopy(optimizer)
 
     # Add new edges
     n_nodes = model.g.number_of_nodes()
@@ -235,8 +231,11 @@ def main(args):
             add_nodes = node_q
             node_q.clear()
 
+        # No retraining
         util.graph_evolve(add_nodes, g_csr, g, node_map_orig2evo,
                           node_map_evo2orig, model.g)
+
+        print('>> Edge_number:', model.g.number_of_edges())
 
         features = model.g.ndata['feat']
         labels = model.g.ndata['label']
@@ -247,13 +246,15 @@ def main(args):
         acc = evaluate(model, features, labels, test_mask)
         print("Test accuracy of non-retrain @ {:d} nodes {:.2%}".format(
             model.g.number_of_nodes(), acc))
-        # accuracy[i][0] = add_node_num
         acc_non_retrain = acc * 100
 
-        # Retrain
-        # train(model_evolve, features, model_evolve.g.number_of_edges(),
-        #       train_mask, val_mask, labels, loss_fcn_evolve, optimizer_evolve)
+        # # Plot graph structure
+        # g_evo_csr = model.g.adj_sparse('csr')
+        # indptr = g_evo_csr[0]
+        # indices = g_evo_csr[1]
+        # plt_graph.graph_visualize(indptr, indices, None)
 
+        # Full graph retraining
         util.graph_evolve(add_nodes, g_csr, g, node_map_orig2evo,
                           node_map_evo2orig, model_retrain.g)
 
@@ -263,33 +264,59 @@ def main(args):
         val_mask = model_retrain.g.ndata['val_mask']
         test_mask = model_retrain.g.ndata['test_mask']
 
-        train(model_retrain, features, model_retrain.g.number_of_edges(),
-              train_mask, val_mask, labels, loss_fcn_retrain, optimizer_retrain)
+        if i <= 7:
+            train(model_retrain, features, model_retrain.g.number_of_edges(),
+                  train_mask, val_mask, labels, loss_fcn_retrain,
+                  optimizer_retrain)
 
-        # Evaluate retrain acc
         acc = evaluate(model_retrain, features, labels, test_mask)
         print("Test accuracy of retrain @ {:d} nodes {:.2%}".format(
             model_retrain.g.number_of_nodes(), acc))
         acc_retrain = acc * 100
 
+        # Delta retraining
+        # Execute full retraining at the first time
+        if i <= 2:
+            util.graph_evolve(add_nodes, g_csr, g, node_map_orig2evo,
+                              node_map_evo2orig, model_delta.g)
+        else:
+            util.graph_evolve_delta(add_nodes, g_csr, g, node_map_orig2evo,
+                                    node_map_evo2orig, model_delta.g)
+
+        features = model_delta.g.ndata['feat']
+        labels = model_delta.g.ndata['label']
+        train_mask = model_delta.g.ndata['train_mask']
+        val_mask = model_delta.g.ndata['val_mask']
+        test_mask = model_delta.g.ndata['test_mask']
+
+        if i <= 7:
+            train(model_delta, features, model_delta.g.number_of_edges(),
+                  train_mask, val_mask, labels, loss_fcn_delta, optimizer_delta)
+
+        acc = evaluate(model_delta, features, labels, test_mask)
+        print("Test accuracy of delta @ {:d} nodes {:.2%}".format(
+            model_delta.g.number_of_nodes(), acc))
+        acc_retrain_delta = acc * 100
+
         accuracy.append([
             model.g.number_of_nodes(),
-            model.g.number_of_edges(), acc_non_retrain, acc_retrain
+            model.g.number_of_edges(), acc_non_retrain, acc_retrain,
+            acc_retrain_delta
         ])
         i += 1
 
     if args.dataset == 'cora':
         np.savetxt('./results/cora_add_edge.txt',
                    accuracy,
-                   fmt='%d, %d, %.2f, %.2f')
+                   fmt='%d, %d, %.2f, %.2f, %.2f')
     elif args.dataset == 'citeseer':
         np.savetxt('./results/citeseer_add_edge.txt',
                    accuracy,
-                   fmt='%d, %d, %.2f, %.2f')
+                   fmt='%d, %d, %.2f, %.2f, %.2f')
     elif args.dataset == 'pubmed':
         np.savetxt('./results/pubmed_add_edge.txt',
                    accuracy,
-                   fmt='%d, %d, %.2f, %.2f')
+                   fmt='%d, %d, %.2f, %.2f, %.2f')
     else:
         raise ValueError('Unknown dataset: {}'.format(args.dataset))
 
@@ -331,8 +358,8 @@ if __name__ == '__main__':
                         help="graph self-loop (default=False)")
     parser.set_defaults(self_loop=False)
     args = parser.parse_args()
-    print(args)
 
-    args.dataset = 'cora'
+    args.dataset = 'pubmed'
+    print(args)
 
     main(args)
