@@ -332,3 +332,37 @@ def update_g_attribute_delta(new_nodes, g_evo, g_orig, node_map_evo2orig,
     idx_test.sort()
     test_mask = generate_mask_tensor(_sample_mask(idx_test, labels.shape[0]))
     g_evo.ndata['test_mask'] = test_mask
+
+
+def count_neighbor(nodes, g_csr, node_map_orig2evo, layer_num):
+    """ 
+    Count neighbor edges and vertices of specific node set
+    """
+    edge_set = set()
+    node_set = set(nodes)
+    indptr = g_csr[0].numpy().tolist()
+    indices = g_csr[1].numpy().tolist()
+    node_queue = nodes
+    for layer_id in range(layer_num):
+        node_num = len(node_queue)
+        for i in range(node_num):
+            node_id = node_queue[i]
+            begin = indptr[node_id]
+            end = indptr[node_id + 1]
+            for edge_id in range(begin, end):
+                node = indices[edge_id]
+                if node in node_map_orig2evo:
+                    node_queue.append(node)
+                    node_set.add(node)
+                    edge_set.add(edge_id)
+
+            # s_tmp = set(indices[begin:end])
+            # node_set.update(s_tmp)
+
+        # Pop visited node
+        node_queue = node_queue[node_num:]
+
+    node_sum = len(node_set)
+    edge_sum = len(edge_set)
+
+    return node_sum, edge_sum
