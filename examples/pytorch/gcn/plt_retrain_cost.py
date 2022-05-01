@@ -674,7 +674,7 @@ def plt_delta_retrain_comp():
             height = round(rect.get_height(), 1)
             ax1.annotate(
                 '{}'.format(height),
-                fontsize=10,
+                fontsize=8,
                 xy=(rect.get_x() + rect.get_width() / 2, height),
                 xytext=(0, 3),  # 3 points vertical offset
                 textcoords="offset points",
@@ -802,7 +802,7 @@ def plt_delta_retrain_comp():
             height = round(rect.get_height(), 1)
             ax1.annotate(
                 '{}'.format(height),
-                fontsize=10,
+                fontsize=8,
                 xy=(rect.get_x() + rect.get_width() / 2, height),
                 xytext=(0, 3),  # 3 points vertical offset
                 textcoords="offset points",

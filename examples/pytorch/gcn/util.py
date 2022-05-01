@@ -186,7 +186,7 @@ def graph_evolve(new_nodes,
 
     # print('\n>> g_evo', g_evo)
 
-    update_g_attribute(g_evo, g_orig, node_map_evo2orig)
+    update_g_attr(g_evo, g_orig, node_map_evo2orig)
     return g_evo
 
 
@@ -210,8 +210,33 @@ def graph_evolve_delta(new_nodes,
 
     # print('\n>> g_evo', g_evo)
 
-    update_g_attribute_delta(new_nodes, g_evo, g_orig, node_map_evo2orig,
-                             node_map_orig2evo)
+    update_g_attr_delta(new_nodes, g_evo, g_orig, node_map_evo2orig,
+                        node_map_orig2evo)
+    return g_evo
+
+
+def graph_evolve_delta_all_ngh(new_nodes,
+                               g_orig_csr,
+                               g_orig,
+                               node_map_orig2evo,
+                               node_map_evo2orig,
+                               g_evo=None):
+    """
+    Construct evolve graph from an orginal static graph
+    """
+
+    if g_evo is None:
+        # Construct a new graph
+        g_evo = update_g_struct(new_nodes, g_orig_csr, node_map_orig2evo,
+                                node_map_evo2orig)
+    else:
+        g_evo = update_g_struct(new_nodes, g_orig_csr, node_map_orig2evo,
+                                node_map_evo2orig, g_evo)
+
+    # print('\n>> g_evo', g_evo)
+
+    update_g_attr_all_ngh(new_nodes, g_evo, g_orig, g_orig_csr,
+                          node_map_evo2orig, node_map_orig2evo)
     return g_evo
 
 
@@ -228,9 +253,9 @@ def node_reindex(node_map, node_id_old):
     return node_id_new
 
 
-def update_g_attribute(g_evo, g_orig, node_map_evo2orig):
+def update_g_attr(g_evo, g_orig, node_map_evo2orig):
     """
-    Update feature and train/eval/test mask
+    Update graph attribution (feature and train/eval/test mask)
     """
     # Get orig_node_index of evo_node_index
     nodes_orig_index = []
@@ -254,6 +279,7 @@ def update_g_attribute(g_evo, g_orig, node_map_evo2orig):
     loc_list = range(labels.size()[0])
     idx_train = random.sample(loc_list,
                               math.floor(labels.size()[0] * train_ratio))
+    print('Train_set size: ', len(idx_train))
     idx_train.sort()
     train_mask = generate_mask_tensor(_sample_mask(idx_train, labels.shape[0]))
     g_evo.ndata['train_mask'] = train_mask
@@ -282,10 +308,11 @@ def update_g_attribute(g_evo, g_orig, node_map_evo2orig):
     g_evo.ndata['test_mask'] = test_mask
 
 
-def update_g_attribute_delta(new_nodes, g_evo, g_orig, node_map_evo2orig,
-                             node_map_orig2evo):
+def update_g_attr_delta(new_nodes, g_evo, g_orig, node_map_evo2orig,
+                        node_map_orig2evo):
     """
-    Update feature and eval/test mask, but set train_mask with the new inserted vertices for delta updating
+    Update feature and eval/test mask
+    Set train_mask only with the new inserted vertices
     """
     # Get orig_node_index of evo_node_index
     nodes_orig_index = []
@@ -298,7 +325,7 @@ def update_g_attribute_delta(new_nodes, g_evo, g_orig, node_map_evo2orig,
     labels = g_orig.ndata['label'][nodes_orig_index]
     g_evo.ndata['label'] = labels
 
-    # train_ratio = 0.06
+    train_ratio = 0.06
     val_ratio = 0.15
     test_ratio = 0.3
 
@@ -309,12 +336,93 @@ def update_g_attribute_delta(new_nodes, g_evo, g_orig, node_map_evo2orig,
     # train_mask = generate_mask_tensor(_sample_mask(idx_train, labels.shape[0]))
     # g_evo.ndata['train_mask'] = train_mask
     """
-    Training mask are set to new inserted vertices and its neighbor vi 
+    Training mask are set to new inserted vertices 
     """
     nodes_index_evo = []
     for node in new_nodes:
         nodes_index_evo.append(node_map_orig2evo[node])
+        
+    # Restrict neighbor size less than training ratio
+    ngh_limit = math.floor(labels.size()[0] * train_ratio)
+    if len(nodes_index_evo) > ngh_limit:
+        nodes_index_evo = random.sample(nodes_index_evo, ngh_limit)
 
+    print('Train_set size: ', len(nodes_index_evo))
+    nodes_index_evo.sort()
+    idx_train = nodes_index_evo
+    train_mask = generate_mask_tensor(_sample_mask(idx_train, labels.shape[0]))
+    g_evo.ndata['train_mask'] = train_mask
+
+    loc_list = range(labels.size()[0])
+    idx_val = random.sample(loc_list, math.floor(labels.size()[0] * val_ratio))
+    idx_val.sort()
+    val_mask = generate_mask_tensor(_sample_mask(idx_val, labels.shape[0]))
+    g_evo.ndata['val_mask'] = val_mask
+
+    loc_list = range(labels.size()[0])
+    idx_test = random.sample(loc_list,
+                             math.floor(labels.size()[0] * test_ratio))
+    idx_test.sort()
+    test_mask = generate_mask_tensor(_sample_mask(idx_test, labels.shape[0]))
+    g_evo.ndata['test_mask'] = test_mask
+
+
+def update_g_attr_all_ngh(new_nodes, g_evo, g_orig, g_orig_csr,
+                          node_map_evo2orig, node_map_orig2evo):
+    """
+    Update feature and eval/test mask
+    Set train_mask with the new inserted vertices and all of its neighbors
+    """
+    # Get orig_node_index of evo_node_index
+    nodes_orig_index = []
+    for node_id in g_evo.nodes().tolist():
+        nodes_orig_index.append(node_map_evo2orig[node_id])
+
+    features = g_orig.ndata['feat'][nodes_orig_index, :]
+    g_evo.ndata['feat'] = features
+
+    labels = g_orig.ndata['label'][nodes_orig_index]
+    g_evo.ndata['label'] = labels
+
+    train_ratio = 0.06
+    val_ratio = 0.15
+    test_ratio = 0.3
+
+    # loc_list = range(labels.size()[0])
+    # idx_train = random.sample(loc_list,
+    #                           math.floor(labels.size()[0] * train_ratio))
+    # idx_train.sort()
+    # train_mask = generate_mask_tensor(_sample_mask(idx_train, labels.shape[0]))
+    # g_evo.ndata['train_mask'] = train_mask
+    """
+    Training mask are set to new inserted vertices 
+    """
+    nodes_index_evo = []
+    # ngh_queue = []
+    indptr = g_orig_csr[0].numpy().tolist()
+    indices = g_orig_csr[1].numpy().tolist()
+    for node_id in new_nodes:
+        nodes_index_evo.append(node_map_orig2evo[node_id])
+        # Add node neighbor
+        begin = indptr[node_id]
+        end = indptr[node_id + 1]
+        for v in indices[begin:end]:
+            if v in node_map_orig2evo:
+                nodes_index_evo.append(node_map_orig2evo[v])
+
+    # # Restrict neighbor size less than training ratio
+    # if len(ngh_queue) > labels.size()[0]:
+    #     ngh_queue = random.sample(ngh_queue,
+    #                               math.floor(labels.size()[0] * train_ratio))
+
+    # nodes_index_evo.extend(ngh_queue)
+    nodes_index_evo = list(set(nodes_index_evo))
+    # Restrict neighbor size less than training ratio
+    ngh_limit = math.floor(labels.size()[0] * train_ratio)
+    if len(nodes_index_evo) > ngh_limit:
+        nodes_index_evo = random.sample(nodes_index_evo, ngh_limit)
+
+    print('Train_set size: ', len(nodes_index_evo))
     nodes_index_evo.sort()
     idx_train = nodes_index_evo
     train_mask = generate_mask_tensor(_sample_mask(idx_train, labels.shape[0]))
