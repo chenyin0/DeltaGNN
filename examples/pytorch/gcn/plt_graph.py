@@ -41,3 +41,10 @@ def graph_visualize(indptr, indices, data):
 
     # igraph.plot(g, layout)
     # fig.show()
+    
+    
+def plot_degree_distribution(degree_list):
+    x = [i for i in range(len(degree_list))]
+    y = [len(degree_list[i])/3327 for i in range(len(degree_list))]
+    plt.bar(x, y)
+    plt.show()
