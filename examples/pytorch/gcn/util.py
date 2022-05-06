@@ -7,6 +7,7 @@ from dgl.data.utils import generate_mask_tensor
 from dgl.data.citation_graph import _sample_mask
 import math
 import random
+import numpy as np
 
 
 def gen_root_node_queue(g):
@@ -341,7 +342,7 @@ def update_g_attr_delta(new_nodes, g_evo, g_orig, node_map_evo2orig,
     nodes_index_evo = []
     for node in new_nodes:
         nodes_index_evo.append(node_map_orig2evo[node])
-        
+
     # Restrict neighbor size less than training ratio
     ngh_limit = math.floor(labels.size()[0] * train_ratio)
     if len(nodes_index_evo) > ngh_limit:
@@ -474,3 +475,12 @@ def count_neighbor(nodes, g_csr, node_map_orig2evo, layer_num):
     edge_sum = len(edge_set)
 
     return node_sum, edge_sum
+
+
+def save_graph_csr(g, dataset):
+    g_csr = g.adj_sparse('csr')
+    indptr = g_csr[0].numpy().tolist()
+    indices = g_csr[1].numpy().tolist()
+
+    np.savetxt('./dataset/csr/' + dataset + '_indptr.txt', indptr, fmt='%d')
+    np.savetxt('./dataset/csr/' + dataset + '_indices.txt', indices, fmt='%d')
