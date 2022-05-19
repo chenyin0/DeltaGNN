@@ -59,6 +59,17 @@ def bfs_traverse(g_csr, root_node_q):
     return sequence
 
 
+def get_ngh(g_csr, root_nodes):
+    indptr = g_csr[0]
+    indices = g_csr[1]
+    ngh = []
+    for root_node in root_nodes:
+        begin = indptr[root_node]
+        end = indptr[root_node + 1]
+        ngh.extend(indices[begin:end].tolist())
+    return ngh
+
+
 def update_g_struct(new_nodes,
                     g_orig_csr,
                     node_map_orig2evo,
@@ -187,7 +198,8 @@ def graph_evolve(new_nodes,
 
     # print('\n>> g_evo', g_evo)
 
-    update_g_attr(g_evo, g_orig, node_map_evo2orig)
+    new_nodes_evo = nodes_reindex(node_map_orig2evo, new_nodes)
+    update_g_attr(g_evo, g_orig, node_map_evo2orig, new_nodes_evo)
     return g_evo
 
 
@@ -211,8 +223,9 @@ def graph_evolve_delta(new_nodes,
 
     # print('\n>> g_evo', g_evo)
 
+    new_nodes_evo = nodes_reindex(node_map_orig2evo, new_nodes)
     update_g_attr_delta(new_nodes, g_evo, g_orig, node_map_evo2orig,
-                        node_map_orig2evo)
+                        node_map_orig2evo, new_nodes_evo)
     return g_evo
 
 
@@ -236,8 +249,9 @@ def graph_evolve_delta_all_ngh(new_nodes,
 
     # print('\n>> g_evo', g_evo)
 
+    new_nodes_evo = nodes_reindex(node_map_orig2evo, new_nodes)
     update_g_attr_all_ngh(new_nodes, g_evo, g_orig, g_orig_csr,
-                          node_map_evo2orig, node_map_orig2evo)
+                          node_map_evo2orig, node_map_orig2evo, new_nodes_evo)
     return g_evo
 
 
@@ -254,7 +268,14 @@ def node_reindex(node_map, node_id_old):
     return node_id_new
 
 
-def update_g_attr(g_evo, g_orig, node_map_evo2orig):
+def nodes_reindex(node_map, nodes_id_old):
+    nodes_id_new = []
+    for node_id in nodes_id_old:
+        nodes_id_new.append(node_reindex(node_map, node_id))
+    return nodes_id_new
+
+
+def update_g_attr(g_evo, g_orig, node_map_evo2orig, new_nodes_evo):
     """
     Update graph attribution (feature and train/eval/test mask)
     """
@@ -304,13 +325,19 @@ def update_g_attr(g_evo, g_orig, node_map_evo2orig):
     loc_list = range(labels.size()[0])
     idx_test = random.sample(loc_list,
                              math.floor(labels.size()[0] * test_ratio))
+
+    # Add new nodes and its neighbors in test set
+    idx_test.extend(new_nodes_evo)
+    idx_test.extend(get_ngh(g_evo.adj_sparse('csr'), new_nodes_evo))
+    idx_test = list(set(idx_test))
+
     idx_test.sort()
     test_mask = generate_mask_tensor(_sample_mask(idx_test, labels.shape[0]))
     g_evo.ndata['test_mask'] = test_mask
 
 
 def update_g_attr_delta(new_nodes, g_evo, g_orig, node_map_evo2orig,
-                        node_map_orig2evo):
+                        node_map_orig2evo, new_nodes_evo):
     """
     Update feature and eval/test mask
     Set train_mask only with the new inserted vertices
@@ -363,13 +390,19 @@ def update_g_attr_delta(new_nodes, g_evo, g_orig, node_map_evo2orig,
     loc_list = range(labels.size()[0])
     idx_test = random.sample(loc_list,
                              math.floor(labels.size()[0] * test_ratio))
+
+    # Add new nodes and its neighbors in test set
+    idx_test.extend(new_nodes_evo)
+    idx_test.extend(get_ngh(g_evo.adj_sparse('csr'), new_nodes_evo))
+    idx_test = list(set(idx_test))
+
     idx_test.sort()
     test_mask = generate_mask_tensor(_sample_mask(idx_test, labels.shape[0]))
     g_evo.ndata['test_mask'] = test_mask
 
 
 def update_g_attr_all_ngh(new_nodes, g_evo, g_orig, g_orig_csr,
-                          node_map_evo2orig, node_map_orig2evo):
+                          node_map_evo2orig, node_map_orig2evo, new_nodes_evo):
     """
     Update feature and eval/test mask
     Set train_mask with the new inserted vertices and all of its neighbors
@@ -438,6 +471,12 @@ def update_g_attr_all_ngh(new_nodes, g_evo, g_orig, g_orig_csr,
     loc_list = range(labels.size()[0])
     idx_test = random.sample(loc_list,
                              math.floor(labels.size()[0] * test_ratio))
+
+    # Add new nodes and its neighbors in test set
+    idx_test.extend(new_nodes_evo)
+    idx_test.extend(get_ngh(g_evo.adj_sparse('csr'), new_nodes_evo))
+    idx_test = list(set(idx_test))
+
     idx_test.sort()
     test_mask = generate_mask_tensor(_sample_mask(idx_test, labels.shape[0]))
     g_evo.ndata['test_mask'] = test_mask

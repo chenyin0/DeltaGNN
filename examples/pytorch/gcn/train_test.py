@@ -9,6 +9,7 @@ from dgl.data import CoraGraphDataset, CiteseerGraphDataset, PubmedGraphDataset
 import util
 import copy
 import plt_graph
+import time
 
 from gcn import GCN
 #from gcn_mp import GCN
@@ -56,6 +57,21 @@ def evaluate(model, features, labels, mask):
     with torch.no_grad():
         logits = model(features)
         logits = logits[mask]
+        labels = labels[mask]
+        _, indices = torch.max(logits, dim=1)
+        correct = torch.sum(indices == labels)
+        return correct.item() * 1.0 / len(labels)
+
+
+def evaluate_delta(model, features, labels, mask, deg_threshold):
+    model.eval()
+    with torch.no_grad():
+        logits = model(features)
+        logits = logits[mask]
+
+        logits = 
+        model.logits = logits  # Record updated logits
+
         labels = labels[mask]
         _, indices = torch.max(logits, dim=1)
         correct = torch.sum(indices == labels)
@@ -291,14 +307,16 @@ def main(args):
         train_mask = model_retrain.g.ndata['train_mask']
         val_mask = model_retrain.g.ndata['val_mask']
         test_mask = model_retrain.g.ndata['test_mask']
-
         # if len(node_q) > 0:
         #     train(model_retrain, features, model_retrain.g.number_of_edges(),
         #           train_mask, val_mask, labels, loss_fcn_retrain,
         #           optimizer_retrain)
 
+        time_start = time.perf_counter()
         train(model_retrain, features, model_retrain.g.number_of_edges(),
               train_mask, val_mask, labels, loss_fcn_retrain, optimizer_retrain)
+        time_full_retrain = time.perf_counter() - time_start
+        print('>> Epoch training time with full nodes: ', time_full_retrain)
 
         acc = evaluate(model_retrain, features, labels, test_mask)
         print("Test accuracy of retrain @ {:d} nodes {:.2%}".format(
@@ -311,7 +329,7 @@ def main(args):
         """
         print('\n>> Delta retraining')
         # Execute full retraining at the beginning
-        if i <= 3:
+        if i <= 0:
             util.graph_evolve(add_nodes, g_csr, g, node_map_orig2evo,
                               node_map_evo2orig, model_delta.g)
         else:
@@ -325,8 +343,11 @@ def main(args):
         test_mask = model_delta.g.ndata['test_mask']
 
         if len(node_q) > 0:
+            time_start = time.perf_counter()
             train(model_delta, features, model_delta.g.number_of_edges(),
                   train_mask, val_mask, labels, loss_fcn_delta, optimizer_delta)
+            time_delta_retrain = time.perf_counter() - time_start
+            print('>> Epoch training time in delta: ', time_delta_retrain)
 
         acc = evaluate(model_delta, features, labels, test_mask)
         print("Test accuracy of delta @ {:d} nodes {:.2%}".format(
@@ -339,15 +360,7 @@ def main(args):
         """
         print('\n>> Delta all neighbor retraining')
         # Execute full retraining at the beginning
-        # if i <= 2:
-        #     util.graph_evolve(add_nodes, g_csr, g, node_map_orig2evo,
-        #                       node_map_evo2orig, model_delta.g)
-        # else:
-        #     util.graph_evolve_delta(add_nodes, g_csr, g, node_map_orig2evo,
-        #                             node_map_evo2orig, model_delta.g)
-
-        # Execute full retraining at the beginning
-        if i <= 3:
+        if i <= 0:
             util.graph_evolve(add_nodes, g_csr, g, node_map_orig2evo,
                               node_map_evo2orig, model_delta_all_ngh.g)
         else:
@@ -363,9 +376,13 @@ def main(args):
         test_mask = model_delta_all_ngh.g.ndata['test_mask']
 
         if len(node_q) > 0:
+            time_start = time.perf_counter()
             train(model_delta_all_ngh, features,
                   model_delta_all_ngh.g.number_of_edges(), train_mask, val_mask,
                   labels, loss_fcn_delta_all_ngh, optimizer_delta_all_ngh)
+            time_delta_all_ngh_retrain = time.perf_counter() - time_start
+            print('>> Epoch training time in delta with all ngh: ',
+                  time_delta_all_ngh_retrain)
 
         acc = evaluate(model_delta_all_ngh, features, labels, test_mask)
         print("Test accuracy of delta_all_ngh @ {:d} nodes {:.2%}".format(
@@ -441,7 +458,7 @@ if __name__ == '__main__':
     parser.set_defaults(self_loop=False)
     args = parser.parse_args()
 
-    args.dataset = 'pubmed'
+    args.dataset = 'cora'
     print(args)
 
     main(args)

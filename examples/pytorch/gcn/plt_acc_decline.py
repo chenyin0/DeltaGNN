@@ -22,6 +22,7 @@ def plt_edge_epoch():
     plt.plot(x1, cora[:, -3], 'o-', color='r', label="Full retrain")
     plt.plot(x1, cora[:, -4], 'o-', color='grey', label="W/O retrain")
     # plt.legend(prop={'size': 10})
+    ax1.set_ylim([0, 100])
     plt.ylabel('Accuracy (%)', fontsize=16)
     plt.title('Cora', fontsize=16)
 
@@ -31,6 +32,7 @@ def plt_edge_epoch():
     plt.plot(x2, citeseer[:, -3], 'o-', color='r', label="Full retrain")
     plt.plot(x2, citeseer[:, -4], 'o-', color='grey', label="W/O retrain")
     # plt.legend(prop={'size': 10})
+    ax2.set_ylim([0, 100])
     # plt.ylabel('Accuracy (%)', fontsize=16)
     plt.title('Citeseer', fontsize=16)
 
@@ -40,6 +42,7 @@ def plt_edge_epoch():
     plt.plot(x3, pubmed[:, -3], 'o-', color='r', label="Full retrain")
     plt.plot(x3, pubmed[:, -4], 'o-', color='grey', label="W/O retrain")
     plt.legend(prop={'size': 12})
+    ax3.set_ylim([0, 100])
     # plt.ylabel('Accuracy (%)', fontsize=16)
     plt.title('Pubmed', fontsize=16)
 
