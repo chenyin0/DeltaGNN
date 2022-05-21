@@ -59,7 +59,36 @@ def bfs_traverse(g_csr, root_node_q):
     return sequence
 
 
+# def get_ngh(g_csr, root_nodes, deg_th=-1):
+#     '''
+#     deg_th: node degree threshold, disable value = -1
+#     '''
+#     indptr = g_csr[0]
+#     indices = g_csr[1]
+#     ngh = []
+#     ngh_low_deg = []
+#     ngh_high_deg = []
+#     if deg_th == -1:
+#         for root_node in root_nodes:
+#             begin = indptr[root_node]
+#             end = indptr[root_node + 1]
+#             ngh.extend(indices[begin:end].tolist())
+#         return ngh
+#     else:
+#         for root_node in root_nodes:
+#             begin = indptr[root_node]
+#             end = indptr[root_node + 1]
+#             for ngh_node in indices[begin:end].tolist():
+#                 ngh_node_deg = indptr[ngh_node + 1] - indptr[ngh_node]
+#                 if ngh_node_deg >= deg_th:
+#                     ngh.append(ngh_node)
+#         return ngh_low_deg, ngh_high_deg
+
+
 def get_ngh(g_csr, root_nodes):
+    '''
+    deg_th: node degree threshold, disable value = -1
+    '''
     indptr = g_csr[0]
     indices = g_csr[1]
     ngh = []
@@ -67,7 +96,38 @@ def get_ngh(g_csr, root_nodes):
         begin = indptr[root_node]
         end = indptr[root_node + 1]
         ngh.extend(indices[begin:end].tolist())
+
     return ngh
+
+
+def get_ngh_with_deg_th(g_csr, root_nodes, deg_th):
+    '''
+    deg_th: node degree threshold
+    '''
+    indptr = g_csr[0]
+    indices = g_csr[1]
+    # key = 'the ngh node', value = 'all neighbors of this ngh node'
+    ngh_low_deg = dict()
+    # key = 'the ngh node', value = 'the ngh node's neighbors which are inserted nodes'
+    ngh_high_deg = dict()
+    if deg_th < 0:
+        raise ValueError("Degree threshold should be larger than 0")
+    else:
+        for root_node in root_nodes:
+            begin = indptr[root_node]
+            end = indptr[root_node + 1]
+            for ngh_node in indices[begin:end].tolist():
+                ngh_begin = indptr[ngh_node]
+                ngh_end = indptr[ngh_node + 1]
+                ngh_node_deg = ngh_end - ngh_begin
+                if ngh_node_deg >= deg_th:
+                    # Add all neighbors of the node with high degree
+                    ngh_high_deg.setdefault(ngh_node, []).extend(
+                        indices[ngh_begin:ngh_end])
+                else:
+                    ngh_low_deg.setdefault(ngh_node, []).append(root_node)
+
+    return ngh_high_deg, ngh_low_deg
 
 
 def update_g_struct(new_nodes,
@@ -76,16 +136,19 @@ def update_g_struct(new_nodes,
                     node_map_evo2orig,
                     g_evo=None):
 
-    indptr = g_orig_csr[0]
-    indices = g_orig_csr[1]
+    indptr = g_orig_csr[0].numpy().tolist()
+    indices = g_orig_csr[1].numpy().tolist()
 
     edge_src_nodes = list()
     edge_dst_nodes = list()
     for node in new_nodes:
         e_src_nodes = indices[indptr[node]:indptr[node + 1]]
-        e_dst_nodes = th.linspace(node, node, len(e_src_nodes))
-        edge_dst_nodes.extend(e_src_nodes.numpy().tolist())
-        edge_src_nodes.extend(e_dst_nodes.numpy().tolist())
+        # e_dst_nodes = th.linspace(node, node, len(e_src_nodes))
+        e_dst_nodes = [node] * len(e_src_nodes)
+        # edge_dst_nodes.extend(e_src_nodes.numpy().tolist())
+        # edge_src_nodes.extend(e_dst_nodes.numpy().tolist())
+        edge_dst_nodes.extend(e_src_nodes)
+        edge_src_nodes.extend(e_dst_nodes)
 
     # Remapping node_id from g_orig -> g_evo, and record mapping from g_evo -> g_orig
     edge_src_nodes_reindex = []
@@ -255,22 +318,22 @@ def graph_evolve_delta_all_ngh(new_nodes,
     return g_evo
 
 
-def node_reindex(node_map, node_id_old):
+def node_reindex(node_map, node_id_prev):
     """
     node_id(g_orig) -> node_id(g_evo)
     """
-    if node_id_old in node_map:
-        node_id_new = node_map[node_id_old]
+    if node_id_prev in node_map:
+        node_id_new = node_map[node_id_prev]
     else:
         node_id_new = len(node_map)
-        node_map[node_id_old] = node_id_new
+        node_map[node_id_prev] = node_id_new
 
     return node_id_new
 
 
-def nodes_reindex(node_map, nodes_id_old):
+def nodes_reindex(node_map, nodes_id_prev):
     nodes_id_new = []
-    for node_id in nodes_id_old:
+    for node_id in nodes_id_prev:
         nodes_id_new.append(node_reindex(node_map, node_id))
     return nodes_id_new
 
@@ -429,7 +492,7 @@ def update_g_attr_all_ngh(new_nodes, g_evo, g_orig, g_orig_csr,
     # train_mask = generate_mask_tensor(_sample_mask(idx_train, labels.shape[0]))
     # g_evo.ndata['train_mask'] = train_mask
     """
-    Training mask are set to new inserted vertices 
+    Training mask are set to new inserted vertices and its neighbors
     """
     nodes_index_evo = []
     # ngh_queue = []

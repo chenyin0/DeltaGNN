@@ -63,20 +63,48 @@ def evaluate(model, features, labels, mask):
         return correct.item() * 1.0 / len(labels)
 
 
-def evaluate_delta(model, features, labels, mask, deg_threshold):
+def evaluate_delta(model, features, labels, mask, updated_nodes):
     model.eval()
     with torch.no_grad():
+        logits_prev = model.logits
         logits = model(features)
-        logits = logits[mask]
+        # logits = logits[mask]
 
-        logits = 
-        model.logits = logits  # Record updated logits
+        logits_updated = logits
+        logits_updated[0:logits_prev.size()[0]] = logits_prev
+        for node_id in updated_nodes:
+            logits_updated[node_id] = logits[node_id]
 
+        model.logits = logits_updated  # Record updated logits
+
+        logits_updated = logits_updated[mask]
         labels = labels[mask]
-        _, indices = torch.max(logits, dim=1)
+        _, indices = torch.max(logits_updated, dim=1)
         correct = torch.sum(indices == labels)
         return correct.item() * 1.0 / len(labels)
 
+def evaluate_delta_with_degree(model, features, labels, mask, nodes_high_deg, nodes_low_deg):
+    model.eval()
+    with torch.no_grad():
+        logits_prev = model.logits
+        logits = model(features)
+
+        logits_updated = logits
+        logits_updated[0:logits_prev.size()[0]] = logits_prev
+        
+        # Update nodes in high degree with full aggregation
+        for key in nodes_high_deg.items():
+            logits_updated[key] = logits[key]
+        # Update nodes in low degree with delta aggregation
+        
+        
+        model.logits = logits_updated  # Record updated logits
+
+        logits_updated = logits_updated[mask]
+        labels = labels[mask]
+        _, indices = torch.max(logits_updated, dim=1)
+        correct = torch.sum(indices == labels)
+        return correct.item() * 1.0 / len(labels)
 
 def main(args):
     # load and preprocess dataset
@@ -237,33 +265,34 @@ def main(args):
     print(">>> Accuracy on evolove graph: ")
 
     # Add new edges
-    n_nodes = model.g.number_of_nodes()
+    # n_nodes = model.g.number_of_nodes()
     # iter = 8
     i = 0
     node_batch = round(g.number_of_nodes() / 10)  # default = 10
     # edge_epoch = np.arange(0, iter * edge_batch, edge_batch)
     accuracy = []
     delta_neighbor = []
+    deg_th = -1
     while len(node_q) > 0:
         print('\n>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
         print('Add node-batch @ iter = {:d}'.format(i))
         print('node_q size: {:d}'.format(len(node_q)))
         # add_node_num = i * node_batch
         if node_batch < len(node_q):
-            add_nodes = node_q[:node_batch]
+            inserted_nodes = node_q[:node_batch]
             node_q = node_q[node_batch:]
         else:
-            add_nodes = node_q
+            inserted_nodes = node_q
             node_q.clear()
 
-        print('Add node size: ', len(add_nodes))
+        print('Add node size: ', len(inserted_nodes))
 
         ##
         """
         # No retraining
         """
         print('\n>> No retraining')
-        util.graph_evolve(add_nodes, g_csr, g, node_map_orig2evo,
+        util.graph_evolve(inserted_nodes, g_csr, g, node_map_orig2evo,
                           node_map_evo2orig, model.g)
 
         print('Node_number:', model.g.number_of_nodes())
@@ -279,6 +308,10 @@ def main(args):
         print("Test accuracy of non-retrain @ {:d} nodes {:.2%}".format(
             model.g.number_of_nodes(), acc))
         acc_non_retrain = acc * 100
+
+        # Get node index of added_nodes in evolve graph
+        inserted_nodes_evo = util.nodes_reindex(node_map_orig2evo,
+                                                inserted_nodes)
 
         # # Statistic neighbor edges and nodes
         # neighbor_node_sum, neighbor_edge_sum = util.count_neighbor(
@@ -299,7 +332,7 @@ def main(args):
         # Full graph retraining
         """
         print('\n>> Full graph retraining')
-        util.graph_evolve(add_nodes, g_csr, g, node_map_orig2evo,
+        util.graph_evolve(inserted_nodes, g_csr, g, node_map_orig2evo,
                           node_map_evo2orig, model_retrain.g)
 
         features = model_retrain.g.ndata['feat']
@@ -330,10 +363,10 @@ def main(args):
         print('\n>> Delta retraining')
         # Execute full retraining at the beginning
         if i <= 0:
-            util.graph_evolve(add_nodes, g_csr, g, node_map_orig2evo,
+            util.graph_evolve(inserted_nodes, g_csr, g, node_map_orig2evo,
                               node_map_evo2orig, model_delta.g)
         else:
-            util.graph_evolve_delta(add_nodes, g_csr, g, node_map_orig2evo,
+            util.graph_evolve_delta(inserted_nodes, g_csr, g, node_map_orig2evo,
                                     node_map_evo2orig, model_delta.g)
 
         features = model_delta.g.ndata['feat']
@@ -349,7 +382,12 @@ def main(args):
             time_delta_retrain = time.perf_counter() - time_start
             print('>> Epoch training time in delta: ', time_delta_retrain)
 
-        acc = evaluate(model_delta, features, labels, test_mask)
+        if i <= 10:
+            acc = evaluate(model_delta, features, labels, test_mask)
+        else:
+            acc = evaluate_delta(model_delta, features, labels, test_mask,
+                                 inserted_nodes_evo)
+        # acc = evaluate(model_delta, features, labels, test_mask)
         print("Test accuracy of delta @ {:d} nodes {:.2%}".format(
             model_delta.g.number_of_nodes(), acc))
         acc_retrain_delta = acc * 100
@@ -361,10 +399,10 @@ def main(args):
         print('\n>> Delta all neighbor retraining')
         # Execute full retraining at the beginning
         if i <= 0:
-            util.graph_evolve(add_nodes, g_csr, g, node_map_orig2evo,
+            util.graph_evolve(inserted_nodes, g_csr, g, node_map_orig2evo,
                               node_map_evo2orig, model_delta_all_ngh.g)
         else:
-            util.graph_evolve_delta_all_ngh(add_nodes, g_csr, g,
+            util.graph_evolve_delta_all_ngh(inserted_nodes, g_csr, g,
                                             node_map_orig2evo,
                                             node_map_evo2orig,
                                             model_delta_all_ngh.g)
@@ -384,7 +422,19 @@ def main(args):
             print('>> Epoch training time in delta with all ngh: ',
                   time_delta_all_ngh_retrain)
 
-        acc = evaluate(model_delta_all_ngh, features, labels, test_mask)
+        ##
+        """
+        Get ngh with high deg and low deg
+        """
+        ngh_high_deg, ngh_low_deg = util.get_ngh_with_deg_th(
+            model_delta.g.adj_sparse('csr'), inserted_nodes_evo, deg_th)
+
+        if i <= 10:
+            acc = evaluate(model_delta, features, labels, test_mask)
+        else:
+            acc = evaluate_delta(model_delta, features, labels, test_mask,
+                                 ngh_high_deg, ngh_low_deg)
+        # acc = evaluate(model_delta_all_ngh, features, labels, test_mask)
         print("Test accuracy of delta_all_ngh @ {:d} nodes {:.2%}".format(
             model_delta_all_ngh.g.number_of_nodes(), acc))
         acc_retrain_delta_all_ngh = acc * 100
@@ -396,6 +446,7 @@ def main(args):
         ])
         i += 1
 
+    # Dump log
     if args.dataset == 'cora':
         np.savetxt('./results/cora_add_edge.txt',
                    accuracy,
