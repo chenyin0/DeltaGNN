@@ -438,6 +438,10 @@ def update_g_attr_delta(new_nodes, g_evo, g_orig, node_map_evo2orig,
     if len(nodes_index_evo) > ngh_limit:
         nodes_index_evo = random.sample(nodes_index_evo, ngh_limit)
 
+    # Add inserted nodes into training set
+    nodes_index_evo.extend(new_nodes_evo)
+    nodes_index_evo=list(set(nodes_index_evo))
+    
     print('Train_set size: ', len(nodes_index_evo))
     nodes_index_evo.sort()
     idx_train = nodes_index_evo
