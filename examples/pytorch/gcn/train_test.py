@@ -52,11 +52,46 @@ def train(model, features, n_edges, train_mask, val_mask, labels, loss_fcn, opti
         #                                     acc, n_edges / np.mean(dur) / 1000))
 
 
-def train_delta(model, features, n_edges, train_mask, val_mask, labels, loss_fcn, optimizer,
-                nodes_high_deg, nodes_low_deg):
+# def train_delta(model, features, n_edges, train_mask, val_mask, labels, loss_fcn, optimizer,
+#                 nodes_high_deg, nodes_low_deg):
 
-    # torch.autograd.set_detect_anomaly(True)
+#     # torch.autograd.set_detect_anomaly(True)
 
+#     # initialize graph
+#     dur = []
+#     for epoch in range(args.n_epochs):
+#         model.train()
+#         if epoch >= 3:
+#             t0 = time.time()
+#         # forward
+#         logits = model(features, nodes_high_deg, nodes_low_deg)
+#         loss = loss_fcn(logits[train_mask], labels[train_mask])
+
+#         optimizer.zero_grad()
+#         # loss.backward(retain_graph=True)
+#         loss.backward()
+#         optimizer.step()
+
+#         if epoch >= 3:
+#             dur.append(time.time() - t0)
+
+#         acc = evaluate_delta_with_degree(model, features, labels, val_mask, nodes_high_deg,
+#                                          nodes_low_deg)
+#         # print("Epoch {:05d} | Time(s) {:.4f} | Loss {:.4f} | Accuracy {:.4f} | "
+#         #       "ETputs(KTEPS) {:.2f}".format(epoch, np.mean(dur), loss.item(),
+#         #                                     acc, n_edges / np.mean(dur) / 1000))
+
+
+def train_delta_edge_masked(model,
+                            features,
+                            n_edges,
+                            train_mask,
+                            val_mask,
+                            labels,
+                            loss_fcn,
+                            optimizer,
+                            ngh_high_deg=None,
+                            ngh_low_deg=None):
     # initialize graph
     dur = []
     for epoch in range(args.n_epochs):
@@ -64,7 +99,7 @@ def train_delta(model, features, n_edges, train_mask, val_mask, labels, loss_fcn
         if epoch >= 3:
             t0 = time.time()
         # forward
-        logits = model(features, nodes_high_deg, nodes_low_deg)
+        logits = model(features, ngh_high_deg, ngh_low_deg)
         loss = loss_fcn(logits[train_mask], labels[train_mask])
 
         optimizer.zero_grad()
@@ -75,8 +110,8 @@ def train_delta(model, features, n_edges, train_mask, val_mask, labels, loss_fcn
         if epoch >= 3:
             dur.append(time.time() - t0)
 
-        acc = evaluate_delta_with_degree(model, features, labels, val_mask, nodes_high_deg,
-                                         nodes_low_deg)
+        acc = evaluate_delta_edge_masked(model, features, labels, val_mask, ngh_high_deg,
+                                         ngh_low_deg)
         # print("Epoch {:05d} | Time(s) {:.4f} | Loss {:.4f} | Accuracy {:.4f} | "
         #       "ETputs(KTEPS) {:.2f}".format(epoch, np.mean(dur), loss.item(),
         #                                     acc, n_edges / np.mean(dur) / 1000))
@@ -117,7 +152,7 @@ def evaluate_delta(model, features, labels, mask, updated_nodes):
         return correct.item() * 1.0 / len(labels)
 
 
-def evaluate_delta_with_degree(model,
+def evaluate_delta_edge_masked(model,
                                features,
                                labels,
                                mask,
@@ -125,30 +160,9 @@ def evaluate_delta_with_degree(model,
                                nodes_low_deg=None):
     r"""
     Update feature of updated nodes according to node degree
-    
+
     "model" should be GCN_delta
     """
-    # model.eval()
-    # with torch.no_grad():
-    #     logits_prev = model.logits
-    #     logits = model(features)
-
-    #     logits_updated = logits
-    #     logits_updated[0:logits_prev.size()[0]] = logits_prev
-
-    #     # Update nodes in high degree with full aggregation
-    #     for key in nodes_high_deg.items():
-    #         logits_updated[key] = logits[key]
-    #     # Update nodes in low degree with delta aggregation
-
-    #     model.logits = logits_updated  # Record updated logits
-
-    #     logits_updated = logits_updated[mask]
-    #     labels = labels[mask]
-    #     _, indices = torch.max(logits_updated, dim=1)
-    #     correct = torch.sum(indices == labels)
-    #     return correct.item() * 1.0 / len(labels)
-
     model.eval()
     with torch.no_grad():
         logits = model(features, nodes_high_deg, nodes_low_deg)
@@ -157,6 +171,17 @@ def evaluate_delta_with_degree(model,
         _, indices = torch.max(logits, dim=1)
         correct = torch.sum(indices == labels)
         return correct.item() * 1.0 / len(labels)
+
+
+# def evaluate_delta_edge_masked(model, features, labels, mask):
+#     model.eval()
+#     with torch.no_grad():
+#         logits = model(features)
+#         logits = logits[mask]
+#         labels = labels[mask]
+#         _, indices = torch.max(logits, dim=1)
+#         correct = torch.sum(indices == labels)
+#         return correct.item() * 1.0 / len(labels)
 
 
 def main(args):
@@ -358,6 +383,7 @@ def main(args):
 
         # Get node index of added_nodes in evolve graph
         inserted_nodes_evo = util.nodes_reindex(node_map_orig2evo, inserted_nodes)
+        # inserted_nodes_evo.sort()
 
         # # Statistic neighbor edges and nodes
         # neighbor_node_sum, neighbor_edge_sum = util.count_neighbor(
@@ -451,12 +477,15 @@ def main(args):
             util.graph_evolve_delta_all_ngh(inserted_nodes, g_csr, g, node_map_orig2evo,
                                             node_map_evo2orig, model_delta_all_ngh.g)
 
-        ##
-        """
-        Get ngh with high deg and low deg
-        """
-        ngh_high_deg, ngh_low_deg = util.get_ngh_with_deg_th(
-            model_delta_all_ngh.g.adj_sparse('csr'), inserted_nodes_evo, deg_th)
+        # Get ngh with high deg and low deg
+        ngh_high_deg, ngh_low_deg = util.get_ngh_with_deg_th(model_delta_all_ngh.g,
+                                                             inserted_nodes_evo, deg_th)
+        # Merge ngh_high_deg and ngh_low_deg
+        ngh_dict = ngh_high_deg.copy()
+        ngh_dict.update(ngh_low_deg)
+
+        #Set edge weight (mask) according to node degree
+        util.gen_edge_mask(model_delta_all_ngh.g, ngh_dict)
 
         features = model_delta_all_ngh.g.ndata['feat']
         labels = model_delta_all_ngh.g.ndata['label']
@@ -466,20 +495,31 @@ def main(args):
 
         if len(node_q) > 0:
             time_start = time.perf_counter()
-            train_delta(model_delta_all_ngh, features, model_delta_all_ngh.g.number_of_edges(),
-                        train_mask, val_mask, labels, loss_fcn_delta_all_ngh,
-                        optimizer_delta_all_ngh, ngh_high_deg, ngh_low_deg)
+            # train_delta(model_delta_all_ngh, features, model_delta_all_ngh.g.number_of_edges(),
+            #             train_mask, val_mask, labels, loss_fcn_delta_all_ngh,
+            #             optimizer_delta_all_ngh, ngh_high_deg, ngh_low_deg)
+
             # train(model_delta_all_ngh, features, model_delta_all_ngh.g.number_of_edges(),
             #       train_mask, val_mask, labels, loss_fcn_delta_all_ngh, optimizer_delta_all_ngh)
-            time_delta_all_ngh_retrain = time.perf_counter() - time_start
-            print('>> Epoch training time in delta with all ngh: {:.4}s'.format(time_delta_all_ngh_retrain))
 
-        if i <= -1:
+            train_delta_edge_masked(model_delta_all_ngh, features,
+                                    model_delta_all_ngh.g.number_of_edges(), train_mask, val_mask,
+                                    labels, loss_fcn_delta_all_ngh, optimizer_delta_all_ngh,
+                                    list(ngh_high_deg.keys()), list(ngh_low_deg.keys()))
+
+            time_delta_all_ngh_retrain = time.perf_counter() - time_start
+            print('>> Epoch training time in delta with all ngh: {:.4}s'.format(
+                time_delta_all_ngh_retrain))
+
+        if i <= 3:
             acc = evaluate(model_delta_all_ngh, features, labels, test_mask)
         else:
             # acc = evaluate_delta_with_degree(model_delta_all_ngh, features, labels, test_mask,
             #                                  ngh_high_deg, ngh_low_deg)
-            acc = evaluate_delta_with_degree(model_delta_all_ngh, features, labels, test_mask)
+            # acc = evaluate_delta_with_degree(model_delta_all_ngh, features, labels, test_mask)
+
+            acc = evaluate_delta_edge_masked(model_delta_all_ngh, features, labels, test_mask,
+                                             ngh_high_deg, ngh_low_deg)
 
         # acc = evaluate(model_delta_all_ngh, features, labels, test_mask)
         print("Test accuracy of delta_all_ngh @ {:d} nodes {:.2%}".format(
@@ -536,6 +576,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     args.dataset = 'cora'
+    args.n_epochs = 200
     print(args)
 
     main(args)

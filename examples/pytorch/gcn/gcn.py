@@ -75,10 +75,18 @@ class GCN_delta(nn.Module):
     #         # print(h.equal(h1))
     #     return h
 
-    def forward(self, features, nodes_high_deg=None, nodes_low_deg=None):
+    # def forward(self, features, nodes_high_deg=None, nodes_low_deg=None):
+    #     h = features
+    #     for i, layer in enumerate(self.layers):
+    #         if i != 0:
+    #             h = self.dropout(h)
+    #         h = layer(self.g, h, nodes_high_deg, nodes_low_deg)
+    #     return h
+
+    def forward(self, features, ngh_high_deg=None, ngh_low_deg=None):
         h = features
         for i, layer in enumerate(self.layers):
             if i != 0:
                 h = self.dropout(h)
-            h = layer(self.g, h, nodes_high_deg, nodes_low_deg)
+            h = layer(self.g, h, ngh_high_deg, ngh_low_deg)
         return h

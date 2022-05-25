@@ -100,10 +100,11 @@ def get_ngh(g_csr, root_nodes):
     return ngh
 
 
-def get_ngh_with_deg_th(g_csr, root_nodes, deg_th):
+def get_ngh_with_deg_th(g, root_nodes, deg_th):
     '''
     deg_th: node degree threshold
     '''
+    g_csr = g.adj_sparse('csr')
     indptr = g_csr[0]
     indices = g_csr[1]
     # key = 'the ngh node', value = 'all neighbors of this ngh node'
@@ -116,25 +117,42 @@ def get_ngh_with_deg_th(g_csr, root_nodes, deg_th):
         for root_node in root_nodes:
             begin = indptr[root_node]
             end = indptr[root_node + 1]
-            for ngh_node in indices[begin:end].tolist():
+            ngh_nodes = indices[begin:end].tolist()
+            for ngh_node in ngh_nodes:
                 ngh_begin = indptr[ngh_node]
                 ngh_end = indptr[ngh_node + 1]
                 ngh_node_deg = ngh_end - ngh_begin
                 if ngh_node_deg >= deg_th:
                     # Add all neighbors of the node with high degree
-                    ngh_high_deg.setdefault(ngh_node, []).extend(
-                        indices[ngh_begin:ngh_end])
+                    ngh_high_deg.setdefault(ngh_node,
+                                            set()).update(indices[ngh_begin:ngh_end].tolist())
                 else:
-                    ngh_low_deg.setdefault(ngh_node, []).append(root_node)
+                    # Ensure edge ngh_node -> root_node exists
+                    if g.has_edges_between(ngh_node, root_node):
+                        ngh_low_deg.setdefault(ngh_node, set()).add(root_node)
 
     return ngh_high_deg, ngh_low_deg
 
 
-def update_g_struct(new_nodes,
-                    g_orig_csr,
-                    node_map_orig2evo,
-                    node_map_evo2orig,
-                    g_evo=None):
+def gen_edge_mask(g, ngh_dict):
+    src_nodes = []
+    dst_nodes = []
+    for root_node, ngh in ngh_dict.items():
+        src_nodes.extend([root_node for i in range(len(ngh))])
+        dst_nodes.extend(ngh)
+
+    # edge_ids = g.edge_ids(th.Tensor(src_nodes).long(), th.Tensor(dst_nodes).long())
+    edge_ids = g.edge_ids(th.tensor(src_nodes, dtype=th.long), th.tensor(dst_nodes, dtype=th.long))
+
+    edge_ids = edge_ids.tolist()
+    edge_mask = [0 for i in range(g.number_of_edges())]
+    for id in edge_ids:
+        edge_mask[id] = 1
+
+    g.edata['edge_mask'] = th.Tensor(edge_mask)
+
+
+def update_g_struct(new_nodes, g_orig_csr, node_map_orig2evo, node_map_evo2orig, g_evo=None):
 
     indptr = g_orig_csr[0].numpy().tolist()
     indices = g_orig_csr[1].numpy().tolist()
@@ -199,65 +217,20 @@ def update_g_struct(new_nodes,
         # Construct a new graph
         g_evo = dgl.graph((edge_src_nodes_reindex, edge_dst_nodes_reindex))
     else:
-        g_evo.add_edges(th.tensor(edge_src_nodes_reindex),
-                        th.tensor(edge_dst_nodes_reindex))
+        g_evo.add_edges(th.tensor(edge_src_nodes_reindex), th.tensor(edge_dst_nodes_reindex))
 
     return g_evo
 
 
-def graph_evolve(new_nodes,
-                 g_orig_csr,
-                 g_orig,
-                 node_map_orig2evo,
-                 node_map_evo2orig,
-                 g_evo=None):
+def graph_evolve(new_nodes, g_orig_csr, g_orig, node_map_orig2evo, node_map_evo2orig, g_evo=None):
     """
     Construct evolve graph from an orginal static graph
     """
-
-    # indptr = g_orig_csr[0]
-    # indices = g_orig_csr[1]
-
-    # edge_src_nodes = list()
-    # edge_dst_nodes = list()
-    # for node in new_nodes:
-    #     e_src_nodes = indices[indptr[node]:indptr[node + 1]]
-    #     e_dst_nodes = th.linspace(node, node, len(e_src_nodes))
-    #     edge_dst_nodes.extend(e_src_nodes.numpy().tolist())
-    #     edge_src_nodes.extend(e_dst_nodes.numpy().tolist())
-
-    # # Remapping node_id from g_orig -> g_evo, and record mapping from g_evo -> g_orig
-    # edge_src_nodes_reindex = []
-    # edge_dst_nodes_reindex = []
-    # for node in edge_src_nodes:
-    #     node_id_evo = node_reindex(node_map_orig2evo, node)
-    #     edge_src_nodes_reindex.append(node_id_evo)
-    #     if node_id_evo not in node_map_evo2orig:
-    #         node_map_evo2orig[node_id_evo] = node
-
-    # for node in edge_dst_nodes:
-    #     node_id_evo = node_reindex(node_map_orig2evo, node)
-    #     edge_dst_nodes_reindex.append(node_id_evo)
-    #     if node_id_evo not in node_map_evo2orig:
-    #         node_map_evo2orig[node_id_evo] = node
-
-    # edge_src_nodes_reindex = th.tensor(edge_src_nodes_reindex, dtype=th.int64)
-    # edge_dst_nodes_reindex = th.tensor(edge_dst_nodes_reindex, dtype=th.int64)
-
-    # if g_evo is None:
-    #     # Construct a new graph
-    #     g_evo = dgl.graph((edge_src_nodes_reindex, edge_dst_nodes_reindex))
-    # else:
-    #     g_evo.add_edges(th.tensor(edge_src_nodes_reindex),
-    #                     th.tensor(edge_dst_nodes_reindex))
-
     if g_evo is None:
         # Construct a new graph
-        g_evo = update_g_struct(new_nodes, g_orig_csr, node_map_orig2evo,
-                                node_map_evo2orig)
+        g_evo = update_g_struct(new_nodes, g_orig_csr, node_map_orig2evo, node_map_evo2orig)
     else:
-        g_evo = update_g_struct(new_nodes, g_orig_csr, node_map_orig2evo,
-                                node_map_evo2orig, g_evo)
+        g_evo = update_g_struct(new_nodes, g_orig_csr, node_map_orig2evo, node_map_evo2orig, g_evo)
 
     # print('\n>> g_evo', g_evo)
 
@@ -278,17 +251,15 @@ def graph_evolve_delta(new_nodes,
 
     if g_evo is None:
         # Construct a new graph
-        g_evo = update_g_struct(new_nodes, g_orig_csr, node_map_orig2evo,
-                                node_map_evo2orig)
+        g_evo = update_g_struct(new_nodes, g_orig_csr, node_map_orig2evo, node_map_evo2orig)
     else:
-        g_evo = update_g_struct(new_nodes, g_orig_csr, node_map_orig2evo,
-                                node_map_evo2orig, g_evo)
+        g_evo = update_g_struct(new_nodes, g_orig_csr, node_map_orig2evo, node_map_evo2orig, g_evo)
 
     # print('\n>> g_evo', g_evo)
 
     new_nodes_evo = nodes_reindex(node_map_orig2evo, new_nodes)
-    update_g_attr_delta(new_nodes, g_evo, g_orig, node_map_evo2orig,
-                        node_map_orig2evo, new_nodes_evo)
+    update_g_attr_delta(new_nodes, g_evo, g_orig, node_map_evo2orig, node_map_orig2evo,
+                        new_nodes_evo)
     return g_evo
 
 
@@ -304,17 +275,15 @@ def graph_evolve_delta_all_ngh(new_nodes,
 
     if g_evo is None:
         # Construct a new graph
-        g_evo = update_g_struct(new_nodes, g_orig_csr, node_map_orig2evo,
-                                node_map_evo2orig)
+        g_evo = update_g_struct(new_nodes, g_orig_csr, node_map_orig2evo, node_map_evo2orig)
     else:
-        g_evo = update_g_struct(new_nodes, g_orig_csr, node_map_orig2evo,
-                                node_map_evo2orig, g_evo)
+        g_evo = update_g_struct(new_nodes, g_orig_csr, node_map_orig2evo, node_map_evo2orig, g_evo)
 
     # print('\n>> g_evo', g_evo)
 
     new_nodes_evo = nodes_reindex(node_map_orig2evo, new_nodes)
-    update_g_attr_all_ngh(new_nodes, g_evo, g_orig, g_orig_csr,
-                          node_map_evo2orig, node_map_orig2evo, new_nodes_evo)
+    update_g_attr_all_ngh(new_nodes, g_evo, g_orig, g_orig_csr, node_map_evo2orig,
+                          node_map_orig2evo, new_nodes_evo)
     return g_evo
 
 
@@ -362,8 +331,7 @@ def update_g_attr(g_evo, g_orig, node_map_evo2orig, new_nodes_evo):
     # g_evo.ndata['train_mask'] = train_mask
 
     loc_list = range(labels.size()[0])
-    idx_train = random.sample(loc_list,
-                              math.floor(labels.size()[0] * train_ratio))
+    idx_train = random.sample(loc_list, math.floor(labels.size()[0] * train_ratio))
     print('Train_set size: ', len(idx_train))
     idx_train.sort()
     train_mask = generate_mask_tensor(_sample_mask(idx_train, labels.shape[0]))
@@ -386,8 +354,7 @@ def update_g_attr(g_evo, g_orig, node_map_evo2orig, new_nodes_evo):
     # g_evo.ndata['test_mask'] = test_mask
 
     loc_list = range(labels.size()[0])
-    idx_test = random.sample(loc_list,
-                             math.floor(labels.size()[0] * test_ratio))
+    idx_test = random.sample(loc_list, math.floor(labels.size()[0] * test_ratio))
 
     # Add new nodes and its neighbors in test set
     idx_test.extend(new_nodes_evo)
@@ -399,8 +366,8 @@ def update_g_attr(g_evo, g_orig, node_map_evo2orig, new_nodes_evo):
     g_evo.ndata['test_mask'] = test_mask
 
 
-def update_g_attr_delta(new_nodes, g_evo, g_orig, node_map_evo2orig,
-                        node_map_orig2evo, new_nodes_evo):
+def update_g_attr_delta(new_nodes, g_evo, g_orig, node_map_evo2orig, node_map_orig2evo,
+                        new_nodes_evo):
     """
     Update feature and eval/test mask
     Set train_mask only with the new inserted vertices
@@ -440,8 +407,8 @@ def update_g_attr_delta(new_nodes, g_evo, g_orig, node_map_evo2orig,
 
     # Add inserted nodes into training set
     nodes_index_evo.extend(new_nodes_evo)
-    nodes_index_evo=list(set(nodes_index_evo))
-    
+    nodes_index_evo = list(set(nodes_index_evo))
+
     print('Train_set size: ', len(nodes_index_evo))
     nodes_index_evo.sort()
     idx_train = nodes_index_evo
@@ -455,8 +422,7 @@ def update_g_attr_delta(new_nodes, g_evo, g_orig, node_map_evo2orig,
     g_evo.ndata['val_mask'] = val_mask
 
     loc_list = range(labels.size()[0])
-    idx_test = random.sample(loc_list,
-                             math.floor(labels.size()[0] * test_ratio))
+    idx_test = random.sample(loc_list, math.floor(labels.size()[0] * test_ratio))
 
     # Add new nodes and its neighbors in test set
     idx_test.extend(new_nodes_evo)
@@ -468,8 +434,8 @@ def update_g_attr_delta(new_nodes, g_evo, g_orig, node_map_evo2orig,
     g_evo.ndata['test_mask'] = test_mask
 
 
-def update_g_attr_all_ngh(new_nodes, g_evo, g_orig, g_orig_csr,
-                          node_map_evo2orig, node_map_orig2evo, new_nodes_evo):
+def update_g_attr_all_ngh(new_nodes, g_evo, g_orig, g_orig_csr, node_map_evo2orig,
+                          node_map_orig2evo, new_nodes_evo):
     """
     Update feature and eval/test mask
     Set train_mask with the new inserted vertices and all of its neighbors
@@ -536,8 +502,7 @@ def update_g_attr_all_ngh(new_nodes, g_evo, g_orig, g_orig_csr,
     g_evo.ndata['val_mask'] = val_mask
 
     loc_list = range(labels.size()[0])
-    idx_test = random.sample(loc_list,
-                             math.floor(labels.size()[0] * test_ratio))
+    idx_test = random.sample(loc_list, math.floor(labels.size()[0] * test_ratio))
 
     # Add new nodes and its neighbors in test set
     idx_test.extend(new_nodes_evo)
