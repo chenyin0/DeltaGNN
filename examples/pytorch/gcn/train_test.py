@@ -327,9 +327,9 @@ def main(args):
             dur.append(time.time() - t0)
 
         acc = evaluate(model, features, labels, val_mask)
-        print("Epoch {:05d} | Time(s) {:.4f} | Loss {:.4f} | Accuracy {:.4f} | "
-              "ETputs(KTEPS) {:.2f}".format(epoch, np.mean(dur), loss.item(), acc,
-                                            n_edges / np.mean(dur) / 1000))
+        # print("Epoch {:05d} | Time(s) {:.4f} | Loss {:.4f} | Accuracy {:.4f} | "
+        #       "ETputs(KTEPS) {:.2f}".format(epoch, np.mean(dur), loss.item(), acc,
+        #                                     n_edges / np.mean(dur) / 1000))
 
     print()
     print(">>> Accuracy on original graph: ")

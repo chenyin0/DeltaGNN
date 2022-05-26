@@ -14,7 +14,7 @@ from dgl.utils import expand_as_pair
 from dgl.convert import block_to_graph
 from dgl.heterograph import DGLBlock
 
-from pyinstrument import Profiler
+# from pyinstrument import Profiler
 
 
 class GraphConv_delta(GraphConv):
@@ -26,8 +26,7 @@ class GraphConv_delta(GraphConv):
                  bias=True,
                  activation=None,
                  allow_zero_in_degree=False):
-        super(GraphConv_delta, self).__init__(in_feats, out_feats, norm, weight, bias, activation,
-                                              allow_zero_in_degree)
+        super(GraphConv_delta, self).__init__(in_feats, out_feats, norm, weight, bias, activation, allow_zero_in_degree)
 
         # feat_prev size is variable with graph evolving (size = g_nodes_number * out_feats)
         # self.feat_prev = nn.Parameter(th.Tensor(in_feats, out_feats), requires_grad=True)
@@ -74,18 +73,30 @@ class GraphConv_delta(GraphConv):
             edge_mask = graph.edata['edge_mask']
             rst_delta = super().forward(graph, feat, edge_weight=edge_mask)
 
+            # Resize feat_prev
+            feat_num = self.feat_prev.shape[0]
+            if self.feat_prev.shape[0] < rst_delta.shape[0]:
+                new_feat_num = rst_delta.shape[0] - self.feat_prev.shape[0]
+                self.feat_prev = th.cat((self.feat_prev, th.zeros([new_feat_num, self.feat_prev.shape[1]])), 0)
+
             # Combine delta rst with feat_prev
-            tmp = rst_golden.clone()  # To avoid in-place operation
+            # tmp = rst_golden.clone()  # To avoid in-place operation
+            tmp = self.feat_prev.clone()
             for node in ngh_high_deg:
                 tmp[node] = rst_delta[node]
 
             for node in ngh_low_deg:
                 tmp[node] = rst_golden[node] + rst_delta[node]
+                # if node < feat_num:
+                #     # tmp[node] = self.feat_prev[node] + rst_delta[node]
+                #     # tmp[node] = rst_delta[node]
+                #     tmp[node] = rst_golden[node]
+                # else:
+                #     tmp[node] = rst_golden[node]
 
-            rst_golden = tmp
-            self.feat_prev = rst_golden  # Update feat_prev
-
-            return rst_golden
+            rst = tmp
+            self.feat_prev = rst  # Update feat_prev
+            return rst
         else:
             rst = super().forward(graph, feat)
             self.feat_prev = rst

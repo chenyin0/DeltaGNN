@@ -59,32 +59,6 @@ def bfs_traverse(g_csr, root_node_q):
     return sequence
 
 
-# def get_ngh(g_csr, root_nodes, deg_th=-1):
-#     '''
-#     deg_th: node degree threshold, disable value = -1
-#     '''
-#     indptr = g_csr[0]
-#     indices = g_csr[1]
-#     ngh = []
-#     ngh_low_deg = []
-#     ngh_high_deg = []
-#     if deg_th == -1:
-#         for root_node in root_nodes:
-#             begin = indptr[root_node]
-#             end = indptr[root_node + 1]
-#             ngh.extend(indices[begin:end].tolist())
-#         return ngh
-#     else:
-#         for root_node in root_nodes:
-#             begin = indptr[root_node]
-#             end = indptr[root_node + 1]
-#             for ngh_node in indices[begin:end].tolist():
-#                 ngh_node_deg = indptr[ngh_node + 1] - indptr[ngh_node]
-#                 if ngh_node_deg >= deg_th:
-#                     ngh.append(ngh_node)
-#         return ngh_low_deg, ngh_high_deg
-
-
 def get_ngh(g_csr, root_nodes):
     '''
     deg_th: node degree threshold, disable value = -1
@@ -124,10 +98,10 @@ def get_ngh_with_deg_th(g, root_nodes, deg_th):
                 ngh_node_deg = ngh_end - ngh_begin
                 if ngh_node_deg >= deg_th:
                     # Add all neighbors of the node with high degree
-                    ngh_high_deg.setdefault(ngh_node,
-                                            set()).update(indices[ngh_begin:ngh_end].tolist())
+                    ngh_high_deg.setdefault(ngh_node, set()).update(indices[ngh_begin:ngh_end].tolist())
                 else:
-                    # Ensure edge ngh_node -> root_node exists
+                    # Add neighbors of the node with low degree
+                    # Ensure edge: ngh_node->root_node exists
                     if g.has_edges_between(ngh_node, root_node):
                         ngh_low_deg.setdefault(ngh_node, set()).add(root_node)
 
@@ -238,12 +212,7 @@ def graph_evolve(new_nodes, g_orig_csr, g_orig, node_map_orig2evo, node_map_evo2
     return g_evo
 
 
-def graph_evolve_delta(new_nodes,
-                       g_orig_csr,
-                       g_orig,
-                       node_map_orig2evo,
-                       node_map_evo2orig,
-                       g_evo=None):
+def graph_evolve_delta(new_nodes, g_orig_csr, g_orig, node_map_orig2evo, node_map_evo2orig, g_evo=None):
     """
     Construct evolve graph from an orginal static graph
     """
@@ -260,12 +229,7 @@ def graph_evolve_delta(new_nodes,
     return g_evo
 
 
-def graph_evolve_delta_all_ngh(new_nodes,
-                               g_orig_csr,
-                               g_orig,
-                               node_map_orig2evo,
-                               node_map_evo2orig,
-                               g_evo=None):
+def graph_evolve_delta_all_ngh(new_nodes, g_orig_csr, g_orig, node_map_orig2evo, node_map_evo2orig, g_evo=None):
     """
     Construct evolve graph from an orginal static graph
     """
@@ -448,7 +412,7 @@ def update_g_attr_all_ngh(new_nodes, g_evo, g_orig, node_map_evo2orig, node_map_
 
     train_ratio = 0.06
     val_ratio = 0.15
-    test_ratio = 0.3
+    test_ratio = 0.1
 
     # loc_list = range(labels.size()[0])
     # idx_train = random.sample(loc_list,

@@ -17,7 +17,7 @@ def plt_edge_epoch():
     fig = plt.figure(figsize=(10, 3), dpi=100)
 
     ax1 = plt.subplot(1, 3, 1)
-    plt.plot(x1, cora[:, -2], 'v-', color='g', label="Delta")
+    # plt.plot(x1, cora[:, -2], 'v-', color='g', label="Delta")
     plt.plot(x1, cora[:, -1], 'o-', color='b', label="Delta_all_ngh")
     plt.plot(x1, cora[:, -3], 'o-', color='r', label="Full retrain")
     plt.plot(x1, cora[:, -4], 'o-', color='grey', label="W/O retrain")
@@ -27,7 +27,7 @@ def plt_edge_epoch():
     plt.title('Cora', fontsize=16)
 
     ax2 = plt.subplot(1, 3, 2)
-    plt.plot(x2, citeseer[:, -2], 'v-', color='g', label="Delta")
+    # plt.plot(x2, citeseer[:, -2], 'v-', color='g', label="Delta")
     plt.plot(x2, citeseer[:, -1], 'v-', color='b', label="Delta_all_ngh")
     plt.plot(x2, citeseer[:, -3], 'o-', color='r', label="Full retrain")
     plt.plot(x2, citeseer[:, -4], 'o-', color='grey', label="W/O retrain")
@@ -37,7 +37,7 @@ def plt_edge_epoch():
     plt.title('Citeseer', fontsize=16)
 
     ax3 = plt.subplot(1, 3, 3)
-    plt.plot(x3, pubmed[:, -2], 'v-', color='g', label="Delta")
+    # plt.plot(x3, pubmed[:, -2], 'v-', color='g', label="Delta")
     plt.plot(x3, pubmed[:, -1], 'v-', color='b', label="Delta_all_ngh")
     plt.plot(x3, pubmed[:, -3], 'o-', color='r', label="Full retrain")
     plt.plot(x3, pubmed[:, -4], 'o-', color='grey', label="W/O retrain")
@@ -46,7 +46,7 @@ def plt_edge_epoch():
     # plt.ylabel('Accuracy (%)', fontsize=16)
     plt.title('Pubmed', fontsize=16)
 
-    plt.suptitle('Accuracy with graph evolving', fontsize=16)
+    plt.suptitle('Accuracy with graph evolving', fontsize=18, y=1.07)
 
     # # Plot legend for all subplot
     # lines, labels = fig.axes[-1].get_legend_handles_labels()
@@ -59,10 +59,7 @@ def plt_edge_epoch():
     # plt.show()
 
     plt.tight_layout()
-    plt.savefig('./figure/acc_degrad.pdf',
-                dpi=600,
-                bbox_inches="tight",
-                pad_inches=0)
+    plt.savefig('./figure/acc_degrad.pdf', dpi=600, bbox_inches="tight", pad_inches=0)
 
 
 plt_edge_epoch()
