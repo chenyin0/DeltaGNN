@@ -102,10 +102,11 @@ def train_delta_edge_masked(model,
         logits = model(features, ngh_high_deg, ngh_low_deg)
         loss = loss_fcn(logits[train_mask], labels[train_mask])
 
-        optimizer.zero_grad()
-        # loss.backward(retain_graph=True)
-        loss.backward()
-        optimizer.step()
+        with torch.autograd.set_detect_anomaly(True):
+            optimizer.zero_grad()
+            # loss.backward(retain_graph=True)
+            loss.backward()
+            optimizer.step()
 
         if epoch >= 3:
             dur.append(time.time() - t0)
@@ -345,7 +346,7 @@ def main(args):
     node_batch = round(g.number_of_nodes() / 10)  # default = 10
     # edge_epoch = np.arange(0, iter * edge_batch, edge_batch)
     accuracy = []
-    deg_th = 5
+    deg_th = args.deg_threshold
     while len(node_q) > 0:
         print('\n>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
         print('Add node-batch @ iter = {:d}'.format(i))
@@ -501,17 +502,21 @@ def main(args):
 
             # train(model_delta_all_ngh, features, model_delta_all_ngh.g.number_of_edges(),
             #       train_mask, val_mask, labels, loss_fcn_delta_all_ngh, optimizer_delta_all_ngh)
-
-            train_delta_edge_masked(model_delta_all_ngh, features,
-                                    model_delta_all_ngh.g.number_of_edges(), train_mask, val_mask,
-                                    labels, loss_fcn_delta_all_ngh, optimizer_delta_all_ngh,
-                                    list(ngh_high_deg.keys()), list(ngh_low_deg.keys()))
+            if i <= 3:
+                train(model_delta_all_ngh, features, model_delta_all_ngh.g.number_of_edges(),
+                      train_mask, val_mask, labels, loss_fcn_delta_all_ngh, optimizer_delta_all_ngh)
+            else:
+                train_delta_edge_masked(model_delta_all_ngh, features,
+                                        model_delta_all_ngh.g.number_of_edges(), train_mask,
+                                        val_mask, labels, loss_fcn_delta_all_ngh,
+                                        optimizer_delta_all_ngh, list(ngh_high_deg.keys()),
+                                        list(ngh_low_deg.keys()))
 
             time_delta_all_ngh_retrain = time.perf_counter() - time_start
             print('>> Epoch training time in delta with all ngh: {:.4}s'.format(
                 time_delta_all_ngh_retrain))
 
-        if i <= 3:
+        if i <= -1:
             acc = evaluate(model_delta_all_ngh, features, labels, test_mask)
         else:
             # acc = evaluate_delta_with_degree(model_delta_all_ngh, features, labels, test_mask,
@@ -572,11 +577,15 @@ if __name__ == '__main__':
     parser.add_argument("--n-layers", type=int, default=1, help="number of hidden gcn layers")
     parser.add_argument("--weight-decay", type=float, default=5e-4, help="Weight for L2 loss")
     parser.add_argument("--self-loop", action='store_true', help="graph self-loop (default=False)")
+    parser.add_argument("--deg-threshold",
+                        type=int,
+                        default=0,
+                        help="degree threshold of neighbors nodes")
     parser.set_defaults(self_loop=False)
     args = parser.parse_args()
 
-    args.dataset = 'cora'
-    args.n_epochs = 200
+    # args.dataset = 'cora'
+    # args.n_epochs = 200
     print(args)
 
     main(args)

@@ -33,34 +33,62 @@ class GraphConv_delta(GraphConv):
         # self.feat_prev = nn.Parameter(th.Tensor(in_feats, out_feats), requires_grad=True)
         self.feat_prev = th.Tensor(1, out_feats)
 
+    # def forward(self, graph, feat, ngh_high_deg=None, ngh_low_deg=None):
+    #     r"""
+    #     The data type of "ngh_high_deg" and "ngh_low_deg" is List
+    #     """
+    #     if ngh_high_deg is not None and ngh_low_deg is not None:
+    #         edge_mask = graph.edata['edge_mask']
+    #         rst_delta = super().forward(graph, feat, edge_weight=edge_mask)
+
+    #         # Resize rst
+    #         if self.feat_prev.size()[0] < graph.number_of_nodes():
+    #             new_feat_num = graph.number_of_nodes() - self.feat_prev.size()[0]
+    #             rst = th.cat((self.feat_prev, th.zeros(new_feat_num, self.feat_prev.size()[1])), 0)
+    #         else:
+    #             rst = self.feat_prev.clone()
+
+    #         # Combine delta rst with feat_prev
+    #         for node in ngh_high_deg:
+    #             rst[node] = rst_delta[node]
+
+    #         for node in ngh_low_deg:
+    #             # rst[node] = rst[node] + rst_delta[node]
+    #             rst[node] = rst_delta[node]
+
+    #         self.feat_prev = rst  # Update feat_prev
+
+    #         return rst
+    #     else:
+    #         rst = super().forward(graph, feat)
+    #         return rst
+
     def forward(self, graph, feat, ngh_high_deg=None, ngh_low_deg=None):
         r"""    
         The data type of "ngh_high_deg" and "ngh_low_deg" is List
         """
         if ngh_high_deg is not None and ngh_low_deg is not None:
+            # Debug_yin 22.05.25
+            rst_golden = super().forward(graph, feat)
+
             edge_mask = graph.edata['edge_mask']
             rst_delta = super().forward(graph, feat, edge_weight=edge_mask)
 
-            # Resize rst
-            if self.feat_prev.size()[0] < graph.number_of_nodes():
-                new_feat_num = graph.number_of_nodes() - self.feat_prev.size()[0]
-                rst = th.cat((self.feat_prev, th.zeros(new_feat_num, self.feat_prev.size()[1])), 0)
-            else:
-                rst = self.feat_prev.clone()
-
             # Combine delta rst with feat_prev
+            tmp = rst_golden.clone()  # To avoid in-place operation
             for node in ngh_high_deg:
-                rst[node] = rst_delta[node]
+                tmp[node] = rst_delta[node]
 
             for node in ngh_low_deg:
-                rst[node] = rst[node] + rst_delta[node]
-                # rst[node] = rst_delta[node]
+                tmp[node] = rst_golden[node] + rst_delta[node]
 
-            self.feat_prev = rst  # Update feat_prev
+            rst_golden = tmp
+            self.feat_prev = rst_golden  # Update feat_prev
 
-            return rst
+            return rst_golden
         else:
             rst = super().forward(graph, feat)
+            self.feat_prev = rst
             return rst
 
     # def forward(self,
