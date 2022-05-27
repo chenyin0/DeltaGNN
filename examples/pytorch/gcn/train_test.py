@@ -347,6 +347,7 @@ def main(args):
     # edge_epoch = np.arange(0, iter * edge_batch, edge_batch)
     accuracy = []
     deg_th = args.deg_threshold
+    delta_neighbor = []
     while len(node_q) > 0:
         print('\n>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
         print('Add node-batch @ iter = {:d}'.format(i))
@@ -386,13 +387,17 @@ def main(args):
         inserted_nodes_evo = util.nodes_reindex(node_map_orig2evo, inserted_nodes)
         # inserted_nodes_evo.sort()
 
-        # # Statistic neighbor edges and nodes
-        # neighbor_node_sum, neighbor_edge_sum = util.count_neighbor(
-        #     add_nodes, g_csr, node_map_orig2evo, args.n_layers + 1)
-        # delta_neighbor.append([
-        #     model.g.number_of_nodes(),
-        #     model.g.number_of_edges(), neighbor_node_sum, neighbor_edge_sum
-        # ])
+        # Statistic neighbor edges and nodes
+        node_ngh_delta_sum, edge_ngh_delta_sum = util.count_neighbor_delta(
+            inserted_nodes, g_csr, node_map_orig2evo, args.n_layers + 1, args.deg_threshold)
+        node_ngh_all_sum, edge_ngh_all_sum = util.count_neighbor(inserted_nodes, g_csr,
+                                                                 node_map_orig2evo,
+                                                                 args.n_layers + 1)
+        delta_neighbor.append([
+            model.g.number_of_nodes(),
+            model.g.number_of_edges(), node_ngh_delta_sum, edge_ngh_delta_sum, node_ngh_all_sum,
+            edge_ngh_all_sum
+        ])
 
         # # Plot graph structure
         # g_evo_csr = model.g.adj_sparse('csr')
@@ -431,7 +436,7 @@ def main(args):
 
         ##
         """
-        # Delta retraining only on inserted nodes        
+        # Delta retraining only on inserted nodes
         """
         print('\n>> Delta retraining')
         # Execute full retraining at the beginning
@@ -536,26 +541,27 @@ def main(args):
             model.g.number_of_edges(), acc_non_retrain, acc_retrain, acc_retrain_delta,
             acc_retrain_delta_all_ngh
         ])
+
         i += 1
 
     # Dump log
     if args.dataset == 'cora':
-        np.savetxt('./results/cora_add_edge.txt', accuracy, fmt='%d, %d, %.2f, %.2f, %.2f, %.2f')
-        # np.savetxt('./results/cora_delta_neighbor.txt',
-        #            delta_neighbor,
-        #            fmt='%d, %d, %d, %d')
+        # np.savetxt('./results/cora_add_edge.txt', accuracy, fmt='%d, %d, %.2f, %.2f, %.2f, %.2f')
+        np.savetxt('./results/cora_delta_neighbor.txt',
+                   delta_neighbor,
+                   fmt='%d, %d, %d, %d, %d, %d')
     elif args.dataset == 'citeseer':
-        np.savetxt('./results/citeseer_add_edge.txt',
-                   accuracy,
-                   fmt='%d, %d, %.2f, %.2f, %.2f, %.2f')
-        # np.savetxt('./results/citeseer_delta_neighbor.txt',
-        #            delta_neighbor,
-        #            fmt='%d, %d, %d, %d')
+        # np.savetxt('./results/citeseer_add_edge.txt',
+        #            accuracy,
+        #            fmt='%d, %d, %.2f, %.2f, %.2f, %.2f')
+        np.savetxt('./results/citeseer_delta_neighbor.txt',
+                   delta_neighbor,
+                   fmt='%d, %d, %d, %d, %d, %d')
     elif args.dataset == 'pubmed':
-        np.savetxt('./results/pubmed_add_edge.txt', accuracy, fmt='%d, %d, %.2f, %.2f, %.2f, %.2f')
-        # np.savetxt('./results/pubmed_delta_neighbor.txt',
-        #            delta_neighbor,
-        #            fmt='%d, %d, %d, %d')
+        # np.savetxt('./results/pubmed_add_edge.txt', accuracy, fmt='%d, %d, %.2f, %.2f, %.2f, %.2f')
+        np.savetxt('./results/pubmed_delta_neighbor.txt',
+                   delta_neighbor,
+                   fmt='%d, %d, %d, %d, %d, %d')
     else:
         raise ValueError('Unknown dataset: {}'.format(args.dataset))
 
@@ -584,8 +590,9 @@ if __name__ == '__main__':
     parser.set_defaults(self_loop=False)
     args = parser.parse_args()
 
-    # args.dataset = 'cora'
+    # args.dataset = 'pubmed'
     # args.n_epochs = 200
+    # args.deg_threshold=5
     print(args)
 
     main(args)

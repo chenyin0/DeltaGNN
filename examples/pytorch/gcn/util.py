@@ -98,7 +98,8 @@ def get_ngh_with_deg_th(g, root_nodes, deg_th):
                 ngh_node_deg = ngh_end - ngh_begin
                 if ngh_node_deg >= deg_th:
                     # Add all neighbors of the node with high degree
-                    ngh_high_deg.setdefault(ngh_node, set()).update(indices[ngh_begin:ngh_end].tolist())
+                    ngh_high_deg.setdefault(ngh_node,
+                                            set()).update(indices[ngh_begin:ngh_end].tolist())
                 else:
                     # Add neighbors of the node with low degree
                     # Ensure edge: ngh_node->root_node exists
@@ -212,7 +213,12 @@ def graph_evolve(new_nodes, g_orig_csr, g_orig, node_map_orig2evo, node_map_evo2
     return g_evo
 
 
-def graph_evolve_delta(new_nodes, g_orig_csr, g_orig, node_map_orig2evo, node_map_evo2orig, g_evo=None):
+def graph_evolve_delta(new_nodes,
+                       g_orig_csr,
+                       g_orig,
+                       node_map_orig2evo,
+                       node_map_evo2orig,
+                       g_evo=None):
     """
     Construct evolve graph from an orginal static graph
     """
@@ -229,7 +235,12 @@ def graph_evolve_delta(new_nodes, g_orig_csr, g_orig, node_map_orig2evo, node_ma
     return g_evo
 
 
-def graph_evolve_delta_all_ngh(new_nodes, g_orig_csr, g_orig, node_map_orig2evo, node_map_evo2orig, g_evo=None):
+def graph_evolve_delta_all_ngh(new_nodes,
+                               g_orig_csr,
+                               g_orig,
+                               node_map_orig2evo,
+                               node_map_evo2orig,
+                               g_evo=None):
     """
     Construct evolve graph from an orginal static graph
     """
@@ -463,7 +474,7 @@ def update_g_attr_all_ngh(new_nodes, g_evo, g_orig, node_map_evo2orig, node_map_
 
 
 def count_neighbor(nodes, g_csr, node_map_orig2evo, layer_num):
-    """ 
+    """
     Count neighbor edges and vertices of specific node set
     """
     edge_set = set()
@@ -474,18 +485,60 @@ def count_neighbor(nodes, g_csr, node_map_orig2evo, layer_num):
     for layer_id in range(layer_num):
         node_num = len(node_queue)
         for i in range(node_num):
-            node_id = node_queue[i]
-            begin = indptr[node_id]
-            end = indptr[node_id + 1]
-            for edge_id in range(begin, end):
-                node = indices[edge_id]
-                if node in node_map_orig2evo:
-                    node_queue.append(node)
-                    node_set.add(node)
-                    edge_set.add(edge_id)
+            node = node_queue[i]
+            begin = indptr[node]
+            end = indptr[node + 1]
+            for edge in range(begin, end):
+                ngh_node = indices[edge]
+                if ngh_node in node_map_orig2evo:
+                    node_queue.append(ngh_node)
+                    node_set.add(ngh_node)
+                    edge_set.add(edge)
 
             # s_tmp = set(indices[begin:end])
             # node_set.update(s_tmp)
+
+        # Pop visited node
+        node_queue = node_queue[node_num:]
+
+    node_sum = len(node_set)
+    edge_sum = len(edge_set)
+
+    return node_sum, edge_sum
+
+
+def count_neighbor_delta(nodes, g_csr, node_map_orig2evo, layer_num, deg_th=0):
+    """ 
+    Count accesses of the new nodes and edges in GNN-delta under degree threshold
+    """
+    edge_set = set()
+    node_set = set(nodes)
+    indptr = g_csr[0].numpy().tolist()
+    indices = g_csr[1].numpy().tolist()
+    node_queue = nodes
+    for layer_id in range(layer_num):
+        node_num = len(node_queue)
+        for i in range(node_num):
+            node = node_queue[i]
+            begin = indptr[node]
+            end = indptr[node + 1]
+            for edge in range(begin, end):
+                node_ngh = indices[edge]
+                if node_ngh in node_map_orig2evo:
+                    begin_ngh = indptr[node_ngh]
+                    end_ngh = indptr[node_ngh + 1]
+                    # If ngh_node is a high degree node
+                    if end_ngh - begin_ngh >= deg_th:
+                        for edge_ngh in range(begin, end):
+                            # Visit the neighbors of this ngh_node
+                            ngh_ngh_node = indices[edge_ngh]
+                            if ngh_ngh_node in node_map_orig2evo:
+                                node_queue.append(ngh_ngh_node)
+                                node_set.add(ngh_ngh_node)
+                                edge_set.add(edge_ngh)
+                    else:
+                        node_set.add(node)
+                        edge_set.add(edge)
 
         # Pop visited node
         node_queue = node_queue[node_num:]

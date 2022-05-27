@@ -42,10 +42,12 @@ def accumulate(li):
 #         sum += li[i]
 
 
-def plt_full_retrain_comp():
+def plt_full_retrain():
+    r"""
+    Plot full and delta (This function is deprecated)
+    """
     cora = np.loadtxt('./results/cora_delta_neighbor.txt', delimiter=',')
-    citeseer = np.loadtxt('./results/citeseer_delta_neighbor.txt',
-                          delimiter=',')
+    citeseer = np.loadtxt('./results/citeseer_delta_neighbor.txt', delimiter=',')
     pubmed = np.loadtxt('./results/pubmed_delta_neighbor.txt', delimiter=',')
 
     v_cora = cora[:, 0]
@@ -109,8 +111,7 @@ def plt_full_retrain_comp():
     v_base = 0
     e_base = 0
     for i in range(len(citeseer)):
-        comp = comp_per_layer(feat_dim, v_citeseer[i] - v_base,
-                              e_citeseer[i] - e_base)
+        comp = comp_per_layer(feat_dim, v_citeseer[i] - v_base, e_citeseer[i] - e_base)
         comp_citeseer_delta.append(layer_num * comp)
         mem = access_per_layer(feat_dim, e_citeseer[i] - e_base)
         mem_citeseer_delta.append(layer_num * mem)
@@ -120,8 +121,7 @@ def plt_full_retrain_comp():
     v_base = 0
     e_base = 0
     for i in range(len(pubmed)):
-        comp = comp_per_layer(feat_dim, v_pubmed[i] - v_base,
-                              e_pubmed[i] - e_base)
+        comp = comp_per_layer(feat_dim, v_pubmed[i] - v_base, e_pubmed[i] - e_base)
         comp_pubmed_delta.append(layer_num * comp)
         mem = access_per_layer(feat_dim, e_pubmed[i] - e_base)
         mem_pubmed_delta.append(layer_num * mem)
@@ -164,20 +164,16 @@ def plt_full_retrain_comp():
     import matplotlib.ticker as mtick
 
     labels = [
-        'Orig', 'Time 1', 'Time 2', 'Time 3', 'Time 4', 'Time 5', 'Time 6',
-        'Time 7', 'Time 8'
+        'Orig', 'Time 1', 'Time 2', 'Time 3', 'Time 4', 'Time 5', 'Time 6', 'Time 7', 'Time 8'
     ]
-    items = [
-        'Cora', 'Citeseer', 'Pubmed', 'Cora_delta', 'Citeseer_delta',
-        'Pubmed_delta'
-    ]
+    items = ['Cora', 'Citeseer', 'Pubmed', 'Cora_delta', 'Citeseer_delta', 'Pubmed_delta']
     """
     Computation
     """
     # data = [comp_cora, comp_citeseer, comp_pubmed]
     data = [
-        comp_cora, comp_citeseer, comp_pubmed, comp_cora_delta,
-        comp_citeseer_delta, comp_pubmed_delta
+        comp_cora, comp_citeseer, comp_pubmed, comp_cora_delta, comp_citeseer_delta,
+        comp_pubmed_delta
     ]
 
     # Group size in each label
@@ -281,18 +277,14 @@ def plt_full_retrain_comp():
     plt.ylabel('Computation\n(norm to non-retrain)', fontsize=fontsize)
 
     plt.tight_layout()
-    plt.savefig('./figure/retrain_comp.pdf',
-                dpi=600,
-                bbox_inches="tight",
-                pad_inches=0)
+    plt.savefig('./figure/retrain_comp.pdf', dpi=600, bbox_inches="tight", pad_inches=0)
     """
     Mem access
     """
 
     # data = [mem_cora, mem_citeseer, mem_pubmed]
     data = [
-        mem_cora, mem_citeseer, mem_pubmed, mem_cora_delta, mem_citeseer_delta,
-        mem_pubmed_delta
+        mem_cora, mem_citeseer, mem_pubmed, mem_cora_delta, mem_citeseer_delta, mem_pubmed_delta
     ]
 
     # Group size in each label
@@ -395,16 +387,12 @@ def plt_full_retrain_comp():
     plt.ylabel('Memory access\n(norm to non-retrain)', fontsize=fontsize)
 
     plt.tight_layout()
-    plt.savefig('./figure/retrain_mem.pdf',
-                dpi=600,
-                bbox_inches="tight",
-                pad_inches=0)
+    plt.savefig('./figure/retrain_mem.pdf', dpi=600, bbox_inches="tight", pad_inches=0)
 
 
-def plt_delta_retrain_comp():
+def plt_delta_retrain():
     cora = np.loadtxt('./results/cora_delta_neighbor.txt', delimiter=',')
-    citeseer = np.loadtxt('./results/citeseer_delta_neighbor.txt',
-                          delimiter=',')
+    citeseer = np.loadtxt('./results/citeseer_delta_neighbor.txt', delimiter=',')
     pubmed = np.loadtxt('./results/pubmed_delta_neighbor.txt', delimiter=',')
 
     v_cora = cora[:, 0]
@@ -446,87 +434,76 @@ def plt_delta_retrain_comp():
 
     ##
     """
-    Computation and memory access of full-neighbor delta-retraining    
+    Computation and memory access of ngh-delta retraining    
     """
+    v_cora_ngh_delta = cora[:, 2]
+    e_cora_ngh_delta = cora[:, 3]
+    v_citeseer_ngh_delta = citeseer[:, 2]
+    e_citeseer_ngh_delta = citeseer[:, 3]
+    v_pubmed_ngh_delta = pubmed[:, 2]
+    e_pubmed_ngh_delta = pubmed[:, 3]
 
-    v_cora_delta_ngh = cora[:, 2]
-    e_cora_delta_ngh = cora[:, 3]
-    v_citeseer_delta_ngh = citeseer[:, 2]
-    e_citeseer_delta_ngh = citeseer[:, 3]
-    v_pubmed_delta_ngh = pubmed[:, 2]
-    e_pubmed_delta_ngh = pubmed[:, 3]
-
-    comp_cora_delta_ngh = []
-    comp_citeseer_delta_ngh = []
-    comp_pubmed_delta_ngh = []
-    mem_cora_delta_ngh = []
-    mem_citeseer_delta_ngh = []
-    mem_pubmed_delta_ngh = []
+    comp_cora_ngh_delta = []
+    comp_citeseer_ngh_delta = []
+    comp_pubmed_ngh_delta = []
+    mem_cora_ngh_delta = []
+    mem_citeseer_ngh_delta = []
+    mem_pubmed_ngh_delta = []
 
     for i in range(len(cora)):
-        comp = comp_per_layer(feat_dim, v_cora_delta_ngh[i],
-                              e_cora_delta_ngh[i])
-        comp_cora_delta_ngh.append(layer_num * comp)
-        mem = access_per_layer(feat_dim, e_cora_delta_ngh[i])
-        mem_cora_delta_ngh.append(layer_num * mem)
+        comp = comp_per_layer(feat_dim, v_cora_ngh_delta[i], e_cora_ngh_delta[i])
+        comp_cora_ngh_delta.append(layer_num * comp)
+        mem = access_per_layer(feat_dim, e_cora_ngh_delta[i])
+        mem_cora_ngh_delta.append(layer_num * mem)
 
     for i in range(len(citeseer)):
-        comp = comp_per_layer(feat_dim, v_citeseer_delta_ngh[i],
-                              e_citeseer_delta_ngh[i])
-        comp_citeseer_delta_ngh.append(layer_num * comp)
-        mem = access_per_layer(feat_dim, e_citeseer_delta_ngh[i])
-        mem_citeseer_delta_ngh.append(layer_num * mem)
+        comp = comp_per_layer(feat_dim, v_citeseer_ngh_delta[i], e_citeseer_ngh_delta[i])
+        comp_citeseer_ngh_delta.append(layer_num * comp)
+        mem = access_per_layer(feat_dim, e_citeseer_ngh_delta[i])
+        mem_citeseer_ngh_delta.append(layer_num * mem)
 
     for i in range(len(pubmed)):
-        comp = comp_per_layer(feat_dim, v_pubmed_delta_ngh[i],
-                              e_pubmed_delta_ngh[i])
-        comp_pubmed_delta_ngh.append(layer_num * comp)
-        mem = access_per_layer(feat_dim, e_pubmed_delta_ngh[i])
-        mem_pubmed_delta_ngh.append(layer_num * mem)
+        comp = comp_per_layer(feat_dim, v_pubmed_ngh_delta[i], e_pubmed_ngh_delta[i])
+        comp_pubmed_ngh_delta.append(layer_num * comp)
+        mem = access_per_layer(feat_dim, e_pubmed_ngh_delta[i])
+        mem_pubmed_ngh_delta.append(layer_num * mem)
     ##
 
     ##
     """
-    Computation and memory access of delta-retraining        
+    Computation and memory access of ngh_all retraining        
     """
-    comp_cora_delta = []
-    comp_citeseer_delta = []
-    comp_pubmed_delta = []
-    mem_cora_delta = []
-    mem_citeseer_delta = []
-    mem_pubmed_delta = []
+    v_cora_ngh_all = cora[:, 4]
+    e_cora_ngh_all = cora[:, 5]
+    v_citeseer_ngh_all = citeseer[:, 4]
+    e_citeseer_ngh_all = citeseer[:, 5]
+    v_pubmed_ngh_all = pubmed[:, 4]
+    e_pubmed_ngh_all = pubmed[:, 5]
 
-    v_base = 0
-    e_base = 0
+    comp_cora_ngh_all = []
+    comp_citeseer_ngh_all = []
+    comp_pubmed_ngh_all = []
+    mem_cora_ngh_all = []
+    mem_citeseer_ngh_all = []
+    mem_pubmed_ngh_all = []
+
     for i in range(len(cora)):
-        comp = comp_per_layer(feat_dim, v_cora[i] - v_base, e_cora[i] - e_base)
-        comp_cora_delta.append(layer_num * comp)
-        mem = access_per_layer(feat_dim, e_cora[i] - e_base)
-        mem_cora_delta.append(layer_num * mem)
-        v_base = v_cora[i]
-        e_base = e_cora[i]
+        comp = comp_per_layer(feat_dim, v_cora_ngh_all[i], e_cora_ngh_all[i])
+        comp_cora_ngh_all.append(layer_num * comp)
+        mem = access_per_layer(feat_dim, e_cora_ngh_all[i])
+        mem_cora_ngh_all.append(layer_num * mem)
 
-    v_base = 0
-    e_base = 0
     for i in range(len(citeseer)):
-        comp = comp_per_layer(feat_dim, v_citeseer[i] - v_base,
-                              e_citeseer[i] - e_base)
-        comp_citeseer_delta.append(layer_num * comp)
-        mem = access_per_layer(feat_dim, e_citeseer[i] - e_base)
-        mem_citeseer_delta.append(layer_num * mem)
-        v_base = v_citeseer[i]
-        e_base = e_citeseer[i]
+        comp = comp_per_layer(feat_dim, v_citeseer_ngh_all[i], e_citeseer_ngh_all[i])
+        comp_citeseer_ngh_all.append(layer_num * comp)
+        mem = access_per_layer(feat_dim, e_citeseer_ngh_all[i])
+        mem_citeseer_ngh_all.append(layer_num * mem)
 
-    v_base = 0
-    e_base = 0
     for i in range(len(pubmed)):
-        comp = comp_per_layer(feat_dim, v_pubmed[i] - v_base,
-                              e_pubmed[i] - e_base)
-        comp_pubmed_delta.append(layer_num * comp)
-        mem = access_per_layer(feat_dim, e_pubmed[i] - e_base)
-        mem_pubmed_delta.append(layer_num * mem)
-        v_base = v_pubmed[i]
-        e_base = e_pubmed[i]
+        comp = comp_per_layer(feat_dim, v_pubmed_ngh_all[i], e_pubmed_ngh_all[i])
+        comp_pubmed_ngh_all.append(layer_num * comp)
+        mem = access_per_layer(feat_dim, e_pubmed_ngh_all[i])
+        mem_pubmed_ngh_all.append(layer_num * mem)
     ##
 
     accumulate(comp_cora)
@@ -544,57 +521,54 @@ def plt_delta_retrain_comp():
     norm(mem_citeseer, mem_citeseer[0])
     norm(mem_pubmed, mem_pubmed[0])
 
-    ## delta_neighbor
-    accumulate(comp_cora_delta_ngh)
-    accumulate(comp_citeseer_delta_ngh)
-    accumulate(comp_pubmed_delta_ngh)
-    accumulate(mem_cora_delta_ngh)
-    accumulate(mem_citeseer_delta_ngh)
-    accumulate(mem_pubmed_delta_ngh)
+    ## ngh_delta
+    accumulate(comp_cora_ngh_delta)
+    accumulate(comp_citeseer_ngh_delta)
+    accumulate(comp_pubmed_ngh_delta)
+    accumulate(mem_cora_ngh_delta)
+    accumulate(mem_citeseer_ngh_delta)
+    accumulate(mem_pubmed_ngh_delta)
 
     # normalize
-    norm(comp_cora_delta_ngh, comp_cora_delta_ngh[0])
-    norm(comp_citeseer_delta_ngh, comp_citeseer_delta_ngh[0])
-    norm(comp_pubmed_delta_ngh, comp_pubmed_delta_ngh[0])
-    norm(mem_cora_delta_ngh, mem_cora_delta_ngh[0])
-    norm(mem_citeseer_delta_ngh, mem_citeseer_delta_ngh[0])
-    norm(mem_pubmed_delta_ngh, mem_pubmed_delta_ngh[0])
+    norm(comp_cora_ngh_delta, comp_cora_ngh_delta[0])
+    norm(comp_citeseer_ngh_delta, comp_citeseer_ngh_delta[0])
+    norm(comp_pubmed_ngh_delta, comp_pubmed_ngh_delta[0])
+    norm(mem_cora_ngh_delta, mem_cora_ngh_delta[0])
+    norm(mem_citeseer_ngh_delta, mem_citeseer_ngh_delta[0])
+    norm(mem_pubmed_ngh_delta, mem_pubmed_ngh_delta[0])
 
-    ## delta
-    accumulate(comp_cora_delta)
-    accumulate(comp_citeseer_delta)
-    accumulate(comp_pubmed_delta)
-    accumulate(mem_cora_delta)
-    accumulate(mem_citeseer_delta)
-    accumulate(mem_pubmed_delta)
+    ## ngh_all
+    accumulate(comp_cora_ngh_all)
+    accumulate(comp_citeseer_ngh_all)
+    accumulate(comp_pubmed_ngh_all)
+    accumulate(mem_cora_ngh_all)
+    accumulate(mem_citeseer_ngh_all)
+    accumulate(mem_pubmed_ngh_all)
 
     # normalize
-    norm(comp_cora_delta, comp_cora_delta[0])
-    norm(comp_citeseer_delta, comp_citeseer_delta[0])
-    norm(comp_pubmed_delta, comp_pubmed_delta[0])
-    norm(mem_cora_delta, mem_cora_delta[0])
-    norm(mem_citeseer_delta, mem_citeseer_delta[0])
-    norm(mem_pubmed_delta, mem_pubmed_delta[0])
+    norm(comp_cora_ngh_all, comp_cora_ngh_all[0])
+    norm(comp_citeseer_ngh_all, comp_citeseer_ngh_all[0])
+    norm(comp_pubmed_ngh_all, comp_pubmed_ngh_all[0])
+    norm(mem_cora_ngh_all, mem_cora_ngh_all[0])
+    norm(mem_citeseer_ngh_all, mem_citeseer_ngh_all[0])
+    norm(mem_pubmed_ngh_all, mem_pubmed_ngh_all[0])
 
     import seaborn as sns
     import matplotlib.ticker as mtick
 
     labels = [
-        'Orig', 'Time 1', 'Time 2', 'Time 3', 'Time 4', 'Time 5', 'Time 6',
-        'Time 7', 'Time 8'
+        'Orig', 'Time 1', 'Time 2', 'Time 3', 'Time 4', 'Time 5', 'Time 6', 'Time 7', 'Time 8'
     ]
     items = [
-        'Cora_all', 'Citeseer_all', 'Pubmed_all', 'Cora_all_ngh',
-        'Citeseer_all_ngh', 'Pubmed_all_ngh', 'Cora_delta', 'Citeseer_delta',
-        'Pubmed_delta'
+        'Cora_full', 'Citeseer_full', 'Pubmed_full', 'Cora_ngh_all', 'Citeseer_ngh_all',
+        'Pubmed_ngh_all', 'Cora_ngh_delta', 'Citeseer_ngh_delta', 'Pubmed_ngh_delta'
     ]
     """
     Computation
     """
     data = [
-        comp_cora, comp_citeseer, comp_pubmed, comp_cora_delta_ngh,
-        comp_citeseer_delta_ngh, comp_pubmed_delta_ngh, comp_cora_delta,
-        comp_citeseer_delta, comp_pubmed_delta
+        comp_cora, comp_citeseer, comp_pubmed, comp_cora_ngh_all, comp_citeseer_ngh_all,
+        comp_pubmed_ngh_all, comp_cora_ngh_delta, comp_citeseer_ngh_delta, comp_pubmed_ngh_delta
     ]
 
     # Group size in each label
@@ -612,23 +586,11 @@ def plt_delta_retrain_comp():
     x = x - ((group_size - 1) / 2) * width
 
     span = 3
-    color_1 = sns.cubehelix_palette(start=2.8,
-                                    rot=-.1,
-                                    n_colors=span,
-                                    dark=0.2,
-                                    light=0.65)
+    color_1 = sns.cubehelix_palette(start=2.8, rot=-.1, n_colors=span, dark=0.2, light=0.65)
 
-    color_2 = sns.cubehelix_palette(start=1,
-                                    rot=-.1,
-                                    n_colors=span,
-                                    dark=0.2,
-                                    light=0.65)
+    color_2 = sns.cubehelix_palette(start=1, rot=-.1, n_colors=span, dark=0.2, light=0.65)
 
-    color_3 = sns.cubehelix_palette(start=1.8,
-                                    rot=-.1,
-                                    n_colors=span,
-                                    dark=0.2,
-                                    light=0.65)
+    color_3 = sns.cubehelix_palette(start=1.8, rot=-.1, n_colors=span, dark=0.2, light=0.65)
 
     fig, ax1 = plt.subplots(figsize=(11, 3), dpi=600)
     # ax1 = plt.subplot(1, 3, 1)
@@ -713,19 +675,15 @@ def plt_delta_retrain_comp():
     plt.ylabel('Computation\n(norm to non-retrain)', fontsize=fontsize)
 
     plt.tight_layout()
-    plt.savefig('./figure/retrain_comp_delta.pdf',
-                dpi=600,
-                bbox_inches="tight",
-                pad_inches=0)
+    plt.savefig('./figure/retrain_comp_delta.pdf', dpi=600, bbox_inches="tight", pad_inches=0)
     """
     Mem access
     """
 
     # data = [mem_cora, mem_citeseer, mem_pubmed]
     data = [
-        mem_cora, mem_citeseer, mem_pubmed, mem_cora_delta_ngh,
-        mem_citeseer_delta_ngh, mem_pubmed_delta_ngh, mem_cora_delta,
-        mem_citeseer_delta, mem_pubmed_delta
+        mem_cora, mem_citeseer, mem_pubmed, mem_cora_ngh_all, mem_citeseer_ngh_all,
+        mem_pubmed_ngh_all, mem_cora_ngh_delta, mem_citeseer_ngh_delta, mem_pubmed_ngh_delta
     ]
 
     # Group size in each label
@@ -743,23 +701,11 @@ def plt_delta_retrain_comp():
     x = x - ((group_size - 1) / 2) * width
 
     span = 3
-    color_1 = sns.cubehelix_palette(start=2.8,
-                                    rot=-.1,
-                                    n_colors=span,
-                                    dark=0.2,
-                                    light=0.65)
+    color_1 = sns.cubehelix_palette(start=2.8, rot=-.1, n_colors=span, dark=0.2, light=0.65)
 
-    color_2 = sns.cubehelix_palette(start=1,
-                                    rot=-.1,
-                                    n_colors=span,
-                                    dark=0.2,
-                                    light=0.65)
+    color_2 = sns.cubehelix_palette(start=1, rot=-.1, n_colors=span, dark=0.2, light=0.65)
 
-    color_3 = sns.cubehelix_palette(start=1.8,
-                                    rot=-.1,
-                                    n_colors=span,
-                                    dark=0.2,
-                                    light=0.65)
+    color_3 = sns.cubehelix_palette(start=1.8, rot=-.1, n_colors=span, dark=0.2, light=0.65)
 
     fig, ax1 = plt.subplots(figsize=(11, 3), dpi=600)
     # ax1 = plt.subplot(1, 3, 1)
@@ -844,11 +790,8 @@ def plt_delta_retrain_comp():
     plt.ylabel('Memory access\n(norm to non-retrain)', fontsize=fontsize)
 
     plt.tight_layout()
-    plt.savefig('./figure/retrain_mem_delta.pdf',
-                dpi=600,
-                bbox_inches="tight",
-                pad_inches=0)
+    plt.savefig('./figure/retrain_mem_delta.pdf', dpi=600, bbox_inches="tight", pad_inches=0)
 
 
-plt_full_retrain_comp()
-plt_delta_retrain_comp()
+# plt_full_retrain()
+plt_delta_retrain()
