@@ -18,8 +18,8 @@ def plt_edge_epoch():
 
     ax1 = plt.subplot(1, 3, 1)
     # plt.plot(x1, cora[:, -2], 'v-', color='g', label="Delta")
-    plt.plot(x1, cora[:, -1], 'o-', color='b', label="Delta_all_ngh")
-    plt.plot(x1, cora[:, -3], 'o-', color='r', label="Full retrain")
+    plt.plot(x1, cora[:, -1], 'o-', color='b', label="Delta retrain")
+    plt.plot(x1, cora[:, -3], 'o-', color='r', label="Full graph retrain")
     plt.plot(x1, cora[:, -4], 'o-', color='grey', label="W/O retrain")
     # plt.legend(prop={'size': 10})
     ax1.set_ylim([0, 100])
@@ -28,8 +28,8 @@ def plt_edge_epoch():
 
     ax2 = plt.subplot(1, 3, 2)
     # plt.plot(x2, citeseer[:, -2], 'v-', color='g', label="Delta")
-    plt.plot(x2, citeseer[:, -1], 'v-', color='b', label="Delta_all_ngh")
-    plt.plot(x2, citeseer[:, -3], 'o-', color='r', label="Full retrain")
+    plt.plot(x2, citeseer[:, -1], 'v-', color='b', label="Delta retrain")
+    plt.plot(x2, citeseer[:, -3], 'o-', color='r', label="Full graph retrain")
     plt.plot(x2, citeseer[:, -4], 'o-', color='grey', label="W/O retrain")
     # plt.legend(prop={'size': 10})
     ax2.set_ylim([0, 100])
@@ -38,8 +38,8 @@ def plt_edge_epoch():
 
     ax3 = plt.subplot(1, 3, 3)
     # plt.plot(x3, pubmed[:, -2], 'v-', color='g', label="Delta")
-    plt.plot(x3, pubmed[:, -1], 'v-', color='b', label="Delta_all_ngh")
-    plt.plot(x3, pubmed[:, -3], 'o-', color='r', label="Full retrain")
+    plt.plot(x3, pubmed[:, -1], 'v-', color='b', label="Delta retrain")
+    plt.plot(x3, pubmed[:, -3], 'o-', color='r', label="Full graph retrain")
     plt.plot(x3, pubmed[:, -4], 'o-', color='grey', label="W/O retrain")
     plt.legend(prop={'size': 12})
     ax3.set_ylim([0, 100])
