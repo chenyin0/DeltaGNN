@@ -192,7 +192,7 @@ def update_g_struct(new_nodes, g_orig_csr, node_map_orig2evo, node_map_evo2orig,
         # Construct a new graph
         g_evo = dgl.graph((edge_src_nodes_reindex, edge_dst_nodes_reindex))
     else:
-        g_evo.add_edges(th.tensor(edge_src_nodes_reindex), th.tensor(edge_dst_nodes_reindex))
+        g_evo.add_edges(edge_src_nodes_reindex, edge_dst_nodes_reindex)
 
     return g_evo
 
