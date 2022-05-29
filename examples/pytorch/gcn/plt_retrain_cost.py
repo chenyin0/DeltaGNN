@@ -1,10 +1,8 @@
 import matplotlib.pyplot as plt
 import numpy as np
-import copy
+
 
 # Computation
-
-
 def comp_per_layer(feat_dim, v_num, e_num):
     """
         X_k+1 = A*X_k*W
@@ -278,6 +276,8 @@ def plt_full_retrain():
 
     plt.tight_layout()
     plt.savefig('./figure/retrain_comp.pdf', dpi=600, bbox_inches="tight", pad_inches=0)
+
+    ##
     """
     Mem access
     """

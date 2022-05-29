@@ -544,22 +544,27 @@ def main(args):
 
         i += 1
 
+    deg_th = str(args.deg_threshold)
     # Dump log
     if args.dataset == 'cora':
-        # np.savetxt('./results/cora_add_edge.txt', accuracy, fmt='%d, %d, %.2f, %.2f, %.2f, %.2f')
-        np.savetxt('./results/cora_delta_neighbor.txt',
+        np.savetxt('./results/cora_add_edge_deg_' + deg_th + '.txt',
+                   accuracy,
+                   fmt='%d, %d, %.2f, %.2f, %.2f, %.2f')
+        np.savetxt('./results/cora_delta_ngh_deg_' + deg_th + '.txt',
                    delta_neighbor,
                    fmt='%d, %d, %d, %d, %d, %d')
     elif args.dataset == 'citeseer':
-        # np.savetxt('./results/citeseer_add_edge.txt',
-        #            accuracy,
-        #            fmt='%d, %d, %.2f, %.2f, %.2f, %.2f')
-        np.savetxt('./results/citeseer_delta_neighbor.txt',
+        np.savetxt('./results/citeseer_add_edge_deg_' + deg_th + '.txt',
+                   accuracy,
+                   fmt='%d, %d, %.2f, %.2f, %.2f, %.2f')
+        np.savetxt('./results/citeseer_delta_ngh_deg_' + deg_th + '.txt',
                    delta_neighbor,
                    fmt='%d, %d, %d, %d, %d, %d')
     elif args.dataset == 'pubmed':
-        # np.savetxt('./results/pubmed_add_edge.txt', accuracy, fmt='%d, %d, %.2f, %.2f, %.2f, %.2f')
-        np.savetxt('./results/pubmed_delta_neighbor.txt',
+        np.savetxt('./results/pubmed_add_edge_deg_' + deg_th + '.txt',
+                   accuracy,
+                   fmt='%d, %d, %.2f, %.2f, %.2f, %.2f')
+        np.savetxt('./results/pubmed_delta_ngh_deg_' + deg_th + '.txt',
                    delta_neighbor,
                    fmt='%d, %d, %d, %d, %d, %d')
     else:
