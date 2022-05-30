@@ -511,42 +511,71 @@ def count_neighbor_delta(nodes, g_csr, node_map_orig2evo, layer_num, deg_th=0):
     """ 
     Count accesses of the new nodes and edges in GNN-delta under degree threshold
     """
-    edge_set = set()
-    node_set = set(nodes)
+    # edge_set = set()
+    # node_set = set(nodes)
+    # indptr = g_csr[0].numpy().tolist()
+    # indices = g_csr[1].numpy().tolist()
+    # node_queue = nodes
+    # for layer_id in range(layer_num):
+    #     node_num = len(node_queue)
+    #     for i in range(node_num):
+    #         node = node_queue[i]
+    #         begin = indptr[node]
+    #         end = indptr[node + 1]
+    #         for edge in range(begin, end):
+    #             node_ngh = indices[edge]
+    #             if node_ngh in node_map_orig2evo:
+    #                 begin_ngh = indptr[node_ngh]
+    #                 end_ngh = indptr[node_ngh + 1]
+    #                 # If ngh_node is a high degree node
+    #                 if end_ngh - begin_ngh >= deg_th:
+    #                     for edge_ngh in range(begin, end):
+    #                         # Visit the neighbors of this ngh_node
+    #                         ngh_ngh_node = indices[edge_ngh]
+    #                         if ngh_ngh_node in node_map_orig2evo:
+    #                             node_queue.append(ngh_ngh_node)
+    #                             node_set.add(ngh_ngh_node)
+    #                             edge_set.add(edge_ngh)
+    #                 else:
+    #                     node_set.add(node)
+    #                     edge_set.add(edge)
+
+    #     # Pop visited node
+    #     node_queue = node_queue[node_num:]
+
+    # node_sum = len(node_set)
+    # edge_sum = len(edge_set)
+
+    # return node_sum, edge_sum
+
+    node_access_num=0
+    edge_access_num=0
     indptr = g_csr[0].numpy().tolist()
     indices = g_csr[1].numpy().tolist()
     node_queue = nodes
-    for layer_id in range(layer_num):
-        node_num = len(node_queue)
-        for i in range(node_num):
-            node = node_queue[i]
-            begin = indptr[node]
-            end = indptr[node + 1]
-            for edge in range(begin, end):
-                node_ngh = indices[edge]
-                if node_ngh in node_map_orig2evo:
-                    begin_ngh = indptr[node_ngh]
-                    end_ngh = indptr[node_ngh + 1]
-                    # If ngh_node is a high degree node
-                    if end_ngh - begin_ngh >= deg_th:
-                        for edge_ngh in range(begin, end):
-                            # Visit the neighbors of this ngh_node
-                            ngh_ngh_node = indices[edge_ngh]
-                            if ngh_ngh_node in node_map_orig2evo:
-                                node_queue.append(ngh_ngh_node)
-                                node_set.add(ngh_ngh_node)
-                                edge_set.add(edge_ngh)
-                    else:
-                        node_set.add(node)
-                        edge_set.add(edge)
+    ngh_queue = []
 
-        # Pop visited node
-        node_queue = node_queue[node_num:]
+    for node in node_queue:
+        begin = indptr[node]
+        end = indptr[node + 1]
+        for edge in range(begin, end):
+            node_ngh = indices[edge]
+            if node_ngh in node_map_orig2evo:
+                begin_ngh = indptr[node_ngh]
+                end_ngh = indptr[node_ngh + 1]
+                # If ngh_node is a high degree node
+                if end_ngh - begin_ngh >= deg_th:
+                    ngh_queue.append(node_ngh)
+                else:
+                    node_access_num += 1
+                    edge_access_num += 1
+    
+    node_ngh_access_num, edge_ngh_access_num = count_neighbor(ngh_queue, g_csr, node_map_orig2evo, layer_num)
 
-    node_sum = len(node_set)
-    edge_sum = len(edge_set)
+    node_access_num+=node_ngh_access_num
+    edge_access_num += edge_ngh_access_num
 
-    return node_sum, edge_sum
+    return node_access_num, edge_access_num
 
 
 def save_graph_csr(g, dataset):
