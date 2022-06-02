@@ -458,15 +458,16 @@ def update_g_attr_all_ngh(new_nodes, g_evo, g_orig, node_map_evo2orig, node_map_
     val_mask = generate_mask_tensor(_sample_mask(idx_val, labels.shape[0]))
     g_evo.ndata['val_mask'] = val_mask
 
-    loc_list = range(labels.size()[0])
-    idx_test = random.sample(loc_list, math.floor(labels.size()[0] * test_ratio))
+    # loc_list = range(labels.size()[0])
+    # idx_test = random.sample(loc_list, math.floor(labels.size()[0] * test_ratio))
+    idx_test = []
     # Add new nodes and its neighbors in test set
     idx_test.extend(new_nodes_evo)
     idx_test.extend(get_ngh(g_evo.adj_sparse('csr'), new_nodes_evo))
     idx_test = list(set(idx_test))
-    # if not idx_test:
-    #     loc_list = range(labels.size()[0])
-    #     idx_test = random.sample(loc_list, math.floor(labels.size()[0] * test_ratio))
+    if not idx_test:
+        loc_list = range(labels.size()[0])
+        idx_test = random.sample(loc_list, math.floor(labels.size()[0] * test_ratio))
 
     idx_test.sort()
     test_mask = generate_mask_tensor(_sample_mask(idx_test, labels.shape[0]))
@@ -548,8 +549,8 @@ def count_neighbor_delta(nodes, g_csr, node_map_orig2evo, layer_num, deg_th=0):
 
     # return node_sum, edge_sum
 
-    node_access_num=0
-    edge_access_num=0
+    node_access_num = 0
+    edge_access_num = 0
     indptr = g_csr[0].numpy().tolist()
     indices = g_csr[1].numpy().tolist()
     node_queue = nodes
@@ -563,16 +564,18 @@ def count_neighbor_delta(nodes, g_csr, node_map_orig2evo, layer_num, deg_th=0):
             if node_ngh in node_map_orig2evo:
                 begin_ngh = indptr[node_ngh]
                 end_ngh = indptr[node_ngh + 1]
-                # If ngh_node is a high degree node
+                # Count all ngh access for high degree nodes
                 if end_ngh - begin_ngh >= deg_th:
                     ngh_queue.append(node_ngh)
+                # Only count delta access for low degree nodes
                 else:
                     node_access_num += 1
                     edge_access_num += 1
-    
-    node_ngh_access_num, edge_ngh_access_num = count_neighbor(ngh_queue, g_csr, node_map_orig2evo, layer_num)
 
-    node_access_num+=node_ngh_access_num
+    node_ngh_access_num, edge_ngh_access_num = count_neighbor(ngh_queue, g_csr, node_map_orig2evo,
+                                                              layer_num)
+
+    node_access_num += node_ngh_access_num
     edge_access_num += edge_ngh_access_num
 
     return node_access_num, edge_access_num
