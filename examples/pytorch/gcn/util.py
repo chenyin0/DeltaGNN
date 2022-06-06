@@ -8,6 +8,7 @@ from dgl.data.citation_graph import _sample_mask
 import math
 import random
 import numpy as np
+import copy as cp
 
 
 def gen_root_node_queue(g):
@@ -482,7 +483,7 @@ def count_neighbor(nodes, g_csr, node_map_orig2evo, layer_num):
     indptr = g_csr[0].numpy().tolist()
     indices = g_csr[1].numpy().tolist()
     # node_queue = nodes
-    node_queue = nodes
+    node_queue = cp.copy(nodes)
     for layer_id in range(layer_num):
         node_queue_seen = set(node_queue)
         node_num = len(node_queue)
@@ -517,7 +518,7 @@ def count_neighbor_delta(nodes, g_csr, node_map_orig2evo, layer_num, deg_th=0):
     edge_access_num = 0
     indptr = g_csr[0].numpy().tolist()
     indices = g_csr[1].numpy().tolist()
-    node_queue = nodes
+    node_queue = cp.copy(nodes)
     # ngh_queue = []
     ngh_queue = set()
 
@@ -538,13 +539,48 @@ def count_neighbor_delta(nodes, g_csr, node_map_orig2evo, layer_num, deg_th=0):
                     node_access_num += 1
                     edge_access_num += 1
 
-    node_ngh_access_num, edge_ngh_access_num = count_neighbor(list(ngh_queue), g_csr, node_map_orig2evo,
-                                                              layer_num)
+    node_ngh_access_num, edge_ngh_access_num = count_neighbor(list(ngh_queue), g_csr,
+                                                              node_map_orig2evo, layer_num)
 
     node_access_num += node_ngh_access_num
     edge_access_num += edge_ngh_access_num
 
     return node_access_num, edge_access_num
+
+
+# def count_neighbor_full(nodes, g_csr, layer_num):
+#     """
+#     Count neighbor edges and vertices of specific node set
+#     """
+#     edge_set = set()
+#     node_set = set(nodes)
+#     indptr = g_csr[0].numpy().tolist()
+#     indices = g_csr[1].numpy().tolist()
+#     # node_queue = nodes
+#     node_queue = nodes
+#     for layer_id in range(layer_num):
+#         node_queue_seen = set(node_queue)
+#         node_num = len(node_queue)
+#         for i in range(node_num):
+#             # print(i, node_num, len(node_queue))
+#             node = node_queue[i]
+#             begin = indptr[node]
+#             end = indptr[node + 1]
+#             for edge in range(begin, end):
+#                 ngh_node = indices[edge]
+#                 if ngh_node not in node_queue_seen:
+#                     node_queue.append(ngh_node)
+#                     node_queue_seen.add(ngh_node)
+#                     node_set.add(ngh_node)
+#                     edge_set.add(edge)
+
+#         # Pop visited node
+#         node_queue = node_queue[node_num:]
+
+#     node_sum = len(node_set)
+#     edge_sum = len(edge_set)
+
+#     return node_sum, edge_sum
 
 
 def save_graph_csr(g, dataset):

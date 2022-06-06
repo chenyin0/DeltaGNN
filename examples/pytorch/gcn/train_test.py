@@ -373,32 +373,36 @@ def main(args):
 
         print('Add node size: ', len(inserted_nodes))
 
-        # ##
-        # """
-        # # No retraining
-        # """
-        # print('\n>> No retraining')
-        # util.graph_evolve(inserted_nodes, g_csr, g, node_map_orig2evo, node_map_evo2orig, model.g)
+        ##
+        """
+        # No retraining
+        """
+        print('\n>> No retraining')
+        util.graph_evolve(inserted_nodes, g_csr, g, node_map_orig2evo, node_map_evo2orig, model.g)
 
-        # print('Node_number:', model.g.number_of_nodes())
-        # print('Edge_number:', model.g.number_of_edges())
+        print('Node_number:', model.g.number_of_nodes())
+        print('Edge_number:', model.g.number_of_edges())
 
-        # features = model.g.ndata['feat']
-        # labels = model.g.ndata['label']
-        # train_mask = model.g.ndata['train_mask']
-        # val_mask = model.g.ndata['val_mask']
-        # test_mask = model.g.ndata['test_mask']
+        features = model.g.ndata['feat']
+        labels = model.g.ndata['label']
+        train_mask = model.g.ndata['train_mask']
+        val_mask = model.g.ndata['val_mask']
+        test_mask = model.g.ndata['test_mask']
 
-        # acc = evaluate(model, features, labels, test_mask)
-        # print("Test accuracy of non-retrain @ {:d} nodes {:.2%}".format(
-        #     model.g.number_of_nodes(), acc))
-        # acc_non_retrain = acc * 100
+        acc = evaluate(model, features, labels, test_mask)
+        print("Test accuracy of non-retrain @ {:d} nodes {:.2%}".format(
+            model.g.number_of_nodes(), acc))
+        acc_non_retrain = acc * 100
 
-        # # Get node index of added_nodes in evolve graph
-        # inserted_nodes_evo = util.nodes_reindex(node_map_orig2evo, inserted_nodes)
-        # # inserted_nodes_evo.sort()
+        # Get node index of added_nodes in evolve graph
+        inserted_nodes_evo = util.nodes_reindex(node_map_orig2evo, inserted_nodes)
+        # inserted_nodes_evo.sort()
 
+        print('>>', len(inserted_nodes))
         # Statistic neighbor edges and nodes
+        node_full_retrain, edge_full_retrain = util.count_neighbor(model.g.nodes().tolist(), g_csr,
+                                                                   node_map_orig2evo,
+                                                                   args.n_layers + 1)
         # os.system('pause')
         node_ngh_delta_sum, edge_ngh_delta_sum = util.count_neighbor_delta(
             inserted_nodes, g_csr, node_map_orig2evo, args.n_layers + 1, args.deg_threshold)
@@ -406,10 +410,11 @@ def main(args):
         node_ngh_all_sum, edge_ngh_all_sum = util.count_neighbor(inserted_nodes, g_csr,
                                                                  node_map_orig2evo,
                                                                  args.n_layers + 1)
+
+        print('>>', len(model.g.nodes().tolist()), len(inserted_nodes))
         delta_neighbor.append([
-            model.g.number_of_nodes(),
-            model.g.number_of_edges(), node_ngh_delta_sum, edge_ngh_delta_sum, node_ngh_all_sum,
-            edge_ngh_all_sum
+            node_full_retrain, edge_full_retrain, node_ngh_all_sum, edge_ngh_all_sum,
+            node_ngh_delta_sum, edge_ngh_delta_sum
         ])
 
         # # Plot graph structure
