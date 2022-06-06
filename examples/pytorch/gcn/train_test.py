@@ -2,19 +2,20 @@ import argparse
 import time
 import numpy as np
 import torch
+import torch as th
 import torch.nn.functional as F
 import dgl
-from dgl.data import CoraGraphDataset, CiteseerGraphDataset, PubmedGraphDataset
+from dgl.data import CoraGraphDataset, CiteseerGraphDataset, PubmedGraphDataset, RedditDataset, AmazonCoBuyComputerDataset
 
 import util
-import copy
-import plt_graph
 import time
 
 from gcn import GCN
 from gcn import GCN_delta
-#from gcn_mp import GCN
-#from gcn_spmv import GCN
+
+from torchviz import make_dot
+
+import os
 
 
 def train(model, features, n_edges, train_mask, val_mask, labels, loss_fcn, optimizer):
@@ -186,6 +187,9 @@ def evaluate_delta_edge_masked(model,
 
 
 def main(args):
+    # Overall task execution time
+    Task_time_start = time.perf_counter()
+
     # load and preprocess dataset
     if args.dataset == 'cora':
         data = CoraGraphDataset(raw_dir='./dataset')
@@ -193,6 +197,10 @@ def main(args):
         data = CiteseerGraphDataset(raw_dir='./dataset')
     elif args.dataset == 'pubmed':
         data = PubmedGraphDataset(raw_dir='./dataset')
+    elif args.dataset == 'reddit':
+        data = RedditDataset(raw_dir='./dataset')
+    elif args.dataset == 'amazon_comp':
+        data = AmazonCoBuyComputerDataset(raw_dir='./dataset')
     else:
         raise ValueError('Unknown dataset: {}'.format(args.dataset))
 
@@ -254,7 +262,10 @@ def main(args):
     # test_mask = g.ndata['test_mask']
 
     in_feats = features.shape[1]
-    n_classes = data.num_labels
+    if args.dataset == 'amazon_comp':
+        n_classes = data.num_classes
+    else:
+        n_classes = data.num_labels
 
     # add self loop
     if args.self_loop:
@@ -362,34 +373,36 @@ def main(args):
 
         print('Add node size: ', len(inserted_nodes))
 
-        ##
-        """
-        # No retraining
-        """
-        print('\n>> No retraining')
-        util.graph_evolve(inserted_nodes, g_csr, g, node_map_orig2evo, node_map_evo2orig, model.g)
+        # ##
+        # """
+        # # No retraining
+        # """
+        # print('\n>> No retraining')
+        # util.graph_evolve(inserted_nodes, g_csr, g, node_map_orig2evo, node_map_evo2orig, model.g)
 
-        print('Node_number:', model.g.number_of_nodes())
-        print('Edge_number:', model.g.number_of_edges())
+        # print('Node_number:', model.g.number_of_nodes())
+        # print('Edge_number:', model.g.number_of_edges())
 
-        features = model.g.ndata['feat']
-        labels = model.g.ndata['label']
-        train_mask = model.g.ndata['train_mask']
-        val_mask = model.g.ndata['val_mask']
-        test_mask = model.g.ndata['test_mask']
+        # features = model.g.ndata['feat']
+        # labels = model.g.ndata['label']
+        # train_mask = model.g.ndata['train_mask']
+        # val_mask = model.g.ndata['val_mask']
+        # test_mask = model.g.ndata['test_mask']
 
-        acc = evaluate(model, features, labels, test_mask)
-        print("Test accuracy of non-retrain @ {:d} nodes {:.2%}".format(
-            model.g.number_of_nodes(), acc))
-        acc_non_retrain = acc * 100
+        # acc = evaluate(model, features, labels, test_mask)
+        # print("Test accuracy of non-retrain @ {:d} nodes {:.2%}".format(
+        #     model.g.number_of_nodes(), acc))
+        # acc_non_retrain = acc * 100
 
-        # Get node index of added_nodes in evolve graph
-        inserted_nodes_evo = util.nodes_reindex(node_map_orig2evo, inserted_nodes)
-        # inserted_nodes_evo.sort()
+        # # Get node index of added_nodes in evolve graph
+        # inserted_nodes_evo = util.nodes_reindex(node_map_orig2evo, inserted_nodes)
+        # # inserted_nodes_evo.sort()
 
         # Statistic neighbor edges and nodes
+        # os.system('pause')
         node_ngh_delta_sum, edge_ngh_delta_sum = util.count_neighbor_delta(
             inserted_nodes, g_csr, node_map_orig2evo, args.n_layers + 1, args.deg_threshold)
+        # os.system('pause')
         node_ngh_all_sum, edge_ngh_all_sum = util.count_neighbor(inserted_nodes, g_csr,
                                                                  node_map_orig2evo,
                                                                  args.n_layers + 1)
@@ -405,181 +418,171 @@ def main(args):
         # indices = g_evo_csr[1]
         # plt_graph.graph_visualize(indptr, indices, None)
 
-        ##
-        """
-        # Full graph retraining
-        """
-        print('\n>> Full graph retraining')
-        util.graph_evolve(inserted_nodes, g_csr, g, node_map_orig2evo, node_map_evo2orig,
-                          model_retrain.g)
+        # ##
+        # """
+        # # Full graph retraining
+        # """
+        # print('\n>> Full graph retraining')
+        # util.graph_evolve(inserted_nodes, g_csr, g, node_map_orig2evo, node_map_evo2orig,
+        #                   model_retrain.g)
 
-        features = model_retrain.g.ndata['feat']
-        labels = model_retrain.g.ndata['label']
-        train_mask = model_retrain.g.ndata['train_mask']
-        val_mask = model_retrain.g.ndata['val_mask']
-        test_mask = model_retrain.g.ndata['test_mask']
+        # features = model_retrain.g.ndata['feat']
+        # labels = model_retrain.g.ndata['label']
+        # train_mask = model_retrain.g.ndata['train_mask']
+        # val_mask = model_retrain.g.ndata['val_mask']
+        # test_mask = model_retrain.g.ndata['test_mask']
+        # # if len(node_q) > 0:
+        # #     train(model_retrain, features, model_retrain.g.number_of_edges(),
+        # #           train_mask, val_mask, labels, loss_fcn_retrain,
+        # #           optimizer_retrain)
+
+        # time_start = time.perf_counter()
+        # train(model_retrain, features, model_retrain.g.number_of_edges(), train_mask, val_mask,
+        #       labels, loss_fcn_retrain, optimizer_retrain)
+        # time_full_retrain = time.perf_counter() - time_start
+        # print('>> Epoch training time with full nodes: {:.4}s'.format(time_full_retrain))
+
+        # acc = evaluate(model_retrain, features, labels, test_mask)
+        # print("Test accuracy of retrain @ {:d} nodes {:.2%}".format(
+        #     model_retrain.g.number_of_nodes(), acc))
+        # acc_retrain = acc * 100
+
+        # ##
+        # """
+        # # Delta retraining only on inserted nodes
+        # """
+        # print('\n>> Delta retraining')
+        # # Execute full retraining at the beginning
+        # if i <= 0:
+        #     util.graph_evolve(inserted_nodes, g_csr, g, node_map_orig2evo, node_map_evo2orig,
+        #                       model_delta.g)
+        # else:
+        #     util.graph_evolve_delta(inserted_nodes, g_csr, g, node_map_orig2evo, node_map_evo2orig,
+        #                             model_delta.g)
+
+        # features = model_delta.g.ndata['feat']
+        # labels = model_delta.g.ndata['label']
+        # train_mask = model_delta.g.ndata['train_mask']
+        # val_mask = model_delta.g.ndata['val_mask']
+        # test_mask = model_delta.g.ndata['test_mask']
+
         # if len(node_q) > 0:
-        #     train(model_retrain, features, model_retrain.g.number_of_edges(),
-        #           train_mask, val_mask, labels, loss_fcn_retrain,
-        #           optimizer_retrain)
+        #     time_start = time.perf_counter()
+        #     train(model_delta, features, model_delta.g.number_of_edges(), train_mask, val_mask,
+        #           labels, loss_fcn_delta, optimizer_delta)
+        #     time_delta_retrain = time.perf_counter() - time_start
+        #     print('>> Epoch training time in delta: {:.4}s'.format(time_delta_retrain))
 
-        time_start = time.perf_counter()
-        train(model_retrain, features, model_retrain.g.number_of_edges(), train_mask, val_mask,
-              labels, loss_fcn_retrain, optimizer_retrain)
-        time_full_retrain = time.perf_counter() - time_start
-        print('>> Epoch training time with full nodes: {:.4}s'.format(time_full_retrain))
+        # if i <= 3:
+        #     acc = evaluate(model_delta, features, labels, test_mask)
+        # else:
+        #     acc = evaluate_delta(model_delta, features, labels, test_mask, inserted_nodes_evo)
+        #     # acc = evaluate(model_delta, features, labels, test_mask)
+        # # acc = evaluate(model_delta, features, labels, test_mask)
+        # print("Test accuracy of delta @ {:d} nodes {:.2%}".format(model_delta.g.number_of_nodes(),
+        #                                                           acc))
+        # acc_retrain_delta = acc * 100
 
-        acc = evaluate(model_retrain, features, labels, test_mask)
-        print("Test accuracy of retrain @ {:d} nodes {:.2%}".format(
-            model_retrain.g.number_of_nodes(), acc))
-        acc_retrain = acc * 100
+        # ##
+        # """
+        # # Delta retraining on inserted nodes and its neighbors
+        # """
+        # print('\n>> Delta all neighbor retraining')
+        # # Execute full retraining at the beginning
+        # if i <= 0:
+        #     util.graph_evolve(inserted_nodes, g_csr, g, node_map_orig2evo, node_map_evo2orig,
+        #                       model_delta_all_ngh.g)
+        # else:
+        #     util.graph_evolve_delta_all_ngh(inserted_nodes, g_csr, g, node_map_orig2evo,
+        #                                     node_map_evo2orig, model_delta_all_ngh.g)
 
-        ##
-        """
-        # Delta retraining only on inserted nodes
-        """
-        print('\n>> Delta retraining')
-        # Execute full retraining at the beginning
-        if i <= 0:
-            util.graph_evolve(inserted_nodes, g_csr, g, node_map_orig2evo, node_map_evo2orig,
-                              model_delta.g)
-        else:
-            util.graph_evolve_delta(inserted_nodes, g_csr, g, node_map_orig2evo, node_map_evo2orig,
-                                    model_delta.g)
+        # # Get ngh with high deg and low deg
+        # ngh_high_deg, ngh_low_deg = util.get_ngh_with_deg_th(model_delta_all_ngh.g,
+        #                                                      inserted_nodes_evo, deg_th)
+        # print('High_deg_ngh_num: {:d}, Low_deg_ngh_num: {:d}'.format(len(ngh_high_deg),
+        #                                                              len(ngh_low_deg)))
 
-        features = model_delta.g.ndata['feat']
-        labels = model_delta.g.ndata['label']
-        train_mask = model_delta.g.ndata['train_mask']
-        val_mask = model_delta.g.ndata['val_mask']
-        test_mask = model_delta.g.ndata['test_mask']
+        # # Merge ngh_high_deg and ngh_low_deg
+        # ngh_dict = ngh_high_deg.copy()
+        # ngh_dict.update(ngh_low_deg)
 
-        if len(node_q) > 0:
-            time_start = time.perf_counter()
-            train(model_delta, features, model_delta.g.number_of_edges(), train_mask, val_mask,
-                  labels, loss_fcn_delta, optimizer_delta)
-            time_delta_retrain = time.perf_counter() - time_start
-            print('>> Epoch training time in delta: {:.4}s'.format(time_delta_retrain))
+        # #Set edge weight (mask) according to node degree
+        # util.gen_edge_mask(model_delta_all_ngh.g, ngh_dict)
 
-        if i <= 3:
-            acc = evaluate(model_delta, features, labels, test_mask)
-        else:
-            acc = evaluate_delta(model_delta, features, labels, test_mask, inserted_nodes_evo)
-            # acc = evaluate(model_delta, features, labels, test_mask)
-        # acc = evaluate(model_delta, features, labels, test_mask)
-        print("Test accuracy of delta @ {:d} nodes {:.2%}".format(model_delta.g.number_of_nodes(),
-                                                                  acc))
-        acc_retrain_delta = acc * 100
+        # features = model_delta_all_ngh.g.ndata['feat']
+        # labels = model_delta_all_ngh.g.ndata['label']
+        # train_mask = model_delta_all_ngh.g.ndata['train_mask']
+        # val_mask = model_delta_all_ngh.g.ndata['val_mask']
+        # test_mask = model_delta_all_ngh.g.ndata['test_mask']
 
-        ##
-        """
-        # Delta retraining on inserted nodes and all of its neighbors
-        """
-        print('\n>> Delta all neighbor retraining')
-        # Execute full retraining at the beginning
-        if i <= 0:
-            util.graph_evolve(inserted_nodes, g_csr, g, node_map_orig2evo, node_map_evo2orig,
-                              model_delta_all_ngh.g)
-        else:
-            util.graph_evolve_delta_all_ngh(inserted_nodes, g_csr, g, node_map_orig2evo,
-                                            node_map_evo2orig, model_delta_all_ngh.g)
+        # if len(node_q) > 0:
+        #     time_start = time.perf_counter()
+        #     # train_delta(model_delta_all_ngh, features, model_delta_all_ngh.g.number_of_edges(),
+        #     #             train_mask, val_mask, labels, loss_fcn_delta_all_ngh,
+        #     #             optimizer_delta_all_ngh, ngh_high_deg, ngh_low_deg)
 
-        # Get ngh with high deg and low deg
-        ngh_high_deg, ngh_low_deg = util.get_ngh_with_deg_th(model_delta_all_ngh.g,
-                                                             inserted_nodes_evo, deg_th)
-        # Merge ngh_high_deg and ngh_low_deg
-        ngh_dict = ngh_high_deg.copy()
-        ngh_dict.update(ngh_low_deg)
+        #     # train(model_delta_all_ngh, features, model_delta_all_ngh.g.number_of_edges(),
+        #     #       train_mask, val_mask, labels, loss_fcn_delta_all_ngh, optimizer_delta_all_ngh)
+        #     if i <= 3:
+        #         train(model_delta_all_ngh, features, model_delta_all_ngh.g.number_of_edges(),
+        #               train_mask, val_mask, labels, loss_fcn_delta_all_ngh, optimizer_delta_all_ngh)
+        #     else:
+        #         train_delta_edge_masked(model_delta_all_ngh, features,
+        #                                 model_delta_all_ngh.g.number_of_edges(), train_mask,
+        #                                 val_mask, labels, loss_fcn_delta_all_ngh,
+        #                                 optimizer_delta_all_ngh, list(ngh_high_deg.keys()),
+        #                                 list(ngh_low_deg.keys()))
 
-        #Set edge weight (mask) according to node degree
-        util.gen_edge_mask(model_delta_all_ngh.g, ngh_dict)
+        #     time_delta_all_ngh_retrain = time.perf_counter() - time_start
+        #     print('>> Epoch training time in delta with all ngh: {:.4}s'.format(
+        #         time_delta_all_ngh_retrain))
 
-        features = model_delta_all_ngh.g.ndata['feat']
-        labels = model_delta_all_ngh.g.ndata['label']
-        train_mask = model_delta_all_ngh.g.ndata['train_mask']
-        val_mask = model_delta_all_ngh.g.ndata['val_mask']
-        test_mask = model_delta_all_ngh.g.ndata['test_mask']
+        # if i <= -1:
+        #     acc = evaluate(model_delta_all_ngh, features, labels, test_mask)
+        # else:
+        #     # acc = evaluate_delta_with_degree(model_delta_all_ngh, features, labels, test_mask,
+        #     #                                  ngh_high_deg, ngh_low_deg)
+        #     # acc = evaluate_delta_with_degree(model_delta_all_ngh, features, labels, test_mask)
 
-        if len(node_q) > 0:
-            time_start = time.perf_counter()
-            # train_delta(model_delta_all_ngh, features, model_delta_all_ngh.g.number_of_edges(),
-            #             train_mask, val_mask, labels, loss_fcn_delta_all_ngh,
-            #             optimizer_delta_all_ngh, ngh_high_deg, ngh_low_deg)
+        #     acc = evaluate_delta_edge_masked(model_delta_all_ngh, features, labels, test_mask,
+        #                                      list(ngh_high_deg.keys()), list(ngh_low_deg.keys()))
 
-            # train(model_delta_all_ngh, features, model_delta_all_ngh.g.number_of_edges(),
-            #       train_mask, val_mask, labels, loss_fcn_delta_all_ngh, optimizer_delta_all_ngh)
-            if i <= 3:
-                train(model_delta_all_ngh, features, model_delta_all_ngh.g.number_of_edges(),
-                      train_mask, val_mask, labels, loss_fcn_delta_all_ngh, optimizer_delta_all_ngh)
-            else:
-                train_delta_edge_masked(model_delta_all_ngh, features,
-                                        model_delta_all_ngh.g.number_of_edges(), train_mask,
-                                        val_mask, labels, loss_fcn_delta_all_ngh,
-                                        optimizer_delta_all_ngh, list(ngh_high_deg.keys()),
-                                        list(ngh_low_deg.keys()))
+        # # acc = evaluate(model_delta_all_ngh, features, labels, test_mask)
+        # print("Test accuracy of delta_all_ngh @ {:d} nodes {:.2%}".format(
+        #     model_delta_all_ngh.g.number_of_nodes(), acc))
+        # acc_retrain_delta_all_ngh = acc * 100
 
-            time_delta_all_ngh_retrain = time.perf_counter() - time_start
-            print('>> Epoch training time in delta with all ngh: {:.4}s'.format(
-                time_delta_all_ngh_retrain))
-
-        if i <= -1:
-            acc = evaluate(model_delta_all_ngh, features, labels, test_mask)
-        else:
-            # acc = evaluate_delta_with_degree(model_delta_all_ngh, features, labels, test_mask,
-            #                                  ngh_high_deg, ngh_low_deg)
-            # acc = evaluate_delta_with_degree(model_delta_all_ngh, features, labels, test_mask)
-
-            acc = evaluate_delta_edge_masked(model_delta_all_ngh, features, labels, test_mask,
-                                             ngh_high_deg, ngh_low_deg)
-
-        # acc = evaluate(model_delta_all_ngh, features, labels, test_mask)
-        print("Test accuracy of delta_all_ngh @ {:d} nodes {:.2%}".format(
-            model_delta_all_ngh.g.number_of_nodes(), acc))
-        acc_retrain_delta_all_ngh = acc * 100
-
-        accuracy.append([
-            model.g.number_of_nodes(),
-            model.g.number_of_edges(), acc_non_retrain, acc_retrain, acc_retrain_delta,
-            acc_retrain_delta_all_ngh
-        ])
+        # accuracy.append([
+        #     model.g.number_of_nodes(),
+        #     model.g.number_of_edges(), acc_non_retrain, acc_retrain, acc_retrain_delta,
+        #     acc_retrain_delta_all_ngh
+        # ])
 
         i += 1
 
     deg_th = str(args.deg_threshold)
     # Dump log
-    if args.dataset == 'cora':
-        np.savetxt('./results/cora_add_edge_deg_' + deg_th + '.txt',
-                   accuracy,
-                   fmt='%d, %d, %.2f, %.2f, %.2f, %.2f')
-        np.savetxt('./results/cora_delta_ngh_deg_' + deg_th + '.txt',
-                   delta_neighbor,
-                   fmt='%d, %d, %d, %d, %d, %d')
-    elif args.dataset == 'citeseer':
-        np.savetxt('./results/citeseer_add_edge_deg_' + deg_th + '.txt',
-                   accuracy,
-                   fmt='%d, %d, %.2f, %.2f, %.2f, %.2f')
-        np.savetxt('./results/citeseer_delta_ngh_deg_' + deg_th + '.txt',
-                   delta_neighbor,
-                   fmt='%d, %d, %d, %d, %d, %d')
-    elif args.dataset == 'pubmed':
-        np.savetxt('./results/pubmed_add_edge_deg_' + deg_th + '.txt',
-                   accuracy,
-                   fmt='%d, %d, %.2f, %.2f, %.2f, %.2f')
-        np.savetxt('./results/pubmed_delta_ngh_deg_' + deg_th + '.txt',
-                   delta_neighbor,
-                   fmt='%d, %d, %d, %d, %d, %d')
-    else:
-        raise ValueError('Unknown dataset: {}'.format(args.dataset))
+    # np.savetxt('./results/' + args.dataset + '_add_edge_deg_' + deg_th + '.txt',
+    #            accuracy,
+    #            fmt='%d, %d, %.2f, %.2f, %.2f, %.2f')
+    np.savetxt('./results/' + args.dataset + '_delta_ngh_deg_' + deg_th + '.txt',
+               delta_neighbor,
+               fmt='%d, %d, %d, %d, %d, %d')
 
     # plot.plt_edge_epoch()
     # plot.plt_edge_epoch(edge_epoch, result)
 
+    print('\n>> Task {:s} execution time: {:.4}s'.format(args.dataset,
+                                                         time.perf_counter() - Task_time_start))
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='GCN')
-    parser.add_argument("--dataset",
-                        type=str,
-                        default="cora",
-                        help="Dataset name ('cora', 'citeseer', 'pubmed').")
+    parser.add_argument(
+        "--dataset",
+        type=str,
+        default="cora",
+        help="Dataset name ('cora', 'citeseer', 'pubmed', 'reddit', 'amazon_comp').")
     parser.add_argument("--dropout", type=float, default=0.5, help="dropout probability")
     parser.add_argument("--gpu", type=int, default=-1, help="gpu")
     parser.add_argument("--lr", type=float, default=1e-2, help="learning rate")
@@ -595,9 +598,23 @@ if __name__ == '__main__':
     parser.set_defaults(self_loop=False)
     args = parser.parse_args()
 
-    # args.dataset = 'pubmed'
-    # args.n_epochs = 200
-    # args.deg_threshold=5
+    args.dataset = 'amazon_comp'
+    args.n_epochs = 0
+    args.deg_threshold = 30
+
+    print('\n************ {:s} ************'.format(args.dataset))
     print(args)
+
+    # new_val = torch.arange(1, 21).reshape((4, 5))
+    # print(new_val)
+    # src = torch.ones(4, 5, dtype=new_val.dtype)
+    # row_id = th.tensor([0, 2, 3])
+    # index = [[row_id[k].item() for i in range(new_val.shape[1])] for k in range(row_id.shape[0])]
+    # print(index)
+    # index=th.tensor(index)
+
+    # # src = torch.arange(1, 11).reshape((2, 5))
+    # # index = torch.tensor([[0, 0, 0, 0, 0], [2,2,2,2, 2]])
+    # print(src.scatter_(0, index, new_val, reduce='add'))
 
     main(args)
