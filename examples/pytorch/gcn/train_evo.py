@@ -164,10 +164,7 @@ def main(args):
     # test_mask = g.ndata['test_mask']
 
     in_feats = features.shape[1]
-    if args.dataset == 'amazon_comp':
-        n_classes = data.num_classes
-    else:
-        n_classes = data.num_labels
+    n_classes = data.num_classes
 
     # add self loop
     if args.self_loop:
@@ -257,8 +254,10 @@ def main(args):
 
     mem_access_q_full_retrain = []  # For gen mem trace
     mem_access_q_all_ngh = []  # For gen mem trace
-    trace_path_full_retrain = './results/' + args.dataset + '_mem_trace_full_retrain.txt'
-    trace_path_all_ngh = './results/' + args.dataset + '_mem_trace_all_ngh.txt'
+    trace_path_full_retrain = './results/mem_trace/' + args.dataset + '_full_retrain.txt'
+    trace_path_all_ngh = './results/mem_trace/' + args.dataset + '_all_ngh.txt'
+    os.system('rm ' + trace_path_full_retrain)  # Reset mem trace
+    os.system('rm ' + trace_path_all_ngh)  # Reset mem trace
 
     while len(node_q) > 0:
         print('\n>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
@@ -306,20 +305,29 @@ def main(args):
                                                                    args.n_layers + 1,
                                                                    mem_access_q_full_retrain)
 
-        # They are all full graph retrain in the initial time
         if i == 0:
+            # There are all full retrain in the initial time of train_full and train_all_ngh
             delta_neighbor.append(
                 [node_full_retrain, edge_full_retrain, node_full_retrain, edge_full_retrain])
 
             # Record mem trace
-            util.gen_mem_trace(mem_access_q_full_retrain, '')
+            util.dump_mem_trace(mem_access_q_full_retrain, trace_path_full_retrain)
+            util.dump_mem_trace(mem_access_q_full_retrain, trace_path_all_ngh)
+            mem_access_q_full_retrain = []  # Reset queue
         else:
             node_ngh_all_sum, edge_ngh_all_sum = util.count_neighbor_delta(
-                inserted_nodes_evo, g_csr_evo, node_map_orig2evo, args.n_layers + 1, 0)
+                inserted_nodes_evo, g_csr_evo, node_map_orig2evo, args.n_layers + 1, 0,
+                mem_access_q_all_ngh)
 
             print('>>', node_full_retrain, edge_full_retrain, node_ngh_all_sum, edge_ngh_all_sum)
             delta_neighbor.append(
                 [node_full_retrain, edge_full_retrain, node_ngh_all_sum, edge_ngh_all_sum])
+
+            # Record mem trace
+            util.dump_mem_trace(mem_access_q_full_retrain, trace_path_full_retrain)
+            util.dump_mem_trace(mem_access_q_all_ngh, trace_path_all_ngh)
+            mem_access_q_full_retrain = []  # Reset queue
+            mem_access_q_all_ngh = []  # Reset queue
 
         # # Plot graph structure
         # g_evo_csr = model.g.adj_sparse('csr')
@@ -402,10 +410,10 @@ def main(args):
 
     deg_th = str(args.deg_threshold)
     # Dump log
-    # np.savetxt('./results/' + args.dataset + '_accuracy_evo' + '.txt',
+    # np.savetxt('./results/accuracy/' + args.dataset + '_evo' + '.txt',
     #            accuracy,
     #            fmt='%d, %d, %.2f, %.2f', %.2f')
-    np.savetxt('./results/' + args.dataset + '_delta_ngh.txt', delta_neighbor, fmt='%d, %d, %d, %d')
+    np.savetxt('./results/node_access/' + args.dataset + '_evo.txt', delta_neighbor, fmt='%d, %d, %d, %d')
 
     # plot.plt_edge_epoch()
     # plot.plt_edge_epoch(edge_epoch, result)

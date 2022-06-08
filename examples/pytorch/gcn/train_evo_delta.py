@@ -238,10 +238,7 @@ def main(args):
     # test_mask = g.ndata['test_mask']
 
     in_feats = features.shape[1]
-    if args.dataset == 'amazon_comp':
-        n_classes = data.num_classes
-    else:
-        n_classes = data.num_labels
+    n_classes = data.num_classes
 
     # add self loop
     if args.self_loop:
@@ -323,7 +320,8 @@ def main(args):
     delta_neighbor = []
 
     mem_access_q_delta_ngh = []  # For gen mem trace
-    trace_path_delta_ngh = './results/' + args.dataset + '_delta_ngh_deg_' + deg_th + '.txt'
+    trace_path_delta_ngh = './results/mem_trace/' + args.dataset + '_delta_ngh_deg_' + str(deg_th) + '.txt'
+    os.system('rm ' + trace_path_delta_ngh)  # Reset mem trace
 
     while len(node_q) > 0:
         print('\n>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
@@ -364,24 +362,26 @@ def main(args):
         inserted_nodes_evo = util.nodes_reindex(node_map_orig2evo, inserted_nodes)
         # inserted_nodes_evo.sort()
 
+        g_csr_evo = model.g.adj_sparse('csr')
         # They are all full graph retrain in the initial time
         if i == 0:
-            g_csr_evo = model.g.adj_sparse('csr')
             # Statistic neighbor edges and nodes
             node_full_retrain, edge_full_retrain = util.count_neighbor(
-                model.g.nodes().tolist(), g_csr_evo, node_map_orig2evo, args.n_layers + 1)
+                model.g.nodes().tolist(), g_csr_evo, node_map_orig2evo, args.n_layers + 1,
+                mem_access_q_delta_ngh)
 
             delta_neighbor.append([node_full_retrain, edge_full_retrain])
-
-            # Record mem trace
-            util.gen_mem_trace(mem_access_q_full_retrain, '')
         else:
             node_ngh_delta_sum, edge_ngh_delta_sum = util.count_neighbor_delta(
                 inserted_nodes_evo, g_csr_evo, node_map_orig2evo, args.n_layers + 1,
-                args.deg_threshold)
+                args.deg_threshold, mem_access_q_delta_ngh)
 
             print('>>', node_ngh_delta_sum, edge_ngh_delta_sum)
             delta_neighbor.append([node_ngh_delta_sum, edge_ngh_delta_sum])
+
+        # Record mem trace
+        util.dump_mem_trace(mem_access_q_delta_ngh, trace_path_delta_ngh)
+        mem_access_q_delta_ngh = []  # Reset queue
 
         # # Plot graph structure
         # g_evo_csr = model.g.adj_sparse('csr')
@@ -468,10 +468,10 @@ def main(args):
 
     deg_th = str(args.deg_threshold)
     # Dump log
-    # np.savetxt('./results/' + args.dataset + '_accuracy_evo_delta_' + deg_th + '.txt',
+    # np.savetxt('./results/accuracy/' + args.dataset + '_evo_delta_' + deg_th + '.txt',
     #            accuracy,
     #            fmt='%d, %d, %.2f)
-    np.savetxt('./results/' + args.dataset + '_delta_ngh_deg_' + deg_th + '.txt',
+    np.savetxt('./results/node_access/' + args.dataset + '_evo_delta_deg_' + deg_th + '.txt',
                delta_neighbor,
                fmt='%d, %d')
 
@@ -504,9 +504,9 @@ if __name__ == '__main__':
     parser.set_defaults(self_loop=False)
     args = parser.parse_args()
 
-    # args.dataset = 'amazon_comp'
+    # args.dataset = 'cora'
     # args.n_epochs = 0
-    # args.deg_threshold = 300
+    # args.deg_threshold = 5
 
     print('\n************ {:s} ************'.format(args.dataset))
     print(args)

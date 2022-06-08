@@ -392,17 +392,19 @@ def plt_full_retrain():
 
 def plt_delta_retrain():
     deg_th = 30
-    cora_evo = np.loadtxt('./results/cora_delta_ngh_deg.txt', delimiter=',')
-    citeseer_evo = np.loadtxt('./results/citeseer_delta_ngh_deg.txt', delimiter=',')
-    pubmed_evo = np.loadtxt('./results/pubmed_delta_ngh_deg.txt', delimiter=',')
+    cora_evo = np.loadtxt('./results/node_access/cora_evo.txt', delimiter=',')
+    citeseer_evo = np.loadtxt('./results/node_access/citeseer_evo.txt', delimiter=',')
+    pubmed_evo = np.loadtxt('./results/node_access/pubmed_evo.txt', delimiter=',')
 
-    cora_evo_delta = np.loadtxt('./results/cora_delta_ngh_deg_' + str(deg_th) + '.txt',
+    cora_evo_delta = np.loadtxt('./results/node_access/cora_evo_delta_deg_' + str(deg_th) + '.txt',
                                 delimiter=',')
-    citeseer_evo_delta = np.loadtxt('./results/citeseer_delta_ngh_deg_' + str(deg_th) + '.txt',
+    citeseer_evo_delta = np.loadtxt('./results/node_access/citeseer_evo_delta_deg_' + str(deg_th) +
+                                    '.txt',
                                     delimiter=',')
-    pubmed_evo_delta = np.loadtxt('./results/pubmed_delta_ngh_deg_' + str(deg_th) + '.txt',
+    pubmed_evo_delta = np.loadtxt('./results/node_access/pubmed_evo_delta_deg_' + str(deg_th) +
+                                  '.txt',
                                   delimiter=',')
-    # pubmed_delta = np.loadtxt('./results/amazon_comp_delta_ngh_deg_' + str(deg_th) + '.txt',
+    # pubmed_delta = np.loadtxt('./results/node_access/amazon_comp_evo_delta_deg_' + str(deg_th) + '.txt',
     #                     delimiter=',')
 
     v_cora = cora_evo[:, 0]

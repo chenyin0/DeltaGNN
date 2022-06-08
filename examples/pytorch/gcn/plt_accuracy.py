@@ -3,13 +3,13 @@ import numpy as np
 
 
 def plt_edge_epoch():
-    cora_evo = np.loadtxt('./results/cora_accuracy_evo.txt', delimiter=',')
-    citeseer_evo = np.loadtxt('./results/citeseer_accuracy_evo.txt', delimiter=',')
-    pubmed_evo = np.loadtxt('./results/pubmed_accuracy_evo.txt', delimiter=',')
+    cora_evo = np.loadtxt('./results/accuracy/cora_evo.txt', delimiter=',')
+    citeseer_evo = np.loadtxt('./results/accuracy/citeseer_evo.txt', delimiter=',')
+    pubmed_evo = np.loadtxt('./results/accuracy/pubmed_evo.txt', delimiter=',')
 
-    cora_evo_delta = np.loadtxt('./results/cora_accuracy_evo_delta_30.txt', delimiter=',')
-    citeseer_evo_delta = np.loadtxt('./results/citeseer_accuracy_evo_delta_30.txt', delimiter=',')
-    pubmed_evo_delta = np.loadtxt('./results/pubmed_accuracy_evo_delta_30.txt', delimiter=',')
+    cora_evo_delta = np.loadtxt('./results/accuracy/cora_evo_delta_30.txt', delimiter=',')
+    citeseer_evo_delta = np.loadtxt('./results/accuracy/citeseer_evo_delta_30.txt', delimiter=',')
+    pubmed_evo_delta = np.loadtxt('./results/accuracy/pubmed_evo_delta_30.txt', delimiter=',')
 
     epoch_num_cora = cora_evo.shape[0] - 1
     epoch_num_citeseer = citeseer_evo.shape[0] - 1

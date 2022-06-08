@@ -560,7 +560,8 @@ def count_neighbor_delta(nodes, g_csr, node_map_orig2evo, layer_num, deg_th=0, m
                 # node_queue_seen.add(node_ngh)
 
     node_ngh_access_num, edge_ngh_access_num = count_neighbor(list(ngh_queue), g_csr,
-                                                              node_map_orig2evo, layer_num, mem_access_q)
+                                                              node_map_orig2evo, layer_num,
+                                                              mem_access_q)
     print(len(nodes), len(list(ngh_queue)))
     print('>> delta ngh', node_access_num, edge_access_num, node_ngh_access_num,
           edge_ngh_access_num)
@@ -615,7 +616,8 @@ def save_graph_csr(g, dataset):
     np.savetxt('./dataset/csr/' + dataset + '_indices.txt', indices, fmt='%d')
 
 
-def gen_mem_trace(queue, file_path):
+def dump_mem_trace(queue, file_path):
     with open(file_path, 'a') as f:
         for item in queue:
-            f.write(item, '\n')
+            f.write(str(item))
+            f.write('\n')
