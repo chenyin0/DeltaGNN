@@ -16,7 +16,7 @@ def comp_per_layer(feat_dim, v_num, e_num):
 
 
 def access_per_layer(feat_dim, e_num):
-    access = e_num * feat_dim / (4 * 1024 * 1024)  # MB
+    access = e_num * feat_dim * 32 / (8 * 1024 * 1024)  # MB
     return access
 
 
@@ -384,16 +384,19 @@ def plt_full_retrain():
 
     fontsize = 16
     #plt.xlabel('Unroll number',fontsize = fontsize)
-    plt.ylabel('Memory access\n(norm to non-retrain)', fontsize=fontsize)
+    plt.ylabel('Memory access\n(norm to Origin)', fontsize=fontsize)
 
     plt.tight_layout()
     plt.savefig('./figure/retrain_mem.pdf', dpi=600, bbox_inches="tight", pad_inches=0)
 
 
 def plt_delta_retrain():
-    cora = np.loadtxt('./results/cora_delta_neighbor.txt', delimiter=',')
-    citeseer = np.loadtxt('./results/citeseer_delta_neighbor.txt', delimiter=',')
-    pubmed = np.loadtxt('./results/pubmed_delta_neighbor.txt', delimiter=',')
+    deg_th = 30
+    cora = np.loadtxt('./results/cora_delta_ngh_deg_' + str(deg_th) + '.txt', delimiter=',')
+    citeseer = np.loadtxt('./results/citeseer_delta_ngh_deg_' + str(deg_th) + '.txt', delimiter=',')
+    pubmed = np.loadtxt('./results/pubmed_delta_ngh_deg_' + str(deg_th) + '.txt', delimiter=',')
+    # pubmed = np.loadtxt('./results/amazon_comp_delta_ngh_deg_' + str(deg_th) + '.txt',
+    #                     delimiter=',')
 
     v_cora = cora[:, 0]
     e_cora = cora[:, 1]
@@ -436,12 +439,12 @@ def plt_delta_retrain():
     """
     Computation and memory access of ngh-delta retraining    
     """
-    v_cora_ngh_delta = cora[:, 2]
-    e_cora_ngh_delta = cora[:, 3]
-    v_citeseer_ngh_delta = citeseer[:, 2]
-    e_citeseer_ngh_delta = citeseer[:, 3]
-    v_pubmed_ngh_delta = pubmed[:, 2]
-    e_pubmed_ngh_delta = pubmed[:, 3]
+    v_cora_ngh_delta = cora[:, 4]
+    e_cora_ngh_delta = cora[:, 5]
+    v_citeseer_ngh_delta = citeseer[:, 4]
+    e_citeseer_ngh_delta = citeseer[:, 5]
+    v_pubmed_ngh_delta = pubmed[:, 4]
+    e_pubmed_ngh_delta = pubmed[:, 5]
 
     comp_cora_ngh_delta = []
     comp_citeseer_ngh_delta = []
@@ -473,12 +476,12 @@ def plt_delta_retrain():
     """
     Computation and memory access of ngh_all retraining        
     """
-    v_cora_ngh_all = cora[:, 4]
-    e_cora_ngh_all = cora[:, 5]
-    v_citeseer_ngh_all = citeseer[:, 4]
-    e_citeseer_ngh_all = citeseer[:, 5]
-    v_pubmed_ngh_all = pubmed[:, 4]
-    e_pubmed_ngh_all = pubmed[:, 5]
+    v_cora_ngh_all = cora[:, 2]
+    e_cora_ngh_all = cora[:, 3]
+    v_citeseer_ngh_all = citeseer[:, 2]
+    e_citeseer_ngh_all = citeseer[:, 3]
+    v_pubmed_ngh_all = pubmed[:, 2]
+    e_pubmed_ngh_all = pubmed[:, 3]
 
     comp_cora_ngh_all = []
     comp_citeseer_ngh_all = []
@@ -557,7 +560,8 @@ def plt_delta_retrain():
     import matplotlib.ticker as mtick
 
     labels = [
-        'Orig', 'Time 1', 'Time 2', 'Time 3', 'Time 4', 'Time 5', 'Time 6', 'Time 7', 'Time 8'
+        'Origin', 'Period 1', 'Period 2', 'Period 3', 'Period 4', 'Period 5', 'Period 6',
+        'Period 7', 'Period 8'
     ]
     items = [
         'Cora_full', 'Citeseer_full', 'Pubmed_full', 'Cora_ngh_all', 'Citeseer_ngh_all',
@@ -571,6 +575,13 @@ def plt_delta_retrain():
         comp_pubmed_ngh_all, comp_cora_ngh_delta, comp_citeseer_ngh_delta, comp_pubmed_ngh_delta
     ]
 
+    # # Print combination(computation) reduction of each dataset
+    # comb_reduct_cora = sum(comp_cora) / sum(comp_cora_ngh_delta)
+    # comb_reduct_citeseer = sum(comp_citeseer) / sum(comp_citeseer_ngh_delta)
+    # comb_reduct_pubmed = sum(comp_pubmed) / sum(comp_pubmed_ngh_delta)
+    # print('\nCombination reduction: \ncora: {:.2%}, citeseer: {:.2%}, pubmed: {:.2%}'.format(
+    #     comb_reduct_cora, comb_reduct_citeseer, comb_reduct_pubmed))
+
     # Group size in each label
     group_size = len(items)
 
@@ -672,7 +683,7 @@ def plt_delta_retrain():
 
     fontsize = 16
     #plt.xlabel('Unroll number',fontsize = fontsize)
-    plt.ylabel('Computation\n(norm to non-retrain)', fontsize=fontsize)
+    plt.ylabel('Total combination\n(norm to Origin)', fontsize=fontsize)
 
     plt.tight_layout()
     plt.savefig('./figure/retrain_comp_delta.pdf', dpi=600, bbox_inches="tight", pad_inches=0)
@@ -686,6 +697,13 @@ def plt_delta_retrain():
         mem_pubmed_ngh_all, mem_cora_ngh_delta, mem_citeseer_ngh_delta, mem_pubmed_ngh_delta
     ]
 
+    # # Print aggregation (mem access) reduction of each dataset
+    # aggr_reduct_cora = sum(mem_cora) / sum(mem_cora_ngh_delta)
+    # aggr_reduct_citeseer = sum(mem_citeseer) / sum(mem_citeseer_ngh_delta)
+    # aggr_reduct_pubmed = sum(mem_pubmed) / sum(mem_pubmed_ngh_delta)
+    # print('\nAggregation reduction: \ncora: {:.2%}, citeseer: {:.2%}, pubmed: {:.2%}'.format(
+    #     aggr_reduct_cora, aggr_reduct_citeseer, aggr_reduct_pubmed))
+
     # Group size in each label
     group_size = len(items)
 
@@ -787,7 +805,7 @@ def plt_delta_retrain():
 
     fontsize = 16
     #plt.xlabel('Unroll number',fontsize = fontsize)
-    plt.ylabel('Memory access\n(norm to non-retrain)', fontsize=fontsize)
+    plt.ylabel('Total aggregation\n(norm to Origin)', fontsize=fontsize)
 
     plt.tight_layout()
     plt.savefig('./figure/retrain_mem_delta.pdf', dpi=600, bbox_inches="tight", pad_inches=0)

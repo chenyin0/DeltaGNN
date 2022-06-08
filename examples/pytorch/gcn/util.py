@@ -474,43 +474,58 @@ def update_g_attr_all_ngh(new_nodes, g_evo, g_orig, node_map_evo2orig, node_map_
     g_evo.ndata['test_mask'] = test_mask
 
 
-def count_neighbor(nodes, g_csr, node_map_orig2evo, layer_num):
+def count_neighbor(nodes, g_csr, node_map_orig2evo, layer_num, mem_access_q=None):
     """
     Count neighbor edges and vertices of specific node set
+
+    node_access_q: used for generating mem trace
     """
-    edge_set = set()
-    node_set = set(nodes)
+    # edge_set = set()
+    # node_set = set(nodes)
+    node_access_num = 0
+    edge_access_num = 0
     indptr = g_csr[0].numpy().tolist()
     indices = g_csr[1].numpy().tolist()
     # node_queue = nodes
+    # node_queue_seen = set()
     node_queue = cp.copy(nodes)
+    mem_access_q.extend(nodes)
     for layer_id in range(layer_num):
-        node_queue_seen = set(node_queue)
         node_num = len(node_queue)
         for i in range(node_num):
             # print(i, node_num, len(node_queue))
             node = node_queue[i]
             begin = indptr[node]
             end = indptr[node + 1]
+            node_access_num += end - begin
+            edge_access_num += end - begin
             for edge in range(begin, end):
                 ngh_node = indices[edge]
-                if ngh_node in node_map_orig2evo:
-                    if ngh_node not in node_queue_seen:
-                        node_queue.append(ngh_node)
-                        node_queue_seen.add(ngh_node)
-                        node_set.add(ngh_node)
-                        edge_set.add(edge)
+                # if ngh_node not in node_queue_seen:
+                node_queue.append(ngh_node)
+                mem_access_q.append(ngh_node)
+                # node_queue_seen.add(ngh_node)
+                # edge_access_num += 1
+                # node_access_num += 1
+                # edge_access_num += 1
+                # if ngh_node in node_map_orig2evo:
+                # if ngh_node not in node_queue_seen:
+
+                #     node_queue_seen.add(ngh_node)
+                # node_set.add(ngh_node)
+                # edge_set.add(edge)
 
         # Pop visited node
         node_queue = node_queue[node_num:]
 
-    node_sum = len(node_set)
-    edge_sum = len(edge_set)
+    # node_sum = len(node_set)
+    # edge_sum = len(edge_set)
 
-    return node_sum, edge_sum
+    # return node_sum, edge_sum
+    return node_access_num, edge_access_num
 
 
-def count_neighbor_delta(nodes, g_csr, node_map_orig2evo, layer_num, deg_th=0):
+def count_neighbor_delta(nodes, g_csr, node_map_orig2evo, layer_num, deg_th=0, mem_access_q=None):
     """ 
     Count accesses of the new nodes and edges in GNN-delta under degree threshold
     """
@@ -521,26 +536,34 @@ def count_neighbor_delta(nodes, g_csr, node_map_orig2evo, layer_num, deg_th=0):
     node_queue = cp.copy(nodes)
     # ngh_queue = []
     ngh_queue = set()
+    # node_queue_seen=set()
+    mem_access_q.extend(nodes)
 
     for node in node_queue:
         begin = indptr[node]
         end = indptr[node + 1]
         for edge in range(begin, end):
             node_ngh = indices[edge]
-            if node_ngh in node_map_orig2evo:
-                begin_ngh = indptr[node_ngh]
-                end_ngh = indptr[node_ngh + 1]
-                # Count all ngh access for high degree nodes
-                if end_ngh - begin_ngh >= deg_th:
-                    # ngh_queue.append(node_ngh)
-                    ngh_queue.add(node_ngh)
-                # Only count delta access for low degree nodes
-                else:
-                    node_access_num += 1
-                    edge_access_num += 1
+            # if node_ngh in node_map_orig2evo:
+            begin_ngh = indptr[node_ngh]
+            end_ngh = indptr[node_ngh + 1]
+            # Count all ngh access for high degree nodes
+            # if node_ngh not in node_queue_seen:
+            if end_ngh - begin_ngh >= deg_th:
+                # ngh_queue.append(node_ngh)
+                ngh_queue.add(node_ngh)
+            # Only count delta access for low degree nodes
+            else:
+                node_access_num += 1
+                edge_access_num += 1
+                mem_access_q.append(node_ngh)
+                # node_queue_seen.add(node_ngh)
 
     node_ngh_access_num, edge_ngh_access_num = count_neighbor(list(ngh_queue), g_csr,
-                                                              node_map_orig2evo, layer_num)
+                                                              node_map_orig2evo, layer_num, mem_access_q)
+    print(len(nodes), len(list(ngh_queue)))
+    print('>> delta ngh', node_access_num, edge_access_num, node_ngh_access_num,
+          edge_ngh_access_num)
 
     node_access_num += node_ngh_access_num
     edge_access_num += edge_ngh_access_num
@@ -590,3 +613,9 @@ def save_graph_csr(g, dataset):
 
     np.savetxt('./dataset/csr/' + dataset + '_indptr.txt', indptr, fmt='%d')
     np.savetxt('./dataset/csr/' + dataset + '_indices.txt', indices, fmt='%d')
+
+
+def gen_mem_trace(queue, file_path):
+    with open(file_path, 'a') as f:
+        for item in queue:
+            f.write(item, '\n')

@@ -175,16 +175,6 @@ def evaluate_delta_edge_masked(model,
         return correct.item() * 1.0 / len(labels)
 
 
-# def evaluate_delta_edge_masked(model, features, labels, mask):
-#     model.eval()
-#     with torch.no_grad():
-#         logits = model(features)
-#         logits = logits[mask]
-#         labels = labels[mask]
-#         _, indices = torch.max(logits, dim=1)
-#         correct = torch.sum(indices == labels)
-#         return correct.item() * 1.0 / len(labels)
-
 
 def main(args):
     # Overall task execution time
@@ -359,6 +349,14 @@ def main(args):
     accuracy = []
     deg_th = args.deg_threshold
     delta_neighbor = []
+
+    mem_access_q_full_retrain = []  # For gen mem trace
+    mem_access_q_all_ngh = []  # For gen mem trace
+    mem_access_q_delta_ngh = []  # For gen mem trace
+    trace_path_full_retrain = './results/' + args.dataset + '_full_retrain' + '.txt'
+    trace_path_all_ngh = './results/' + args.dataset + '_delta_ngh_deg_' + deg_th + '.txt'
+    trace_path_delta_ngh = './results/' + args.dataset + '_delta_ngh_deg_' + deg_th + '.txt'
+
     while len(node_q) > 0:
         print('\n>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
         print('Add node-batch @ iter = {:d}'.format(i))
@@ -383,39 +381,56 @@ def main(args):
         print('Node_number:', model.g.number_of_nodes())
         print('Edge_number:', model.g.number_of_edges())
 
-        features = model.g.ndata['feat']
-        labels = model.g.ndata['label']
-        train_mask = model.g.ndata['train_mask']
-        val_mask = model.g.ndata['val_mask']
-        test_mask = model.g.ndata['test_mask']
+        # features = model.g.ndata['feat']
+        # labels = model.g.ndata['label']
+        # train_mask = model.g.ndata['train_mask']
+        # val_mask = model.g.ndata['val_mask']
+        # test_mask = model.g.ndata['test_mask']
 
-        acc = evaluate(model, features, labels, test_mask)
-        print("Test accuracy of non-retrain @ {:d} nodes {:.2%}".format(
-            model.g.number_of_nodes(), acc))
-        acc_non_retrain = acc * 100
+        # acc = evaluate(model, features, labels, test_mask)
+        # print("Test accuracy of non-retrain @ {:d} nodes {:.2%}".format(
+        #     model.g.number_of_nodes(), acc))
+        # acc_non_retrain = acc * 100
 
         # Get node index of added_nodes in evolve graph
         inserted_nodes_evo = util.nodes_reindex(node_map_orig2evo, inserted_nodes)
         # inserted_nodes_evo.sort()
 
-        print('>>', len(inserted_nodes))
+        g_csr_evo = model.g.adj_sparse('csr')
+        inserted_nodes_evo = util.nodes_reindex(node_map_orig2evo, inserted_nodes)
         # Statistic neighbor edges and nodes
-        node_full_retrain, edge_full_retrain = util.count_neighbor(model.g.nodes().tolist(), g_csr,
-                                                                   node_map_orig2evo,
-                                                                   args.n_layers + 1)
-        # os.system('pause')
-        node_ngh_delta_sum, edge_ngh_delta_sum = util.count_neighbor_delta(
-            inserted_nodes, g_csr, node_map_orig2evo, args.n_layers + 1, args.deg_threshold)
-        # os.system('pause')
-        node_ngh_all_sum, edge_ngh_all_sum = util.count_neighbor(inserted_nodes, g_csr,
-                                                                 node_map_orig2evo,
-                                                                 args.n_layers + 1)
+        node_full_retrain, edge_full_retrain = util.count_neighbor(model.g.nodes().tolist(),
+                                                                   g_csr_evo, node_map_orig2evo,
+                                                                   args.n_layers + 1,
+                                                                   mem_access_q_full_retrain)
 
-        print('>>', len(model.g.nodes().tolist()), len(inserted_nodes))
-        delta_neighbor.append([
-            node_full_retrain, edge_full_retrain, node_ngh_all_sum, edge_ngh_all_sum,
-            node_ngh_delta_sum, edge_ngh_delta_sum
-        ])
+        # They are all full graph retrain in the initial time
+        if i == 0:
+            delta_neighbor.append([
+                node_full_retrain, edge_full_retrain, node_full_retrain, edge_full_retrain,
+                node_full_retrain, edge_full_retrain
+            ])
+
+            # Record mem trace
+            util.gen_mem_trace(mem_access_q_full_retrain, '')
+        else:
+            # os.system('pause')
+            # node_ngh_all_sum, edge_ngh_all_sum = util.count_neighbor(inserted_nodes_evo, g_csr_evo,
+            #                                                          node_map_orig2evo,
+            #                                                          args.n_layers + 1)
+            node_ngh_all_sum, edge_ngh_all_sum = util.count_neighbor_delta(
+                inserted_nodes_evo, g_csr_evo, node_map_orig2evo, args.n_layers + 1, 0)
+            # os.system('pause')
+            node_ngh_delta_sum, edge_ngh_delta_sum = util.count_neighbor_delta(
+                inserted_nodes_evo, g_csr_evo, node_map_orig2evo, args.n_layers + 1,
+                args.deg_threshold)
+
+            print('>>', node_full_retrain, edge_full_retrain, node_ngh_all_sum, edge_ngh_all_sum,
+                  node_ngh_delta_sum, edge_ngh_delta_sum)
+            delta_neighbor.append([
+                node_full_retrain, edge_full_retrain, node_ngh_all_sum, edge_ngh_all_sum,
+                node_ngh_delta_sum, edge_ngh_delta_sum
+            ])
 
         # # Plot graph structure
         # g_evo_csr = model.g.adj_sparse('csr')
@@ -603,9 +618,9 @@ if __name__ == '__main__':
     parser.set_defaults(self_loop=False)
     args = parser.parse_args()
 
-    args.dataset = 'amazon_comp'
-    args.n_epochs = 0
-    args.deg_threshold = 30
+    # args.dataset = 'amazon_comp'
+    # args.n_epochs = 0
+    # args.deg_threshold = 300
 
     print('\n************ {:s} ************'.format(args.dataset))
     print(args)

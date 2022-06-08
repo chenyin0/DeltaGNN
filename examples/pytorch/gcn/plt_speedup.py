@@ -7,11 +7,25 @@ import matplotlib.ticker as mtick
 
 def plot_speedup():
     # GCN
-    # CPU GPU HyGCN AWB-GCN I-GCN
-    gcn_cora = [1, 4.9, 500, 800, 1500, 1800]
-    gcn_citeseer = [1, 6, 40, 450, 1100, 1800]
-    gcn_pubmed = [1, 70, 250, 970, 1900, 2000]
-    gcn_reddit = [1, 8000, 1800, 15000, 17000, 20000]
+    # Cora Citeseer Pubmed Reddit
+    aggr_reduction = [11.7, 11.3, 6.6, 1.94]  # Aggregation reduction compared with HyGCN
+    # comb_reduction=[3.54, 3.13, 1.79, 3.56]  # Combination reduction compared with HyGCN
+    # CPU GPU HyGCN AWB-GCN I-GCN ReGNN Ours
+    # gcn_cora = [1, 4.9, 500, 800, 1500, 700, 4417]
+    # gcn_citeseer = [1, 6, 53, 450, 1100, 1300, 2523]
+    # gcn_pubmed = [1, 70, 420, 970, 2100, 2425, 3419]
+    # gcn_reddit = [1, 8000, 3200, 11000, 13000, 30000, 26100]
+
+    gcn_cora = [1, 4.9, 51, 800, 1500, 700, 1]
+    gcn_citeseer = [1, 6, 53, 450, 1100, 1300, 1]
+    gcn_pubmed = [1, 70, 420, 970, 2100, 2425, 1]
+    gcn_reddit = [1, 8000, 3200, 11000, 13000, 30000, 1]
+
+    preprocess = [26, 22, 9, 6]
+    gcn_cora[-1] = gcn_cora[2] * aggr_reduction[0] * preprocess[0]
+    gcn_citeseer[-1] = gcn_citeseer[2] * aggr_reduction[1] * preprocess[1]
+    gcn_pubmed[-1] = gcn_pubmed[2] * aggr_reduction[2] * preprocess[2]
+    gcn_reddit[-1] = gcn_reddit[2] * aggr_reduction[3] * preprocess[3]
 
     gcn_data = np.array([gcn_cora, gcn_citeseer, gcn_pubmed, gcn_reddit])
     cpu = gcn_data[:, 0]
@@ -19,12 +33,13 @@ def plot_speedup():
     hygcn = gcn_data[:, 2]
     awb_gcn = gcn_data[:, 3]
     i_gcn = gcn_data[:, 4]
-    delta_gcn = gcn_data[:, 5]
+    regnn = gcn_data[:, 5]
+    delta_gcn = gcn_data[:, 6]
 
     labels = ['Cora', 'Citeseer', 'Pubmed', 'Reddit']
-    items = ['CPU-DGL', 'GPU-DGL', 'HyGCN', 'AWB-GCN', 'I-GCN', 'Delta-GCN']
+    items = ['DGL-CPU', 'DGL-GPU', 'HyGCN', 'AWB-GCN', 'I-GCN', 'ReGNN', 'DeltaGNN']
 
-    data = [cpu, gpu, hygcn, awb_gcn, i_gcn, delta_gcn]
+    data = [cpu, gpu, hygcn, awb_gcn, i_gcn, regnn, delta_gcn]
 
     # Group size in each label
     group_size = len(items)
@@ -53,7 +68,7 @@ def plot_speedup():
     #                                 dark=0.2,
     #                                 light=0.65)
 
-    fig, ax1 = plt.subplots(figsize=(6, 3), dpi=600)
+    fig, ax1 = plt.subplots(figsize=(8, 3), dpi=600)
     # ax1 = plt.subplot(1, 3, 1)
 
     rects = [0 for n in range(len(items))]
@@ -100,13 +115,13 @@ def plot_speedup():
     # plt.yticks(size=10)
     # plt.xticks(size = 10)
 
-    ax1.set_ylim([0.1, 3e5])
+    ax1.set_ylim([0.1, 9e5])
     ax1.set_yscale('log')
 
     # my_y_ticks = np.arange(0, 120, 20)
     # plt.yticks(my_y_ticks)
 
-    plt.legend(ncol=3, labelspacing=0, handlelength=1, fontsize=12, loc="best")
+    plt.legend(ncol=4, labelspacing=0, handlelength=1, fontsize=12, loc="best")
     # ax1.get_legend().remove()
 
     #plt.axhline(y=1, color='k', linestyle='-', linewidth=0.8)

@@ -20,10 +20,6 @@ def plt_edge_epoch():
     x2 = range(epoch_num_citeseer)
     x3 = range(epoch_num_pubmed)
 
-    print(x1)
-    print(cora[:epoch_num_cora, -1])
-    print(range(10))
-
     fig = plt.figure(figsize=(10, 3), dpi=100)
 
     ax1 = plt.subplot(1, 3, 1)
