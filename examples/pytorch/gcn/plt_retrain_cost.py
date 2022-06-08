@@ -392,20 +392,27 @@ def plt_full_retrain():
 
 def plt_delta_retrain():
     deg_th = 30
-    cora = np.loadtxt('./results/cora_delta_ngh_deg_' + str(deg_th) + '.txt', delimiter=',')
-    citeseer = np.loadtxt('./results/citeseer_delta_ngh_deg_' + str(deg_th) + '.txt', delimiter=',')
-    pubmed = np.loadtxt('./results/pubmed_delta_ngh_deg_' + str(deg_th) + '.txt', delimiter=',')
-    # pubmed = np.loadtxt('./results/amazon_comp_delta_ngh_deg_' + str(deg_th) + '.txt',
+    cora_evo = np.loadtxt('./results/cora_delta_ngh_deg.txt', delimiter=',')
+    citeseer_evo = np.loadtxt('./results/citeseer_delta_ngh_deg.txt', delimiter=',')
+    pubmed_evo = np.loadtxt('./results/pubmed_delta_ngh_deg.txt', delimiter=',')
+
+    cora_evo_delta = np.loadtxt('./results/cora_delta_ngh_deg_' + str(deg_th) + '.txt',
+                                delimiter=',')
+    citeseer_evo_delta = np.loadtxt('./results/citeseer_delta_ngh_deg_' + str(deg_th) + '.txt',
+                                    delimiter=',')
+    pubmed_evo_delta = np.loadtxt('./results/pubmed_delta_ngh_deg_' + str(deg_th) + '.txt',
+                                  delimiter=',')
+    # pubmed_delta = np.loadtxt('./results/amazon_comp_delta_ngh_deg_' + str(deg_th) + '.txt',
     #                     delimiter=',')
 
-    v_cora = cora[:, 0]
-    e_cora = cora[:, 1]
+    v_cora = cora_evo[:, 0]
+    e_cora = cora_evo[:, 1]
 
-    v_citeseer = citeseer[:, 0]
-    e_citeseer = citeseer[:, 1]
+    v_citeseer = citeseer_evo[:, 0]
+    e_citeseer = citeseer_evo[:, 1]
 
-    v_pubmed = pubmed[:, 0]
-    e_pubmed = pubmed[:, 1]
+    v_pubmed = pubmed_evo[:, 0]
+    e_pubmed = pubmed_evo[:, 1]
 
     comp_cora = []
     comp_citeseer = []
@@ -417,19 +424,19 @@ def plt_delta_retrain():
     layer_num = 2
     feat_dim = 16
 
-    for i in range(len(cora)):
+    for i in range(len(cora_evo)):
         comp = comp_per_layer(feat_dim, v_cora[i], e_cora[i])
         comp_cora.append(layer_num * comp)
         mem = access_per_layer(feat_dim, e_cora[i])
         mem_cora.append(layer_num * mem)
 
-    for i in range(len(citeseer)):
+    for i in range(len(citeseer_evo)):
         comp = comp_per_layer(feat_dim, v_citeseer[i], e_citeseer[i])
         comp_citeseer.append(layer_num * comp)
         mem = access_per_layer(feat_dim, e_citeseer[i])
         mem_citeseer.append(layer_num * mem)
 
-    for i in range(len(pubmed)):
+    for i in range(len(pubmed_evo)):
         comp = comp_per_layer(feat_dim, v_pubmed[i], e_pubmed[i])
         comp_pubmed.append(layer_num * comp)
         mem = access_per_layer(feat_dim, e_pubmed[i])
@@ -439,12 +446,12 @@ def plt_delta_retrain():
     """
     Computation and memory access of ngh-delta retraining    
     """
-    v_cora_ngh_delta = cora[:, 4]
-    e_cora_ngh_delta = cora[:, 5]
-    v_citeseer_ngh_delta = citeseer[:, 4]
-    e_citeseer_ngh_delta = citeseer[:, 5]
-    v_pubmed_ngh_delta = pubmed[:, 4]
-    e_pubmed_ngh_delta = pubmed[:, 5]
+    v_cora_ngh_delta = cora_evo_delta[:, 0]
+    e_cora_ngh_delta = cora_evo_delta[:, 1]
+    v_citeseer_ngh_delta = citeseer_evo_delta[:, 0]
+    e_citeseer_ngh_delta = citeseer_evo_delta[:, 1]
+    v_pubmed_ngh_delta = pubmed_evo_delta[:, 0]
+    e_pubmed_ngh_delta = pubmed_evo_delta[:, 1]
 
     comp_cora_ngh_delta = []
     comp_citeseer_ngh_delta = []
@@ -453,19 +460,19 @@ def plt_delta_retrain():
     mem_citeseer_ngh_delta = []
     mem_pubmed_ngh_delta = []
 
-    for i in range(len(cora)):
+    for i in range(len(cora_evo_delta)):
         comp = comp_per_layer(feat_dim, v_cora_ngh_delta[i], e_cora_ngh_delta[i])
         comp_cora_ngh_delta.append(layer_num * comp)
         mem = access_per_layer(feat_dim, e_cora_ngh_delta[i])
         mem_cora_ngh_delta.append(layer_num * mem)
 
-    for i in range(len(citeseer)):
+    for i in range(len(citeseer_evo_delta)):
         comp = comp_per_layer(feat_dim, v_citeseer_ngh_delta[i], e_citeseer_ngh_delta[i])
         comp_citeseer_ngh_delta.append(layer_num * comp)
         mem = access_per_layer(feat_dim, e_citeseer_ngh_delta[i])
         mem_citeseer_ngh_delta.append(layer_num * mem)
 
-    for i in range(len(pubmed)):
+    for i in range(len(pubmed_evo_delta)):
         comp = comp_per_layer(feat_dim, v_pubmed_ngh_delta[i], e_pubmed_ngh_delta[i])
         comp_pubmed_ngh_delta.append(layer_num * comp)
         mem = access_per_layer(feat_dim, e_pubmed_ngh_delta[i])
@@ -476,12 +483,12 @@ def plt_delta_retrain():
     """
     Computation and memory access of ngh_all retraining        
     """
-    v_cora_ngh_all = cora[:, 2]
-    e_cora_ngh_all = cora[:, 3]
-    v_citeseer_ngh_all = citeseer[:, 2]
-    e_citeseer_ngh_all = citeseer[:, 3]
-    v_pubmed_ngh_all = pubmed[:, 2]
-    e_pubmed_ngh_all = pubmed[:, 3]
+    v_cora_ngh_all = cora_evo[:, 2]
+    e_cora_ngh_all = cora_evo[:, 3]
+    v_citeseer_ngh_all = citeseer_evo[:, 2]
+    e_citeseer_ngh_all = citeseer_evo[:, 3]
+    v_pubmed_ngh_all = pubmed_evo[:, 2]
+    e_pubmed_ngh_all = pubmed_evo[:, 3]
 
     comp_cora_ngh_all = []
     comp_citeseer_ngh_all = []
@@ -490,19 +497,19 @@ def plt_delta_retrain():
     mem_citeseer_ngh_all = []
     mem_pubmed_ngh_all = []
 
-    for i in range(len(cora)):
+    for i in range(len(cora_evo)):
         comp = comp_per_layer(feat_dim, v_cora_ngh_all[i], e_cora_ngh_all[i])
         comp_cora_ngh_all.append(layer_num * comp)
         mem = access_per_layer(feat_dim, e_cora_ngh_all[i])
         mem_cora_ngh_all.append(layer_num * mem)
 
-    for i in range(len(citeseer)):
+    for i in range(len(citeseer_evo)):
         comp = comp_per_layer(feat_dim, v_citeseer_ngh_all[i], e_citeseer_ngh_all[i])
         comp_citeseer_ngh_all.append(layer_num * comp)
         mem = access_per_layer(feat_dim, e_citeseer_ngh_all[i])
         mem_citeseer_ngh_all.append(layer_num * mem)
 
-    for i in range(len(pubmed)):
+    for i in range(len(pubmed_evo)):
         comp = comp_per_layer(feat_dim, v_pubmed_ngh_all[i], e_pubmed_ngh_all[i])
         comp_pubmed_ngh_all.append(layer_num * comp)
         mem = access_per_layer(feat_dim, e_pubmed_ngh_all[i])

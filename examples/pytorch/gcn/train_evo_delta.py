@@ -130,30 +130,6 @@ def evaluate(model, features, labels, mask):
         return correct.item() * 1.0 / len(labels)
 
 
-def evaluate_delta(model, features, labels, mask, updated_nodes):
-    r"""
-    Only update feature of updated nodes in inference
-    """
-    model.eval()
-    with torch.no_grad():
-        logits_prev = model.logits
-        logits = model(features)
-        # logits = logits[mask]
-
-        logits_updated = logits
-        logits_updated[0:logits_prev.size()[0]] = logits_prev
-        for node_id in updated_nodes:
-            logits_updated[node_id] = logits[node_id]
-
-        model.logits = logits_updated  # Record updated logits
-
-        logits_updated = logits_updated[mask]
-        labels = labels[mask]
-        _, indices = torch.max(logits_updated, dim=1)
-        correct = torch.sum(indices == labels)
-        return correct.item() * 1.0 / len(labels)
-
-
 def evaluate_delta_edge_masked(model,
                                features,
                                labels,
@@ -283,10 +259,6 @@ def main(args):
 
     # create GCN model
     model = GCN(g_evo, in_feats, args.n_hidden, n_classes, args.n_layers, F.relu, args.dropout)
-    model_retrain = GCN(g_evo, in_feats, args.n_hidden, n_classes, args.n_layers, F.relu,
-                        args.dropout)
-    model_delta = GCN(g_evo, in_feats, args.n_hidden, n_classes, args.n_layers, F.relu,
-                      args.dropout)
     model_delta_all_ngh = GCN_delta(g_evo, in_feats, args.n_hidden, n_classes, args.n_layers,
                                     F.relu, args.dropout)
 
@@ -300,16 +272,6 @@ def main(args):
 
     loss_fcn = torch.nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
-
-    loss_fcn_retrain = torch.nn.CrossEntropyLoss()
-    optimizer_retrain = torch.optim.Adam(model_retrain.parameters(),
-                                         lr=args.lr,
-                                         weight_decay=args.weight_decay)
-
-    loss_fcn_delta = torch.nn.CrossEntropyLoss()
-    optimizer_delta = torch.optim.Adam(model_delta.parameters(),
-                                       lr=args.lr,
-                                       weight_decay=args.weight_decay)
 
     loss_fcn_delta_all_ngh = torch.nn.CrossEntropyLoss()
     optimizer_delta_all_ngh = torch.optim.Adam(model_delta_all_ngh.parameters(),
@@ -360,11 +322,7 @@ def main(args):
     deg_th = args.deg_threshold
     delta_neighbor = []
 
-    mem_access_q_full_retrain = []  # For gen mem trace
-    mem_access_q_all_ngh = []  # For gen mem trace
     mem_access_q_delta_ngh = []  # For gen mem trace
-    trace_path_full_retrain = './results/' + args.dataset + '_full_retrain' + '.txt'
-    trace_path_all_ngh = './results/' + args.dataset + '_delta_ngh_deg_' + deg_th + '.txt'
     trace_path_delta_ngh = './results/' + args.dataset + '_delta_ngh_deg_' + deg_th + '.txt'
 
     while len(node_q) > 0:
@@ -406,41 +364,24 @@ def main(args):
         inserted_nodes_evo = util.nodes_reindex(node_map_orig2evo, inserted_nodes)
         # inserted_nodes_evo.sort()
 
-        g_csr_evo = model.g.adj_sparse('csr')
-        inserted_nodes_evo = util.nodes_reindex(node_map_orig2evo, inserted_nodes)
-        # Statistic neighbor edges and nodes
-        node_full_retrain, edge_full_retrain = util.count_neighbor(model.g.nodes().tolist(),
-                                                                   g_csr_evo, node_map_orig2evo,
-                                                                   args.n_layers + 1,
-                                                                   mem_access_q_full_retrain)
-
         # They are all full graph retrain in the initial time
         if i == 0:
-            delta_neighbor.append([
-                node_full_retrain, edge_full_retrain, node_full_retrain, edge_full_retrain,
-                node_full_retrain, edge_full_retrain
-            ])
+            g_csr_evo = model.g.adj_sparse('csr')
+            # Statistic neighbor edges and nodes
+            node_full_retrain, edge_full_retrain = util.count_neighbor(
+                model.g.nodes().tolist(), g_csr_evo, node_map_orig2evo, args.n_layers + 1)
+
+            delta_neighbor.append([node_full_retrain, edge_full_retrain])
 
             # Record mem trace
             util.gen_mem_trace(mem_access_q_full_retrain, '')
         else:
-            # os.system('pause')
-            # node_ngh_all_sum, edge_ngh_all_sum = util.count_neighbor(inserted_nodes_evo, g_csr_evo,
-            #                                                          node_map_orig2evo,
-            #                                                          args.n_layers + 1)
-            node_ngh_all_sum, edge_ngh_all_sum = util.count_neighbor_delta(
-                inserted_nodes_evo, g_csr_evo, node_map_orig2evo, args.n_layers + 1, 0)
-            # os.system('pause')
             node_ngh_delta_sum, edge_ngh_delta_sum = util.count_neighbor_delta(
                 inserted_nodes_evo, g_csr_evo, node_map_orig2evo, args.n_layers + 1,
                 args.deg_threshold)
 
-            print('>>', node_full_retrain, edge_full_retrain, node_ngh_all_sum, edge_ngh_all_sum,
-                  node_ngh_delta_sum, edge_ngh_delta_sum)
-            delta_neighbor.append([
-                node_full_retrain, edge_full_retrain, node_ngh_all_sum, edge_ngh_all_sum,
-                node_ngh_delta_sum, edge_ngh_delta_sum
-            ])
+            print('>>', node_ngh_delta_sum, edge_ngh_delta_sum)
+            delta_neighbor.append([node_ngh_delta_sum, edge_ngh_delta_sum])
 
         # # Plot graph structure
         # g_evo_csr = model.g.adj_sparse('csr')
@@ -450,72 +391,7 @@ def main(args):
 
         # ##
         # """
-        # # Full graph retraining
-        # """
-        # print('\n>> Full graph retraining')
-        # util.graph_evolve(inserted_nodes, g_csr, g, node_map_orig2evo, node_map_evo2orig,
-        #                   model_retrain.g)
-
-        # features = model_retrain.g.ndata['feat']
-        # labels = model_retrain.g.ndata['label']
-        # train_mask = model_retrain.g.ndata['train_mask']
-        # val_mask = model_retrain.g.ndata['val_mask']
-        # test_mask = model_retrain.g.ndata['test_mask']
-        # # if len(node_q) > 0:
-        # #     train(model_retrain, features, model_retrain.g.number_of_edges(),
-        # #           train_mask, val_mask, labels, loss_fcn_retrain,
-        # #           optimizer_retrain)
-
-        # time_start = time.perf_counter()
-        # train(model_retrain, features, model_retrain.g.number_of_edges(), train_mask, val_mask,
-        #       labels, loss_fcn_retrain, optimizer_retrain)
-        # time_full_retrain = time.perf_counter() - time_start
-        # print('>> Epoch training time with full nodes: {:.4}s'.format(time_full_retrain))
-
-        # acc = evaluate(model_retrain, features, labels, test_mask)
-        # print("Test accuracy of retrain @ {:d} nodes {:.2%}".format(
-        #     model_retrain.g.number_of_nodes(), acc))
-        # acc_retrain = acc * 100
-
-        # ##
-        # """
-        # # Delta retraining only on inserted nodes
-        # """
-        # print('\n>> Delta retraining')
-        # # Execute full retraining at the beginning
-        # if i <= 0:
-        #     util.graph_evolve(inserted_nodes, g_csr, g, node_map_orig2evo, node_map_evo2orig,
-        #                       model_delta.g)
-        # else:
-        #     util.graph_evolve_delta(inserted_nodes, g_csr, g, node_map_orig2evo, node_map_evo2orig,
-        #                             model_delta.g)
-
-        # features = model_delta.g.ndata['feat']
-        # labels = model_delta.g.ndata['label']
-        # train_mask = model_delta.g.ndata['train_mask']
-        # val_mask = model_delta.g.ndata['val_mask']
-        # test_mask = model_delta.g.ndata['test_mask']
-
-        # if len(node_q) > 0:
-        #     time_start = time.perf_counter()
-        #     train(model_delta, features, model_delta.g.number_of_edges(), train_mask, val_mask,
-        #           labels, loss_fcn_delta, optimizer_delta)
-        #     time_delta_retrain = time.perf_counter() - time_start
-        #     print('>> Epoch training time in delta: {:.4}s'.format(time_delta_retrain))
-
-        # if i <= 3:
-        #     acc = evaluate(model_delta, features, labels, test_mask)
-        # else:
-        #     acc = evaluate_delta(model_delta, features, labels, test_mask, inserted_nodes_evo)
-        #     # acc = evaluate(model_delta, features, labels, test_mask)
-        # # acc = evaluate(model_delta, features, labels, test_mask)
-        # print("Test accuracy of delta @ {:d} nodes {:.2%}".format(model_delta.g.number_of_nodes(),
-        #                                                           acc))
-        # acc_retrain_delta = acc * 100
-
-        # ##
-        # """
-        # # Delta retraining on inserted nodes and its neighbors
+        # # Delta retraining on delta neighbors
         # """
         # print('\n>> Delta all neighbor retraining')
         # # Execute full retraining at the beginning
@@ -584,7 +460,7 @@ def main(args):
 
         # accuracy.append([
         #     model.g.number_of_nodes(),
-        #     model.g.number_of_edges(), acc_non_retrain, acc_retrain, acc_retrain_delta,
+        #     model.g.number_of_edges(),
         #     acc_retrain_delta_all_ngh
         # ])
 
@@ -592,12 +468,12 @@ def main(args):
 
     deg_th = str(args.deg_threshold)
     # Dump log
-    # np.savetxt('./results/' + args.dataset + '_add_edge_deg_' + deg_th + '.txt',
+    # np.savetxt('./results/' + args.dataset + '_accuracy_evo_delta_' + deg_th + '.txt',
     #            accuracy,
-    #            fmt='%d, %d, %.2f, %.2f, %.2f, %.2f')
+    #            fmt='%d, %d, %.2f)
     np.savetxt('./results/' + args.dataset + '_delta_ngh_deg_' + deg_th + '.txt',
                delta_neighbor,
-               fmt='%d, %d, %d, %d, %d, %d')
+               fmt='%d, %d')
 
     # plot.plt_edge_epoch()
     # plot.plt_edge_epoch(edge_epoch, result)

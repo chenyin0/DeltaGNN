@@ -16,15 +16,40 @@ log_path = './results/' + theTime + '_log.txt'
 # Remove previous log
 os.system('rm ' + log_path)
 
+epoch_str = str(epoch)
+
+# # Cora
+# os.system('python ./examples/pytorch/gcn/train_evo.py --dataset=cora --n-epochs=' + epoch_str + ' | tee -a ' + log_path)
+
+# # Citeseer
+# os.system('python ./examples/pytorch/gcn/train_evo.py --dataset=citeseer --n-epochs=' +
+#           epoch_str + ' | tee -a ' + log_path)
+
+# # Pubmed
+# os.system('python ./examples/pytorch/gcn/train_evo.py --dataset=pubmed --n-epochs=' +
+#           epoch_str + ' | tee -a ' + log_path)
+
+# # Plot accuracy
+# os.system('python ./examples/pytorch/gcn/plt_acc_decline.py')
+# # Plot retrain cost
+# os.system('python ./examples/pytorch/gcn/plt_retrain_cost.py')
+
+# Amazon Computer
+os.system('python ./examples/pytorch/gcn/train_evo.py --dataset=amazon_comp --n-epochs=' +
+          epoch_str + ' | tee -a ' + log_path)
+# # Plot accuracy
+# os.system('python ./examples/pytorch/gcn/plt_acc_decline.py')
+# # Plot retrain cost
+# os.system('python ./examples/pytorch/gcn/plt_retrain_cost.py')
+
 for task_id in range(task_num):
     # Task batch
     print('\n********** Task id = {:d} **********'.format(task_id))
 
     deg_th = str(deg_th_list[task_id])
-    epoch_str = str(epoch)
 
     # # Cora
-    # os.system('python ./examples/pytorch/gcn/train_evo.py --dataset=cora --n-epochs=' + epoch_str +
+    # os.system('python ./examples/pytorch/gcn/train_evo_delta.py --dataset=cora --n-epochs=' + epoch_str +
     #           ' --deg-threshold=' + deg_th + ' | tee -a ' + log_path)
     # # Plot accuracy
     # os.system('python ./examples/pytorch/gcn/plt_acc_decline.py')
@@ -32,7 +57,7 @@ for task_id in range(task_num):
     # os.system('python ./examples/pytorch/gcn/plt_retrain_cost.py')
 
     # # Citeseer
-    # os.system('python ./examples/pytorch/gcn/train_evo.py --dataset=citeseer --n-epochs=' +
+    # os.system('python ./examples/pytorch/gcn/train_evo_delta.py --dataset=citeseer --n-epochs=' +
     #           epoch_str + ' --deg-threshold=' + deg_th + ' | tee -a ' + log_path)
     # # Plot accuracy
     # os.system('python ./examples/pytorch/gcn/plt_acc_decline.py')
@@ -40,7 +65,7 @@ for task_id in range(task_num):
     # os.system('python ./examples/pytorch/gcn/plt_retrain_cost.py')
 
     # # Pubmed
-    # os.system('python ./examples/pytorch/gcn/train_evo.py --dataset=pubmed --n-epochs=' +
+    # os.system('python ./examples/pytorch/gcn/train_evo_delta.py --dataset=pubmed --n-epochs=' +
     #           epoch_str + ' --deg-threshold=' + deg_th + ' | tee -a ' + log_path)
     # # Plot accuracy
     # os.system('python ./examples/pytorch/gcn/plt_acc_decline.py')
@@ -48,7 +73,7 @@ for task_id in range(task_num):
     # os.system('python ./examples/pytorch/gcn/plt_retrain_cost.py')
 
     # Amazon Computer
-    os.system('python ./examples/pytorch/gcn/train_evo.py --dataset=amazon_comp --n-epochs=' +
+    os.system('python ./examples/pytorch/gcn/train_evo_delta.py --dataset=amazon_comp --n-epochs=' +
               epoch_str + ' --deg-threshold=' + deg_th + ' | tee -a ' + log_path)
     # # Plot accuracy
     # os.system('python ./examples/pytorch/gcn/plt_acc_decline.py')
