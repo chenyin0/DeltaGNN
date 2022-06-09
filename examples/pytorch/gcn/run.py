@@ -3,7 +3,7 @@ import datetime
 
 deg_th_list = [1, 2, 5, 10, 20, 30]
 deg_th_list_large_dataset = [50, 100, 300, 500, 1000, 2000]
-epoch = 0
+epoch = 200
 task_num = len(deg_th_list)
 
 ISOTIMEFORMAT = '%m%d_%H%M'
@@ -30,9 +30,9 @@ os.system('python ./examples/pytorch/gcn/train_evo.py --dataset=citeseer --n-epo
 os.system('python ./examples/pytorch/gcn/train_evo.py --dataset=pubmed --n-epochs=' + epoch_str +
           ' | tee -a ' + log_path)
 
-# Amazon Computer
-os.system('python ./examples/pytorch/gcn/train_evo.py --dataset=amazon_comp --n-epochs=' +
-          epoch_str + ' | tee -a ' + log_path)
+# # Amazon Computer
+# os.system('python ./examples/pytorch/gcn/train_evo.py --dataset=amazon_comp --n-epochs=' +
+#           epoch_str + ' | tee -a ' + log_path)
 
 # # Plot accuracy
 # os.system('python ./examples/pytorch/gcn/plt_acc_decline.py')

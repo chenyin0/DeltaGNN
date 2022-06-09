@@ -320,8 +320,10 @@ def main(args):
     delta_neighbor = []
 
     mem_access_q_delta_ngh = []  # For gen mem trace
-    trace_path_delta_ngh = './results/mem_trace/' + args.dataset + '_delta_ngh_deg_' + str(deg_th) + '.txt'
-    os.system('rm ' + trace_path_delta_ngh)  # Reset mem trace
+    if dump_mem_trace_flag:
+        trace_path_delta_ngh = './results/mem_trace/' + args.dataset + '_delta_ngh_deg_' + str(
+            deg_th) + '.txt'
+        os.system('rm ' + trace_path_delta_ngh)  # Reset mem trace
 
     while len(node_q) > 0:
         print('\n>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
@@ -337,50 +339,32 @@ def main(args):
 
         print('Add node size: ', len(inserted_nodes))
 
-        ##
-        """
-        # No retraining
-        """
-        print('\n>> No retraining')
-        util.graph_evolve(inserted_nodes, g_csr, g, node_map_orig2evo, node_map_evo2orig, model.g)
-
-        print('Node_number:', model.g.number_of_nodes())
-        print('Edge_number:', model.g.number_of_edges())
-
-        # features = model.g.ndata['feat']
-        # labels = model.g.ndata['label']
-        # train_mask = model.g.ndata['train_mask']
-        # val_mask = model.g.ndata['val_mask']
-        # test_mask = model.g.ndata['test_mask']
-
-        # acc = evaluate(model, features, labels, test_mask)
-        # print("Test accuracy of non-retrain @ {:d} nodes {:.2%}".format(
-        #     model.g.number_of_nodes(), acc))
-        # acc_non_retrain = acc * 100
-
         # Get node index of added_nodes in evolve graph
         inserted_nodes_evo = util.nodes_reindex(node_map_orig2evo, inserted_nodes)
         # inserted_nodes_evo.sort()
 
-        g_csr_evo = model.g.adj_sparse('csr')
-        # They are all full graph retrain in the initial time
-        if i == 0:
-            # Statistic neighbor edges and nodes
-            node_full_retrain, edge_full_retrain = util.count_neighbor(
-                model.g.nodes().tolist(), g_csr_evo, node_map_orig2evo, args.n_layers + 1,
-                mem_access_q_delta_ngh)
+        if dump_node_access_flag or dump_mem_trace_flag:
+            # Count ngh access
+            g_csr_evo = model.g.adj_sparse('csr')
+            # They are all full graph retrain in the initial time
+            if i == 0:
+                # Statistic neighbor edges and nodes
+                node_full_retrain, edge_full_retrain = util.count_neighbor(
+                    model.g.nodes().tolist(), g_csr_evo, node_map_orig2evo, args.n_layers + 1,
+                    mem_access_q_delta_ngh)
 
-            delta_neighbor.append([node_full_retrain, edge_full_retrain])
-        else:
-            node_ngh_delta_sum, edge_ngh_delta_sum = util.count_neighbor_delta(
-                inserted_nodes_evo, g_csr_evo, node_map_orig2evo, args.n_layers + 1,
-                args.deg_threshold, mem_access_q_delta_ngh)
+                delta_neighbor.append([node_full_retrain, edge_full_retrain])
+            else:
+                node_ngh_delta_sum, edge_ngh_delta_sum = util.count_neighbor_delta(
+                    inserted_nodes_evo, g_csr_evo, node_map_orig2evo, args.n_layers + 1, deg_th,
+                    mem_access_q_delta_ngh)
 
-            print('>>', node_ngh_delta_sum, edge_ngh_delta_sum)
-            delta_neighbor.append([node_ngh_delta_sum, edge_ngh_delta_sum])
+                print('>>', node_ngh_delta_sum, edge_ngh_delta_sum)
+                delta_neighbor.append([node_ngh_delta_sum, edge_ngh_delta_sum])
 
-        # Record mem trace
-        util.dump_mem_trace(mem_access_q_delta_ngh, trace_path_delta_ngh)
+        if dump_mem_trace_flag:
+            # Record mem trace
+            util.dump_mem_trace(mem_access_q_delta_ngh, trace_path_delta_ngh)
         mem_access_q_delta_ngh = []  # Reset queue
 
         # # Plot graph structure
@@ -389,91 +373,94 @@ def main(args):
         # indices = g_evo_csr[1]
         # plt_graph.graph_visualize(indptr, indices, None)
 
-        # ##
-        # """
-        # # Delta retraining on delta neighbors
-        # """
-        # print('\n>> Delta all neighbor retraining')
-        # # Execute full retraining at the beginning
-        # if i <= 0:
-        #     util.graph_evolve(inserted_nodes, g_csr, g, node_map_orig2evo, node_map_evo2orig,
-        #                       model_delta_all_ngh.g)
-        # else:
-        #     util.graph_evolve_delta_all_ngh(inserted_nodes, g_csr, g, node_map_orig2evo,
-        #                                     node_map_evo2orig, model_delta_all_ngh.g)
+        if dump_accuracy_flag:
+            ##
+            """
+            # Delta retraining on delta neighbors
+            """
+            print('\n>> Delta all neighbor retraining')
+            # Execute full retraining at the beginning
+            if i <= 0:
+                util.graph_evolve(inserted_nodes, g_csr, g, node_map_orig2evo, node_map_evo2orig,
+                                  model_delta_all_ngh.g)
+            else:
+                util.graph_evolve_delta_all_ngh(inserted_nodes, g_csr, g, node_map_orig2evo,
+                                                node_map_evo2orig, model_delta_all_ngh.g)
 
-        # # Get ngh with high deg and low deg
-        # ngh_high_deg, ngh_low_deg = util.get_ngh_with_deg_th(model_delta_all_ngh.g,
-        #                                                      inserted_nodes_evo, deg_th)
-        # print('High_deg_ngh_num: {:d}, Low_deg_ngh_num: {:d}'.format(len(ngh_high_deg),
-        #                                                              len(ngh_low_deg)))
+            # Get ngh with high deg and low deg
+            ngh_high_deg, ngh_low_deg = util.get_ngh_with_deg_th(model_delta_all_ngh.g,
+                                                                 inserted_nodes_evo, deg_th)
+            print('High_deg_ngh_num: {:d}, Low_deg_ngh_num: {:d}'.format(
+                len(ngh_high_deg), len(ngh_low_deg)))
 
-        # # Merge ngh_high_deg and ngh_low_deg
-        # ngh_dict = ngh_high_deg.copy()
-        # ngh_dict.update(ngh_low_deg)
+            # Merge ngh_high_deg and ngh_low_deg
+            ngh_dict = ngh_high_deg.copy()
+            ngh_dict.update(ngh_low_deg)
 
-        # #Set edge weight (mask) according to node degree
-        # util.gen_edge_mask(model_delta_all_ngh.g, ngh_dict)
+            #Set edge weight (mask) according to node degree
+            util.gen_edge_mask(model_delta_all_ngh.g, ngh_dict)
 
-        # features = model_delta_all_ngh.g.ndata['feat']
-        # labels = model_delta_all_ngh.g.ndata['label']
-        # train_mask = model_delta_all_ngh.g.ndata['train_mask']
-        # val_mask = model_delta_all_ngh.g.ndata['val_mask']
-        # test_mask = model_delta_all_ngh.g.ndata['test_mask']
+            features = model_delta_all_ngh.g.ndata['feat']
+            labels = model_delta_all_ngh.g.ndata['label']
+            train_mask = model_delta_all_ngh.g.ndata['train_mask']
+            val_mask = model_delta_all_ngh.g.ndata['val_mask']
+            test_mask = model_delta_all_ngh.g.ndata['test_mask']
 
-        # if len(node_q) > 0:
-        #     time_start = time.perf_counter()
-        #     # train_delta(model_delta_all_ngh, features, model_delta_all_ngh.g.number_of_edges(),
-        #     #             train_mask, val_mask, labels, loss_fcn_delta_all_ngh,
-        #     #             optimizer_delta_all_ngh, ngh_high_deg, ngh_low_deg)
+            if len(node_q) > 0:
+                time_start = time.perf_counter()
+                # train_delta(model_delta_all_ngh, features, model_delta_all_ngh.g.number_of_edges(),
+                #             train_mask, val_mask, labels, loss_fcn_delta_all_ngh,
+                #             optimizer_delta_all_ngh, ngh_high_deg, ngh_low_deg)
 
-        #     # train(model_delta_all_ngh, features, model_delta_all_ngh.g.number_of_edges(),
-        #     #       train_mask, val_mask, labels, loss_fcn_delta_all_ngh, optimizer_delta_all_ngh)
-        #     if i <= 3:
-        #         train(model_delta_all_ngh, features, model_delta_all_ngh.g.number_of_edges(),
-        #               train_mask, val_mask, labels, loss_fcn_delta_all_ngh, optimizer_delta_all_ngh)
-        #     else:
-        #         train_delta_edge_masked(model_delta_all_ngh, features,
-        #                                 model_delta_all_ngh.g.number_of_edges(), train_mask,
-        #                                 val_mask, labels, loss_fcn_delta_all_ngh,
-        #                                 optimizer_delta_all_ngh, list(ngh_high_deg.keys()),
-        #                                 list(ngh_low_deg.keys()))
+                # train(model_delta_all_ngh, features, model_delta_all_ngh.g.number_of_edges(),
+                #       train_mask, val_mask, labels, loss_fcn_delta_all_ngh, optimizer_delta_all_ngh)
+                if i <= 3:
+                    train(model_delta_all_ngh, features, model_delta_all_ngh.g.number_of_edges(),
+                          train_mask, val_mask, labels, loss_fcn_delta_all_ngh,
+                          optimizer_delta_all_ngh)
+                else:
+                    train_delta_edge_masked(model_delta_all_ngh, features,
+                                            model_delta_all_ngh.g.number_of_edges(), train_mask,
+                                            val_mask, labels, loss_fcn_delta_all_ngh,
+                                            optimizer_delta_all_ngh, list(ngh_high_deg.keys()),
+                                            list(ngh_low_deg.keys()))
 
-        #     time_delta_all_ngh_retrain = time.perf_counter() - time_start
-        #     print('>> Epoch training time in delta with all ngh: {:.4}s'.format(
-        #         time_delta_all_ngh_retrain))
+                time_delta_all_ngh_retrain = time.perf_counter() - time_start
+                print('>> Epoch training time in delta with all ngh: {:.4}s'.format(
+                    time_delta_all_ngh_retrain))
 
-        # if i <= -1:
-        #     acc = evaluate(model_delta_all_ngh, features, labels, test_mask)
-        # else:
-        #     # acc = evaluate_delta_with_degree(model_delta_all_ngh, features, labels, test_mask,
-        #     #                                  ngh_high_deg, ngh_low_deg)
-        #     # acc = evaluate_delta_with_degree(model_delta_all_ngh, features, labels, test_mask)
+            if i <= -1:
+                acc = evaluate(model_delta_all_ngh, features, labels, test_mask)
+            else:
+                # acc = evaluate_delta_with_degree(model_delta_all_ngh, features, labels, test_mask,
+                #                                  ngh_high_deg, ngh_low_deg)
+                # acc = evaluate_delta_with_degree(model_delta_all_ngh, features, labels, test_mask)
 
-        #     acc = evaluate_delta_edge_masked(model_delta_all_ngh, features, labels, test_mask,
-        #                                      list(ngh_high_deg.keys()), list(ngh_low_deg.keys()))
+                acc = evaluate_delta_edge_masked(model_delta_all_ngh, features, labels, test_mask,
+                                                 list(ngh_high_deg.keys()),
+                                                 list(ngh_low_deg.keys()))
 
-        # # acc = evaluate(model_delta_all_ngh, features, labels, test_mask)
-        # print("Test accuracy of delta_all_ngh @ {:d} nodes {:.2%}".format(
-        #     model_delta_all_ngh.g.number_of_nodes(), acc))
-        # acc_retrain_delta_all_ngh = acc * 100
+            # acc = evaluate(model_delta_all_ngh, features, labels, test_mask)
+            print("Test accuracy of delta_all_ngh @ {:d} nodes {:.2%}".format(
+                model_delta_all_ngh.g.number_of_nodes(), acc))
+            acc_retrain_delta_ngh = acc * 100
 
-        # accuracy.append([
-        #     model.g.number_of_nodes(),
-        #     model.g.number_of_edges(),
-        #     acc_retrain_delta_all_ngh
-        # ])
+            accuracy.append(
+                [model.g.number_of_nodes(),
+                 model.g.number_of_edges(), acc_retrain_delta_ngh])
 
         i += 1
 
     deg_th = str(args.deg_threshold)
     # Dump log
-    # np.savetxt('./results/accuracy/' + args.dataset + '_evo_delta_' + deg_th + '.txt',
-    #            accuracy,
-    #            fmt='%d, %d, %.2f)
-    np.savetxt('./results/node_access/' + args.dataset + '_evo_delta_deg_' + deg_th + '.txt',
-               delta_neighbor,
-               fmt='%d, %d')
+    if dump_accuracy_flag:
+        np.savetxt('./results/accuracy/' + args.dataset + '_evo_delta_' + deg_th + '.txt',
+                   accuracy,
+                   fmt='%d, %d, %.2f')
+    if dump_node_access_flag:
+        np.savetxt('./results/node_access/' + args.dataset + '_evo_delta_deg_' + deg_th + '.txt',
+                   delta_neighbor,
+                   fmt='%d, %d')
 
     # plot.plt_edge_epoch()
     # plot.plt_edge_epoch(edge_epoch, result)
@@ -507,6 +494,10 @@ if __name__ == '__main__':
     # args.dataset = 'cora'
     # args.n_epochs = 0
     # args.deg_threshold = 5
+
+    dump_accuracy_flag = 1
+    dump_mem_trace_flag = 0
+    dump_node_access_flag = 0
 
     print('\n************ {:s} ************'.format(args.dataset))
     print(args)

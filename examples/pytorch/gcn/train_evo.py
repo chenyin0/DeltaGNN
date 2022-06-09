@@ -254,10 +254,12 @@ def main(args):
 
     mem_access_q_full_retrain = []  # For gen mem trace
     mem_access_q_all_ngh = []  # For gen mem trace
-    trace_path_full_retrain = './results/mem_trace/' + args.dataset + '_full_retrain.txt'
-    trace_path_all_ngh = './results/mem_trace/' + args.dataset + '_all_ngh.txt'
-    os.system('rm ' + trace_path_full_retrain)  # Reset mem trace
-    os.system('rm ' + trace_path_all_ngh)  # Reset mem trace
+    if dump_mem_trace_flag:
+        trace_path_full_retrain = './results/mem_trace/' + args.dataset + '_full_retrain.txt'
+        trace_path_all_ngh = './results/mem_trace/' + args.dataset + '_all_ngh.txt'
+
+        os.system('rm ' + trace_path_full_retrain)  # Reset mem trace
+        os.system('rm ' + trace_path_all_ngh)  # Reset mem trace
 
     while len(node_q) > 0:
         print('\n>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
@@ -283,51 +285,56 @@ def main(args):
         print('Node_number:', model.g.number_of_nodes())
         print('Edge_number:', model.g.number_of_edges())
 
-        # features = model.g.ndata['feat']
-        # labels = model.g.ndata['label']
-        # train_mask = model.g.ndata['train_mask']
-        # val_mask = model.g.ndata['val_mask']
-        # test_mask = model.g.ndata['test_mask']
+        features = model.g.ndata['feat']
+        labels = model.g.ndata['label']
+        train_mask = model.g.ndata['train_mask']
+        val_mask = model.g.ndata['val_mask']
+        test_mask = model.g.ndata['test_mask']
 
-        # acc = evaluate(model, features, labels, test_mask)
-        # print("Test accuracy of non-retrain @ {:d} nodes {:.2%}".format(
-        #     model.g.number_of_nodes(), acc))
-        # acc_non_retrain = acc * 100
+        acc = evaluate(model, features, labels, test_mask)
+        print("Test accuracy of non-retrain @ {:d} nodes {:.2%}".format(
+            model.g.number_of_nodes(), acc))
+        acc_no_retrain = acc * 100
 
         # Get node index of added_nodes in evolve graph
         inserted_nodes_evo = util.nodes_reindex(node_map_orig2evo, inserted_nodes)
         # inserted_nodes_evo.sort()
 
-        g_csr_evo = model.g.adj_sparse('csr')
-        # Statistic neighbor edges and nodes
-        node_full_retrain, edge_full_retrain = util.count_neighbor(model.g.nodes().tolist(),
-                                                                   g_csr_evo, node_map_orig2evo,
-                                                                   args.n_layers + 1,
-                                                                   mem_access_q_full_retrain)
+        if dump_node_access_flag or dump_mem_trace_flag:
+            g_csr_evo = model.g.adj_sparse('csr')
+            # Statistic neighbor edges and nodes
+            node_full_retrain, edge_full_retrain = util.count_neighbor(
+                model.g.nodes().tolist(), g_csr_evo, node_map_orig2evo, args.n_layers + 1,
+                mem_access_q_full_retrain)
 
-        if i == 0:
-            # There are all full retrain in the initial time of train_full and train_all_ngh
-            delta_neighbor.append(
-                [node_full_retrain, edge_full_retrain, node_full_retrain, edge_full_retrain])
+            if i == 0:
+                # There are all full retrain in the initial time of train_full and train_all_ngh
+                if dump_node_access_flag:
+                    delta_neighbor.append([
+                        node_full_retrain, edge_full_retrain, node_full_retrain, edge_full_retrain
+                    ])
 
-            # Record mem trace
-            util.dump_mem_trace(mem_access_q_full_retrain, trace_path_full_retrain)
-            util.dump_mem_trace(mem_access_q_full_retrain, trace_path_all_ngh)
-            mem_access_q_full_retrain = []  # Reset queue
-        else:
-            node_ngh_all_sum, edge_ngh_all_sum = util.count_neighbor_delta(
-                inserted_nodes_evo, g_csr_evo, node_map_orig2evo, args.n_layers + 1, 0,
-                mem_access_q_all_ngh)
+                if dump_mem_trace_flag:
+                    # Record mem trace
+                    util.dump_mem_trace(mem_access_q_full_retrain, trace_path_full_retrain)
+                    util.dump_mem_trace(mem_access_q_full_retrain, trace_path_all_ngh)
+                mem_access_q_full_retrain = []  # Reset queue
+            else:
+                if dump_node_access_flag:
+                    node_ngh_all, edge_ngh_all = util.count_neighbor_delta(
+                        inserted_nodes_evo, g_csr_evo, node_map_orig2evo, args.n_layers + 1, 0,
+                        mem_access_q_all_ngh)
 
-            print('>>', node_full_retrain, edge_full_retrain, node_ngh_all_sum, edge_ngh_all_sum)
-            delta_neighbor.append(
-                [node_full_retrain, edge_full_retrain, node_ngh_all_sum, edge_ngh_all_sum])
+                    print('>>', node_full_retrain, edge_full_retrain, node_ngh_all, edge_ngh_all)
+                    delta_neighbor.append(
+                        [node_full_retrain, edge_full_retrain, node_ngh_all, edge_ngh_all])
 
-            # Record mem trace
-            util.dump_mem_trace(mem_access_q_full_retrain, trace_path_full_retrain)
-            util.dump_mem_trace(mem_access_q_all_ngh, trace_path_all_ngh)
-            mem_access_q_full_retrain = []  # Reset queue
-            mem_access_q_all_ngh = []  # Reset queue
+                if dump_mem_trace_flag:
+                    # Record mem trace
+                    util.dump_mem_trace(mem_access_q_full_retrain, trace_path_full_retrain)
+                    util.dump_mem_trace(mem_access_q_all_ngh, trace_path_all_ngh)
+                mem_access_q_full_retrain = []  # Reset queue
+                mem_access_q_all_ngh = []  # Reset queue
 
         # # Plot graph structure
         # g_evo_csr = model.g.adj_sparse('csr')
@@ -335,85 +342,88 @@ def main(args):
         # indices = g_evo_csr[1]
         # plt_graph.graph_visualize(indptr, indices, None)
 
-        # ##
-        # """
-        # # Full graph retraining
-        # """
-        # print('\n>> Full graph retraining')
-        # util.graph_evolve(inserted_nodes, g_csr, g, node_map_orig2evo, node_map_evo2orig,
-        #                   model_retrain.g)
+        if dump_accuracy_flag:
+            ##
+            """
+            # Full graph retraining
+            """
+            print('\n>> Full graph retraining')
+            util.graph_evolve(inserted_nodes, g_csr, g, node_map_orig2evo, node_map_evo2orig,
+                              model_retrain.g)
 
-        # features = model_retrain.g.ndata['feat']
-        # labels = model_retrain.g.ndata['label']
-        # train_mask = model_retrain.g.ndata['train_mask']
-        # val_mask = model_retrain.g.ndata['val_mask']
-        # test_mask = model_retrain.g.ndata['test_mask']
-        # # if len(node_q) > 0:
-        # #     train(model_retrain, features, model_retrain.g.number_of_edges(),
-        # #           train_mask, val_mask, labels, loss_fcn_retrain,
-        # #           optimizer_retrain)
+            features = model_retrain.g.ndata['feat']
+            labels = model_retrain.g.ndata['label']
+            train_mask = model_retrain.g.ndata['train_mask']
+            val_mask = model_retrain.g.ndata['val_mask']
+            test_mask = model_retrain.g.ndata['test_mask']
+            # if len(node_q) > 0:
+            #     train(model_retrain, features, model_retrain.g.number_of_edges(),
+            #           train_mask, val_mask, labels, loss_fcn_retrain,
+            #           optimizer_retrain)
 
-        # time_start = time.perf_counter()
-        # train(model_retrain, features, model_retrain.g.number_of_edges(), train_mask, val_mask,
-        #       labels, loss_fcn_retrain, optimizer_retrain)
-        # time_full_retrain = time.perf_counter() - time_start
-        # print('>> Epoch training time with full nodes: {:.4}s'.format(time_full_retrain))
+            time_start = time.perf_counter()
+            train(model_retrain, features, model_retrain.g.number_of_edges(), train_mask, val_mask,
+                  labels, loss_fcn_retrain, optimizer_retrain)
+            time_full_retrain = time.perf_counter() - time_start
+            print('>> Epoch training time with full nodes: {:.4}s'.format(time_full_retrain))
 
-        # acc = evaluate(model_retrain, features, labels, test_mask)
-        # print("Test accuracy of retrain @ {:d} nodes {:.2%}".format(
-        #     model_retrain.g.number_of_nodes(), acc))
-        # acc_retrain = acc * 100
+            acc = evaluate(model_retrain, features, labels, test_mask)
+            print("Test accuracy of retrain @ {:d} nodes {:.2%}".format(
+                model_retrain.g.number_of_nodes(), acc))
+            acc_retrain = acc * 100
 
-        # ##
-        # """
-        # # Delta retraining only on inserted nodes
-        # """
-        # print('\n>> Delta retraining')
-        # # Execute full retraining at the beginning
-        # if i <= 0:
-        #     util.graph_evolve(inserted_nodes, g_csr, g, node_map_orig2evo, node_map_evo2orig,
-        #                       model_delta.g)
-        # else:
-        #     util.graph_evolve_delta(inserted_nodes, g_csr, g, node_map_orig2evo, node_map_evo2orig,
-        #                             model_delta.g)
+            ##
+            """
+            # Delta retraining only on inserted nodes
+            """
+            print('\n>> Delta retraining')
+            # Execute full retraining at the beginning
+            if i <= 0:
+                util.graph_evolve(inserted_nodes, g_csr, g, node_map_orig2evo, node_map_evo2orig,
+                                  model_delta.g)
+            else:
+                util.graph_evolve_delta(inserted_nodes, g_csr, g, node_map_orig2evo,
+                                        node_map_evo2orig, model_delta.g)
 
-        # features = model_delta.g.ndata['feat']
-        # labels = model_delta.g.ndata['label']
-        # train_mask = model_delta.g.ndata['train_mask']
-        # val_mask = model_delta.g.ndata['val_mask']
-        # test_mask = model_delta.g.ndata['test_mask']
+            features = model_delta.g.ndata['feat']
+            labels = model_delta.g.ndata['label']
+            train_mask = model_delta.g.ndata['train_mask']
+            val_mask = model_delta.g.ndata['val_mask']
+            test_mask = model_delta.g.ndata['test_mask']
 
-        # if len(node_q) > 0:
-        #     time_start = time.perf_counter()
-        #     train(model_delta, features, model_delta.g.number_of_edges(), train_mask, val_mask,
-        #           labels, loss_fcn_delta, optimizer_delta)
-        #     time_delta_retrain = time.perf_counter() - time_start
-        #     print('>> Epoch training time in delta: {:.4}s'.format(time_delta_retrain))
+            if len(node_q) > 0:
+                time_start = time.perf_counter()
+                train(model_delta, features, model_delta.g.number_of_edges(), train_mask, val_mask,
+                      labels, loss_fcn_delta, optimizer_delta)
+                time_delta_retrain = time.perf_counter() - time_start
+                print('>> Epoch training time in delta: {:.4}s'.format(time_delta_retrain))
 
-        # if i <= 3:
-        #     acc = evaluate(model_delta, features, labels, test_mask)
-        # else:
-        #     acc = evaluate_delta(model_delta, features, labels, test_mask, inserted_nodes_evo)
-        #     # acc = evaluate(model_delta, features, labels, test_mask)
-        # # acc = evaluate(model_delta, features, labels, test_mask)
-        # print("Test accuracy of delta @ {:d} nodes {:.2%}".format(model_delta.g.number_of_nodes(),
-        #                                                           acc))
-        # acc_retrain_delta = acc * 100
+            if i <= 3:
+                acc = evaluate(model_delta, features, labels, test_mask)
+            else:
+                acc = evaluate_delta(model_delta, features, labels, test_mask, inserted_nodes_evo)
+                # acc = evaluate(model_delta, features, labels, test_mask)
+            # acc = evaluate(model_delta, features, labels, test_mask)
+            print("Test accuracy of delta @ {:d} nodes {:.2%}".format(
+                model_delta.g.number_of_nodes(), acc))
+            acc_retrain_delta = acc * 100
 
-        # accuracy.append([
-        #     model.g.number_of_nodes(),
-        #     model.g.number_of_edges(), acc_non_retrain, acc_retrain, acc_retrain_delta,
-        #     acc_retrain_delta_all_ngh
-        # ])
+            accuracy.append([
+                model.g.number_of_nodes(),
+                model.g.number_of_edges(), acc_no_retrain, acc_retrain, acc_retrain_delta
+            ])
 
         i += 1
 
-    deg_th = str(args.deg_threshold)
     # Dump log
-    # np.savetxt('./results/accuracy/' + args.dataset + '_evo' + '.txt',
-    #            accuracy,
-    #            fmt='%d, %d, %.2f, %.2f', %.2f')
-    np.savetxt('./results/node_access/' + args.dataset + '_evo.txt', delta_neighbor, fmt='%d, %d, %d, %d')
+    if dump_accuracy_flag:
+        np.savetxt('./results/accuracy/' + args.dataset + '_evo' + '.txt',
+                   accuracy,
+                   fmt='%d, %d, %.2f, %.2f, %.2f')
+    if dump_node_access_flag:
+        np.savetxt('./results/node_access/' + args.dataset + '_evo.txt',
+                   delta_neighbor,
+                   fmt='%d, %d, %d, %d')
 
     # plot.plt_edge_epoch()
     # plot.plt_edge_epoch(edge_epoch, result)
@@ -444,9 +454,13 @@ if __name__ == '__main__':
     parser.set_defaults(self_loop=False)
     args = parser.parse_args()
 
-    # args.dataset = 'amazon_comp'
-    # args.n_epochs = 0
+    # args.dataset = 'cora'
+    # args.n_epochs = 200
     # args.deg_threshold = 300
+
+    dump_accuracy_flag = 1
+    dump_mem_trace_flag = 0
+    dump_node_access_flag = 0
 
     print('\n************ {:s} ************'.format(args.dataset))
     print(args)
