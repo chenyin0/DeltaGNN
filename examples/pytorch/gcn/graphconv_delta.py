@@ -72,8 +72,8 @@ class GraphConv_delta(GraphConv):
             # self.feat.scatter(0, index_high_deg, feat_high_deg)
             self.feat.scatter(0, index_high_deg, feat_high_deg_golden)
 
-            # self.feat.scatter(0, index_low_deg, feat_low_deg, reduce='add')
-            self.feat.scatter(0, index_low_deg, feat_low_deg_updated_golden)
+            self.feat.scatter(0, index_low_deg, feat_low_deg, reduce='add')
+            # self.feat.scatter(0, index_low_deg, feat_low_deg_updated_golden)
 
             return self.feat
         else:

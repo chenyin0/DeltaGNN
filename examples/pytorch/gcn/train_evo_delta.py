@@ -378,7 +378,7 @@ def main(args):
             """
             # Delta retraining on delta neighbors
             """
-            print('\n>> Delta all neighbor retraining')
+            print('\n>> Delta neighbor retraining')
             # Execute full retraining at the beginning
             if i <= 0:
                 util.graph_evolve(inserted_nodes, g_csr, g, node_map_orig2evo, node_map_evo2orig,
@@ -426,7 +426,7 @@ def main(args):
                                             list(ngh_low_deg.keys()))
 
                 time_delta_all_ngh_retrain = time.perf_counter() - time_start
-                print('>> Epoch training time in delta with all ngh: {:.4}s'.format(
+                print('>> Epoch training time in delta ngh: {:.4}s'.format(
                     time_delta_all_ngh_retrain))
 
             if i <= -1:
@@ -441,7 +441,7 @@ def main(args):
                                                  list(ngh_low_deg.keys()))
 
             # acc = evaluate(model_delta_all_ngh, features, labels, test_mask)
-            print("Test accuracy of delta_all_ngh @ {:d} nodes {:.2%}".format(
+            print("Test accuracy of delta_ngh @ {:d} nodes {:.2%}".format(
                 model_delta_all_ngh.g.number_of_nodes(), acc))
             acc_retrain_delta_ngh = acc * 100
 

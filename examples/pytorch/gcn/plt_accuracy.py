@@ -7,9 +7,13 @@ def plt_edge_epoch():
     citeseer_evo = np.loadtxt('./results/accuracy/citeseer_evo.txt', delimiter=',')
     pubmed_evo = np.loadtxt('./results/accuracy/pubmed_evo.txt', delimiter=',')
 
-    cora_evo_delta = np.loadtxt('./results/accuracy/cora_evo_delta_30.txt', delimiter=',')
-    citeseer_evo_delta = np.loadtxt('./results/accuracy/citeseer_evo_delta_30.txt', delimiter=',')
-    pubmed_evo_delta = np.loadtxt('./results/accuracy/pubmed_evo_delta_30.txt', delimiter=',')
+    deg_th = 30
+    cora_evo_delta = np.loadtxt('./results/accuracy/cora_evo_delta_' + str(deg_th) + '.txt',
+                                delimiter=',')
+    citeseer_evo_delta = np.loadtxt('./results/accuracy/citeseer_evo_delta_' + str(deg_th) + '.txt',
+                                    delimiter=',')
+    pubmed_evo_delta = np.loadtxt('./results/accuracy/pubmed_evo_delta_' + str(deg_th) + '.txt',
+                                  delimiter=',')
 
     epoch_num_cora = cora_evo.shape[0] - 1
     epoch_num_citeseer = citeseer_evo.shape[0] - 1
