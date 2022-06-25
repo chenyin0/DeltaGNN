@@ -5,28 +5,7 @@ import seaborn as sns
 import matplotlib.ticker as mtick
 
 
-def plot_speedup():
-    # GCN
-    # Cora Citeseer Pubmed Reddit
-    aggr_reduction = [11.7, 11.3, 6.6, 1.94]  # Aggregation reduction compared with HyGCN
-    # comb_reduction=[3.54, 3.13, 1.79, 3.56]  # Combination reduction compared with HyGCN
-    # CPU GPU HyGCN AWB-GCN I-GCN ReGNN Ours
-    # gcn_cora = [1, 4.9, 500, 800, 1500, 700, 4417]
-    # gcn_citeseer = [1, 6, 53, 450, 1100, 1300, 2523]
-    # gcn_pubmed = [1, 70, 420, 970, 2100, 2425, 3419]
-    # gcn_reddit = [1, 8000, 3200, 11000, 13000, 30000, 26100]
-
-    gcn_cora = [1, 4.9, 51, 800, 1500, 700, 1]
-    gcn_citeseer = [1, 6, 53, 450, 1100, 1300, 1]
-    gcn_pubmed = [1, 70, 420, 970, 2100, 2425, 1]
-    gcn_reddit = [1, 8000, 3200, 11000, 13000, 30000, 1]
-
-    preprocess = [26, 22, 9, 6]
-    gcn_cora[-1] = gcn_cora[2] * aggr_reduction[0] * preprocess[0]
-    gcn_citeseer[-1] = gcn_citeseer[2] * aggr_reduction[1] * preprocess[1]
-    gcn_pubmed[-1] = gcn_pubmed[2] * aggr_reduction[2] * preprocess[2]
-    gcn_reddit[-1] = gcn_reddit[2] * aggr_reduction[3] * preprocess[3]
-
+def plot_speedup(gcn_cora, gcn_citeseer, gcn_pubmed, gcn_reddit):
     gcn_data = np.array([gcn_cora, gcn_citeseer, gcn_pubmed, gcn_reddit])
     cpu = gcn_data[:, 0]
     gpu = gcn_data[:, 1]
@@ -137,4 +116,31 @@ def plot_speedup():
     plt.savefig('./figure/speedup.pdf', dpi=600, bbox_inches="tight", pad_inches=0)
 
 
-plot_speedup()
+# GCN
+# Cora Citeseer Pubmed Reddit
+aggr_reduction = [11.7, 11.3, 6.6, 1.94]  # Aggregation reduction compared with HyGCN
+# comb_reduction=[3.54, 3.13, 1.79, 3.56]  # Combination reduction compared with HyGCN
+# CPU GPU HyGCN AWB-GCN I-GCN ReGNN Ours
+# gcn_cora = [1, 4.9, 500, 800, 1500, 700, 4417]
+# gcn_citeseer = [1, 6, 53, 450, 1100, 1300, 2523]
+# gcn_pubmed = [1, 70, 420, 970, 2100, 2425, 3419]
+# gcn_reddit = [1, 8000, 3200, 11000, 13000, 30000, 26100]
+
+gcn_cora = [1, 4.9, 51, 800, 1500, 700, 1]
+gcn_citeseer = [1, 6, 53, 450, 1100, 1300, 1]
+gcn_pubmed = [1, 70, 420, 970, 2100, 2425, 1]
+gcn_reddit = [1, 8000, 3200, 11000, 13000, 30000, 1]
+
+preprocess = [26, 22, 9, 6]
+gcn_cora[-1] = gcn_cora[2] * aggr_reduction[0] * preprocess[0]
+gcn_citeseer[-1] = gcn_citeseer[2] * aggr_reduction[1] * preprocess[1]
+gcn_pubmed[-1] = gcn_pubmed[2] * aggr_reduction[2] * preprocess[2]
+gcn_reddit[-1] = gcn_reddit[2] * aggr_reduction[3] * preprocess[3]
+
+if __name__ == '__main__':
+    print(gcn_cora)
+    print(gcn_citeseer)
+    print(gcn_pubmed)
+    print(gcn_reddit)
+
+    plot_speedup(gcn_cora, gcn_citeseer, gcn_pubmed, gcn_reddit)
