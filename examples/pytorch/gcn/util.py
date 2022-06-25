@@ -60,9 +60,6 @@ def bfs_traverse(g_csr, root_node_q):
 
 
 def get_ngh(g_csr, root_nodes):
-    '''
-    deg_th: node degree threshold, disable value = -1
-    '''
     indptr = g_csr[0]
     indices = g_csr[1]
     ngh = []
@@ -92,6 +89,9 @@ def get_ngh_with_deg_th(g, root_nodes, deg_th):
             begin = indptr[root_node]
             end = indptr[root_node + 1]
             ngh_nodes = indices[begin:end].tolist()
+            ngh_high_deg.setdefault(root_node, set()).update(
+                ngh_nodes
+            )  # Regard inserted nodes as high-degree nodes to execute all-ngh retraining
             for ngh_node in ngh_nodes:
                 ngh_begin = indptr[ngh_node]
                 ngh_end = indptr[ngh_node + 1]
@@ -116,7 +116,11 @@ def gen_edge_mask(g, ngh_dict):
         src_nodes.extend([root_node for i in range(len(ngh))])
         dst_nodes.extend(ngh)
 
-    # edge_ids = g.edge_ids(th.Tensor(src_nodes).long(), th.Tensor(dst_nodes).long())
+    # a = th.tensor(src_nodes, dtype=th.long)
+    # b = th.tensor(dst_nodes, dtype=th.long)
+    # print(a, b)
+    # print(g.edges())
+    # k = g.edge_ids(th.tensor([0, 0]), th.tensor([1, 3]))
     edge_ids = g.edge_ids(th.tensor(src_nodes, dtype=th.long), th.tensor(dst_nodes, dtype=th.long))
 
     edge_ids = edge_ids.tolist()

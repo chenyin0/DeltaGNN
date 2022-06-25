@@ -9,6 +9,7 @@ from dgl.data import CoraGraphDataset, CiteseerGraphDataset, PubmedGraphDataset,
 
 import util
 import time
+import random
 
 from gcn import GCN
 from gcn import GCN_delta
@@ -316,6 +317,9 @@ def main(args):
 
                 if dump_mem_trace_flag:
                     # Record mem trace
+                    mem_access_q_full_retrain = util.nodes_reindex(node_map_evo2orig,
+                                                                   mem_access_q_full_retrain)
+                    random.shuffle(mem_access_q_full_retrain)
                     util.dump_mem_trace(mem_access_q_full_retrain, trace_path_full_retrain)
                     util.dump_mem_trace(mem_access_q_full_retrain, trace_path_all_ngh)
                 mem_access_q_full_retrain = []  # Reset queue
@@ -331,6 +335,12 @@ def main(args):
 
                 if dump_mem_trace_flag:
                     # Record mem trace
+                    mem_access_q_full_retrain = util.nodes_reindex(node_map_evo2orig,
+                                                                   mem_access_q_full_retrain)
+                    mem_access_q_all_ngh = util.nodes_reindex(node_map_evo2orig,
+                                                              mem_access_q_all_ngh)
+                    random.shuffle(mem_access_q_full_retrain)
+                    random.shuffle(mem_access_q_all_ngh)
                     util.dump_mem_trace(mem_access_q_full_retrain, trace_path_full_retrain)
                     util.dump_mem_trace(mem_access_q_all_ngh, trace_path_all_ngh)
                 mem_access_q_full_retrain = []  # Reset queue
@@ -455,26 +465,14 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     # args.dataset = 'cora'
-    # args.n_epochs = 200
+    # args.n_epochs = 0
     # args.deg_threshold = 300
 
-    dump_accuracy_flag = 1
-    dump_mem_trace_flag = 0
+    dump_accuracy_flag = 0
+    dump_mem_trace_flag = 1
     dump_node_access_flag = 0
 
     print('\n************ {:s} ************'.format(args.dataset))
     print(args)
-
-    # new_val = torch.arange(1, 21).reshape((4, 5))
-    # print(new_val)
-    # src = torch.ones(4, 5, dtype=new_val.dtype)
-    # row_id = th.tensor([0, 2, 3])
-    # index = [[row_id[k].item() for i in range(new_val.shape[1])] for k in range(row_id.shape[0])]
-    # print(index)
-    # index=th.tensor(index)
-
-    # # src = torch.arange(1, 11).reshape((2, 5))
-    # # index = torch.tensor([[0, 0, 0, 0, 0], [2,2,2,2, 2]])
-    # print(src.scatter_(0, index, new_val, reduce='add'))
 
     main(args)

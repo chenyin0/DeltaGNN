@@ -6,6 +6,7 @@ References:
 - Code: https://github.com/tkipf/gcn
 """
 import torch
+import torch as th
 import torch.nn as nn
 from dgl.nn.pytorch import GraphConv
 from graphconv_delta import GraphConv_delta
@@ -63,25 +64,14 @@ class GCN_delta(nn.Module):
         self.layers.append(GraphConv_delta(n_hidden, n_classes))
         self.dropout = nn.Dropout(p=dropout)
 
-    # def forward(self, features):
-    #     h = features
-    #     # h1 = h
-    #     for i, layer in enumerate(self.layers):
-    #         if i != 0:
-    #             h = self.dropout(h)
-    #         h = layer(self.g, h)
+        # # Record whether a node has been inferenced embedding
+        # self.nodes_has_inferenced_mask = [0 for i in range(g.number_of_nodes())]
 
-    #         # h1 = torch.matmul(h1, layer.weight)
-    #         # print(h.equal(h1))
-    #     return h
-
-    # def forward(self, features, nodes_high_deg=None, nodes_low_deg=None):
-    #     h = features
-    #     for i, layer in enumerate(self.layers):
-    #         if i != 0:
-    #             h = self.dropout(h)
-    #         h = layer(self.g, h, nodes_high_deg, nodes_low_deg)
-    #     return h
+        # Record previous embedding
+        # self.embedding = nn.Parameter(
+        #     th.Tensor([[0 for i in range(n_classes)] for j in range(g.number_of_nodes())]))
+        self.embedding = th.Tensor([[0 for i in range(n_classes)]
+                                    for j in range(g.number_of_nodes())]).requires_grad_(True)
 
     def forward(self, features, ngh_high_deg=None, ngh_low_deg=None):
         h = features
@@ -89,4 +79,65 @@ class GCN_delta(nn.Module):
             if i != 0:
                 h = self.dropout(h)
             h = layer(self.g, h, ngh_high_deg, ngh_low_deg)
+
+        # for name, parameters in self.named_parameters():
+        #     print(name, ':', parameters.size())
+        #     print(parameters.detach().is_leaf)
+        #     print(parameters.detach().grad)
+        #     print(parameters.detach().grad_fn)
+
+        if (ngh_high_deg is not None) or (ngh_low_deg is not None):
+            # Combine delta-inferenced embedding and previous embedding
+            h = self.combine_embedding(self.embedding, h, ngh_high_deg, ngh_low_deg)
+
         return h
+
+    def combine_embedding(self, embedding_prev, feat, ngh_high_deg, ngh_low_deg):
+        # Combine delta rst with feat_prev
+        feat_prev_ind = list(i for i in range(embedding_prev.shape[0]))
+        feat_prev_keep_ind = list(set(feat_prev_ind) - set(ngh_high_deg) - set(ngh_low_deg))
+
+        feat_prev_keep_ind = th.tensor(feat_prev_keep_ind, dtype=th.long)
+        # ngh_high_deg_ind = th.tensor(ngh_high_deg, dtype=th.long)
+        ngh_low_deg_ind = th.tensor(ngh_low_deg, dtype=th.long)
+
+        feat_prev = th.index_select(embedding_prev, 0, feat_prev_keep_ind)
+        # feat_high_deg = th.index_select(feat, 0, ngh_high_deg_ind)
+        feat_low_deg = th.index_select(feat, 0, ngh_low_deg_ind)
+
+        # Gen index for scatter
+        index_feat_prev = [[feat_prev_keep_ind[row].item() for col in range(feat_prev.shape[1])]
+                           for row in range(feat_prev_keep_ind.shape[0])]
+        # index_high_deg = [[ngh_high_deg_ind[row].item() for col in range(feat_high_deg.shape[1])]
+        #                   for row in range(ngh_high_deg_ind.shape[0])]
+        index_low_deg = [[ngh_low_deg_ind[row].item() for col in range(feat_low_deg.shape[1])]
+                         for row in range(ngh_low_deg_ind.shape[0])]
+
+        index_feat_prev = th.tensor(index_feat_prev)
+        # index_high_deg = th.tensor(index_high_deg)
+        index_low_deg = th.tensor(index_low_deg)
+
+        # Update feat of the nodes in the high and low degree
+        feat.scatter(0, index_feat_prev, feat_prev)
+        # embedding_prev.scatter(0, index_high_deg, feat_high_deg)
+        feat.scatter(0, index_low_deg, feat_low_deg, reduce='add')
+
+        return feat
+
+    # def resize_embedding(self, embedding, feat):
+    #     # Resize feat_prev
+    #     feat_prev_num = embedding.shape[0]
+    #     feat_updated_num = feat.shape[0]
+    #     # print(embedding.grad, feat.grad)
+    #     if feat_prev_num < feat_updated_num:
+    #         added_feat_num = feat_updated_num - feat_prev_num
+    #         tmp = th.zeros(added_feat_num, embedding.shape[1], requires_grad=True)
+    #         embedding = th.cat((embedding, tmp), 0).requires_grad_(True)
+    #         embedding.retain_grad()
+    #         print('\n', embedding.grad)
+    #         # tmp = th.ones(feat_updated_num,
+    #         #               embedding.shape[1],
+    #         #               dtype=th.float32,
+    #         #               requires_grad=True)
+    #         # embedding_resize = th.mul(embedding, tmp)
+    #     return embedding
