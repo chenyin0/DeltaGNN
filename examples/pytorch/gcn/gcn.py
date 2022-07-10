@@ -93,6 +93,11 @@ class GCN_delta(nn.Module):
         return h
 
     def combine_embedding(self, embedding_prev, feat, ngh_high_deg, ngh_low_deg):
+        # Compulsorily execute in CPU (GPU not suits for scalar execution)
+        device = feat.device
+        feat = feat.to('cpu')
+        embedding_prev = embedding_prev.to('cpu')
+
         # Combine delta rst with feat_prev
         feat_prev_ind = list(i for i in range(embedding_prev.shape[0]))
         feat_prev_keep_ind = list(set(feat_prev_ind) - set(ngh_high_deg) - set(ngh_low_deg))
@@ -122,22 +127,7 @@ class GCN_delta(nn.Module):
         # embedding_prev.scatter(0, index_high_deg, feat_high_deg)
         feat.scatter(0, index_low_deg, feat_low_deg, reduce='add')
 
-        return feat
+        # Transfer 'feat' to its previous device
+        feat = feat.to(device)
 
-    # def resize_embedding(self, embedding, feat):
-    #     # Resize feat_prev
-    #     feat_prev_num = embedding.shape[0]
-    #     feat_updated_num = feat.shape[0]
-    #     # print(embedding.grad, feat.grad)
-    #     if feat_prev_num < feat_updated_num:
-    #         added_feat_num = feat_updated_num - feat_prev_num
-    #         tmp = th.zeros(added_feat_num, embedding.shape[1], requires_grad=True)
-    #         embedding = th.cat((embedding, tmp), 0).requires_grad_(True)
-    #         embedding.retain_grad()
-    #         print('\n', embedding.grad)
-    #         # tmp = th.ones(feat_updated_num,
-    #         #               embedding.shape[1],
-    #         #               dtype=th.float32,
-    #         #               requires_grad=True)
-    #         # embedding_resize = th.mul(embedding, tmp)
-    #     return embedding
+        return feat

@@ -1,6 +1,7 @@
 from collections import Counter
 from numpy import int64
 # from msilib import sequence
+import torch
 import torch as th
 import dgl
 from dgl.data.utils import generate_mask_tensor
@@ -15,7 +16,7 @@ def gen_root_node_queue(g):
     """
     Gen root node according to in-degree
     """
-    src_edges = g.edges()[0].numpy().tolist()
+    src_edges = g.edges()[0].cpu().numpy().tolist()
     nodes = Counter(src_edges).most_common(len(src_edges))
     nodes = [x[0] for x in nodes]
     return nodes
@@ -121,20 +122,24 @@ def gen_edge_mask(g, ngh_dict):
     # print(a, b)
     # print(g.edges())
     # k = g.edge_ids(th.tensor([0, 0]), th.tensor([1, 3]))
-    edge_ids = g.edge_ids(th.tensor(src_nodes, dtype=th.long), th.tensor(dst_nodes, dtype=th.long))
+
+    # edge_ids = g.edge_ids(th.tensor(src_nodes, dtype=th.long), th.tensor(dst_nodes, dtype=th.long))
+    src_nodes = th.tensor(src_nodes, dtype=th.long).to(g.device)
+    dst_nodes = th.tensor(dst_nodes, dtype=th.long).to(g.device)
+    edge_ids = g.edge_ids(src_nodes, dst_nodes)
 
     edge_ids = edge_ids.tolist()
     edge_mask = [0 for i in range(g.number_of_edges())]
     for id in edge_ids:
         edge_mask[id] = 1
 
-    g.edata['edge_mask'] = th.Tensor(edge_mask)
+    g.edata['edge_mask'] = th.Tensor(edge_mask).to(g.device)
 
 
 def update_g_struct(new_nodes, g_orig_csr, node_map_orig2evo, node_map_evo2orig, g_evo=None):
 
-    indptr = g_orig_csr[0].numpy().tolist()
-    indices = g_orig_csr[1].numpy().tolist()
+    indptr = g_orig_csr[0].cpu().numpy().tolist()
+    indices = g_orig_csr[1].cpu().numpy().tolist()
 
     edge_src_nodes = list()
     edge_dst_nodes = list()
@@ -196,6 +201,9 @@ def update_g_struct(new_nodes, g_orig_csr, node_map_orig2evo, node_map_evo2orig,
         # Construct a new graph
         g_evo = dgl.graph((edge_src_nodes_reindex, edge_dst_nodes_reindex))
     else:
+        # device = th.device("cuda:0" if th.cuda.is_available() else "cpu")
+        edge_src_nodes_reindex = edge_src_nodes_reindex.to(g_evo.device)
+        edge_dst_nodes_reindex = edge_dst_nodes_reindex.to(g_evo.device)
         g_evo.add_edges(edge_src_nodes_reindex, edge_dst_nodes_reindex)
 
     return g_evo
@@ -290,10 +298,10 @@ def update_g_attr(new_nodes, g_evo, g_orig, node_map_orig2evo, node_map_evo2orig
     for node in g_evo.nodes().tolist():
         nodes_orig_index.append(node_map_evo2orig[node])
 
-    features = g_orig.ndata['feat'][nodes_orig_index, :]
+    features = g_orig.ndata['feat'][nodes_orig_index, :].to(g_evo.device)
     g_evo.ndata['feat'] = features
 
-    labels = g_orig.ndata['label'][nodes_orig_index]
+    labels = g_orig.ndata['label'][nodes_orig_index].to(g_evo.device)
     g_evo.ndata['label'] = labels
 
     train_ratio = 0.06
@@ -308,7 +316,7 @@ def update_g_attr(new_nodes, g_evo, g_orig, node_map_orig2evo, node_map_evo2orig
     idx_train = random.sample(loc_list, math.floor(labels.size()[0] * train_ratio))
     print('Train_set size: ', len(idx_train))
     idx_train.sort()
-    train_mask = generate_mask_tensor(_sample_mask(idx_train, labels.shape[0]))
+    train_mask = generate_mask_tensor(_sample_mask(idx_train, labels.shape[0])).to(g_evo.device)
     g_evo.ndata['train_mask'] = train_mask
 
     # idx_val = range(len(idx_train),
@@ -319,7 +327,7 @@ def update_g_attr(new_nodes, g_evo, g_orig, node_map_orig2evo, node_map_evo2orig
     loc_list = range(labels.size()[0])
     idx_val = random.sample(loc_list, math.floor(labels.size()[0] * val_ratio))
     idx_val.sort()
-    val_mask = generate_mask_tensor(_sample_mask(idx_val, labels.shape[0]))
+    val_mask = generate_mask_tensor(_sample_mask(idx_val, labels.shape[0])).to(g_evo.device)
     g_evo.ndata['val_mask'] = val_mask
 
     # idx_test = range(len(idx_val),
@@ -337,7 +345,7 @@ def update_g_attr(new_nodes, g_evo, g_orig, node_map_orig2evo, node_map_evo2orig
     idx_test = list(set(idx_test))
 
     idx_test.sort()
-    test_mask = generate_mask_tensor(_sample_mask(idx_test, labels.shape[0]))
+    test_mask = generate_mask_tensor(_sample_mask(idx_test, labels.shape[0])).to(g_evo.device)
     g_evo.ndata['test_mask'] = test_mask
 
 
@@ -387,13 +395,13 @@ def update_g_attr_delta(new_nodes, g_evo, g_orig, node_map_evo2orig, node_map_or
     print('Train_set size: ', len(nodes_index_evo))
     nodes_index_evo.sort()
     idx_train = nodes_index_evo
-    train_mask = generate_mask_tensor(_sample_mask(idx_train, labels.shape[0]))
+    train_mask = generate_mask_tensor(_sample_mask(idx_train, labels.shape[0])).to(g_evo.device)
     g_evo.ndata['train_mask'] = train_mask
 
     loc_list = range(labels.size()[0])
     idx_val = random.sample(loc_list, math.floor(labels.size()[0] * val_ratio))
     idx_val.sort()
-    val_mask = generate_mask_tensor(_sample_mask(idx_val, labels.shape[0]))
+    val_mask = generate_mask_tensor(_sample_mask(idx_val, labels.shape[0])).to(g_evo.device)
     g_evo.ndata['val_mask'] = val_mask
 
     loc_list = range(labels.size()[0])
@@ -405,7 +413,7 @@ def update_g_attr_delta(new_nodes, g_evo, g_orig, node_map_evo2orig, node_map_or
     idx_test = list(set(idx_test))
 
     idx_test.sort()
-    test_mask = generate_mask_tensor(_sample_mask(idx_test, labels.shape[0]))
+    test_mask = generate_mask_tensor(_sample_mask(idx_test, labels.shape[0])).to(g_evo.device)
     g_evo.ndata['test_mask'] = test_mask
 
 
@@ -419,10 +427,10 @@ def update_g_attr_all_ngh(new_nodes, g_evo, g_orig, node_map_evo2orig, node_map_
     for node_id in g_evo.nodes().tolist():
         nodes_orig_index.append(node_map_evo2orig[node_id])
 
-    features = g_orig.ndata['feat'][nodes_orig_index, :]
+    features = g_orig.ndata['feat'][nodes_orig_index, :].to(g_evo.device)
     g_evo.ndata['feat'] = features
 
-    labels = g_orig.ndata['label'][nodes_orig_index]
+    labels = g_orig.ndata['label'][nodes_orig_index].to(g_evo.device)
     g_evo.ndata['label'] = labels
 
     train_ratio = 0.06
@@ -453,13 +461,13 @@ def update_g_attr_all_ngh(new_nodes, g_evo, g_orig, node_map_evo2orig, node_map_
     print('Train_set size: ', len(nodes_index_evo))
     nodes_index_evo.sort()
     idx_train = nodes_index_evo
-    train_mask = generate_mask_tensor(_sample_mask(idx_train, labels.shape[0]))
+    train_mask = generate_mask_tensor(_sample_mask(idx_train, labels.shape[0])).to(g_evo.device)
     g_evo.ndata['train_mask'] = train_mask
 
     loc_list = range(labels.size()[0])
     idx_val = random.sample(loc_list, math.floor(labels.size()[0] * val_ratio))
     idx_val.sort()
-    val_mask = generate_mask_tensor(_sample_mask(idx_val, labels.shape[0]))
+    val_mask = generate_mask_tensor(_sample_mask(idx_val, labels.shape[0])).to(g_evo.device)
     g_evo.ndata['val_mask'] = val_mask
 
     # loc_list = range(labels.size()[0])
@@ -474,7 +482,7 @@ def update_g_attr_all_ngh(new_nodes, g_evo, g_orig, node_map_evo2orig, node_map_
         idx_test = random.sample(loc_list, math.floor(labels.size()[0] * test_ratio))
 
     idx_test.sort()
-    test_mask = generate_mask_tensor(_sample_mask(idx_test, labels.shape[0]))
+    test_mask = generate_mask_tensor(_sample_mask(idx_test, labels.shape[0])).to(g_evo.device)
     g_evo.ndata['test_mask'] = test_mask
 
 
@@ -497,7 +505,6 @@ def count_neighbor(nodes, g_csr, node_map_orig2evo, layer_num, mem_access_q=None
     for layer_id in range(layer_num):
         node_num = len(node_queue)
         for i in range(node_num):
-            # print(i, node_num, len(node_queue))
             node = node_queue[i]
             begin = indptr[node]
             end = indptr[node + 1]
@@ -508,16 +515,6 @@ def count_neighbor(nodes, g_csr, node_map_orig2evo, layer_num, mem_access_q=None
                 # if ngh_node not in node_queue_seen:
                 node_queue.append(ngh_node)
                 mem_access_q.append(ngh_node)
-                # node_queue_seen.add(ngh_node)
-                # edge_access_num += 1
-                # node_access_num += 1
-                # edge_access_num += 1
-                # if ngh_node in node_map_orig2evo:
-                # if ngh_node not in node_queue_seen:
-
-                #     node_queue_seen.add(ngh_node)
-                # node_set.add(ngh_node)
-                # edge_set.add(edge)
 
         # Pop visited node
         node_queue = node_queue[node_num:]

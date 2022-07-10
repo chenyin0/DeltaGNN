@@ -4,6 +4,7 @@ import numpy as np
 import torch
 import torch as th
 import torch.nn.functional as F
+
 import dgl
 from dgl.data import CoraGraphDataset, CiteseerGraphDataset, PubmedGraphDataset, RedditDataset, AmazonCoBuyComputerDataset
 
@@ -14,7 +15,7 @@ import random
 from gcn import GCN
 from gcn import GCN_delta
 
-from torchviz import make_dot
+# from torchviz import make_dot
 
 import os
 
@@ -108,11 +109,15 @@ def main(args):
         raise ValueError('Unknown dataset: {}'.format(args.dataset))
 
     g = data[0]
+
     if args.gpu < 0:
         cuda = False
     else:
         cuda = True
-        g = g.int().to(args.gpu)
+        # g = g.int().to(args.gpu)
+
+    # device = th.device("cuda:0" if th.cuda.is_available() else "cpu")
+    device = th.device("cuda:0" if cuda else "cpu")
 
     # features = g.ndata['feat']
     # # print(features)
@@ -152,11 +157,11 @@ def main(args):
     g_evo = util.graph_evolve(init_nodes, g_csr, g, node_map_orig2evo, node_map_evo2orig)
     ##
 
-    features = g_evo.ndata['feat']
-    labels = g_evo.ndata['label']
-    train_mask = g_evo.ndata['train_mask']
-    val_mask = g_evo.ndata['val_mask']
-    test_mask = g_evo.ndata['test_mask']
+    features = g_evo.ndata['feat'].to(device)
+    labels = g_evo.ndata['label'].to(device)
+    train_mask = g_evo.ndata['train_mask'].to(device)
+    val_mask = g_evo.ndata['val_mask'].to(device)
+    test_mask = g_evo.ndata['test_mask'].to(device)
 
     # features = g.ndata['feat']
     # labels = g.ndata['label']
@@ -179,14 +184,17 @@ def main(args):
     norm[torch.isinf(norm)] = 0
     if cuda:
         norm = norm.cuda()
+        g = g.to(args.gpu)
+        g_evo = g_evo.to(args.gpu)
     g_evo.ndata['norm'] = norm.unsqueeze(1)
 
     # create GCN model
-    model = GCN(g_evo, in_feats, args.n_hidden, n_classes, args.n_layers, F.relu, args.dropout)
+    model = GCN(g_evo, in_feats, args.n_hidden, n_classes, args.n_layers, F.relu,
+                args.dropout).to(device)
     model_retrain = GCN(g_evo, in_feats, args.n_hidden, n_classes, args.n_layers, F.relu,
-                        args.dropout)
+                        args.dropout).to(device)
     model_delta = GCN(g_evo, in_feats, args.n_hidden, n_classes, args.n_layers, F.relu,
-                      args.dropout)
+                      args.dropout).to(device)
 
     # for param in model.parameters():
     #     print(param)
@@ -464,12 +472,13 @@ if __name__ == '__main__':
     parser.set_defaults(self_loop=False)
     args = parser.parse_args()
 
-    # args.dataset = 'cora'
-    # args.n_epochs = 0
-    # args.deg_threshold = 300
+    # args.dataset = 'pubmed'
+    # args.n_epochs = 200
+    # args.deg_threshold = 30
+    # args.gpu = 0
 
-    dump_accuracy_flag = 0
-    dump_mem_trace_flag = 1
+    dump_accuracy_flag = 1
+    dump_mem_trace_flag = 0
     dump_node_access_flag = 0
 
     print('\n************ {:s} ************'.format(args.dataset))

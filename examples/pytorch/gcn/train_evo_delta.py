@@ -14,9 +14,9 @@ import random
 from gcn import GCN
 from gcn import GCN_delta
 
-from torchviz import make_dot
+# from torchviz import make_dot
 
-from torch.utils.tensorboard import SummaryWriter
+# from torch.utils.tensorboard import SummaryWriter
 
 import os
 
@@ -145,7 +145,10 @@ def main(args):
         cuda = False
     else:
         cuda = True
-        g = g.int().to(args.gpu)
+        # g = g.int().to(args.gpu)
+
+    # device = th.device("cuda:0" if th.cuda.is_available() else "cpu")
+    device = th.device("cuda:0" if cuda else "cpu")
 
     # features = g.ndata['feat']
     # # print(features)
@@ -185,11 +188,11 @@ def main(args):
     g_evo = util.graph_evolve(init_nodes, g_csr, g, node_map_orig2evo, node_map_evo2orig)
     ##
 
-    features = g_evo.ndata['feat']
-    labels = g_evo.ndata['label']
-    train_mask = g_evo.ndata['train_mask']
-    val_mask = g_evo.ndata['val_mask']
-    test_mask = g_evo.ndata['test_mask']
+    features = g_evo.ndata['feat'].to(device)
+    labels = g_evo.ndata['label'].to(device)
+    train_mask = g_evo.ndata['train_mask'].to(device)
+    val_mask = g_evo.ndata['val_mask'].to(device)
+    test_mask = g_evo.ndata['test_mask'].to(device)
 
     # features = g.ndata['feat']
     # labels = g.ndata['label']
@@ -212,12 +215,14 @@ def main(args):
     norm[torch.isinf(norm)] = 0
     if cuda:
         norm = norm.cuda()
+        g_evo = g_evo.to(args.gpu)
     g_evo.ndata['norm'] = norm.unsqueeze(1)
 
     # create GCN model
-    model = GCN(g_evo, in_feats, args.n_hidden, n_classes, args.n_layers, F.relu, args.dropout)
+    model = GCN(g_evo, in_feats, args.n_hidden, n_classes, args.n_layers, F.relu,
+                args.dropout).to(device)
     model_delta_all_ngh = GCN_delta(g_evo, in_feats, args.n_hidden, n_classes, args.n_layers,
-                                    F.relu, args.dropout)
+                                    F.relu, args.dropout).to(device)
 
     # for param in model.parameters():
     #     print(param)
@@ -446,7 +451,8 @@ if __name__ == '__main__':
 
     # args.dataset = 'cora'
     # args.n_epochs = 200
-    # args.deg_threshold = 5
+    # args.deg_threshold = 20
+    # args.gpu = 0
 
     dump_accuracy_flag = 1
     dump_mem_trace_flag = 0
