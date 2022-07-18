@@ -426,6 +426,9 @@ def main(args):
     print('\n>> Task {:s} execution time: {:.4}s'.format(args.dataset,
                                                          time.perf_counter() - Task_time_start))
 
+    for i in range(len(accuracy)):
+        print(i, round(accuracy[i][2], 2))
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='GCN')
@@ -449,10 +452,11 @@ if __name__ == '__main__':
     parser.set_defaults(self_loop=False)
     args = parser.parse_args()
 
-    # args.dataset = 'cora'
-    # args.n_epochs = 200
-    # args.deg_threshold = 20
-    # args.gpu = 0
+    args.dataset = 'cora'
+    args.n_epochs = 200
+    args.deg_threshold = 20
+    args.gpu = 0
+    args.n_layers = 0
 
     dump_accuracy_flag = 1
     dump_mem_trace_flag = 0

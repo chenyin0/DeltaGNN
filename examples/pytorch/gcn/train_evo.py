@@ -15,9 +15,8 @@ import random
 from gcn import GCN
 from gcn import GCN_delta
 
-# from torchviz import make_dot
-
 import os
+import plt_workload
 
 
 def train(model, features, n_edges, train_mask, val_mask, labels, loss_fcn, optimizer):
@@ -142,6 +141,30 @@ def main(args):
     g_csr = g.adj_sparse('csr')
     root_node_q = util.gen_root_node_queue(g)
     node_q = util.bfs_traverse(g_csr, root_node_q)
+
+    ##
+    """ Profiling node locality with degree """
+    node_q_tmp = util.bfs_traverse(g_csr, [i for i in range(len(node_q))])
+    deg_node_trace_sorted = util.gen_trace_sorted_by_node_deg(g_csr, node_q_tmp)
+    util.rm_repeat_data(deg_node_trace_sorted)
+    deg_node_trace_wo_sort = util.gen_trace_without_sorted(g_csr, node_q_tmp)
+
+    locality_node_degs_sorted = util.eval_node_locality(deg_node_trace_sorted)
+    print(locality_node_degs_sorted)
+
+    # for i in deg_node_trace_wo_sort:
+    #     print(i[0])
+
+    locality_node_degs_wo_sort = util.eval_node_locality(deg_node_trace_wo_sort)
+    print(locality_node_degs_wo_sort)
+
+    # util.save_txt_2d('./results/mem_trace/' + args.dataset + '_node_deg_trace' + '.txt',
+    #                  deg_node_trace_sorted)
+
+    ##
+    """ Profiling workloads imbalance """
+    deg_th = 10
+    plt_workload.plt_workload_imbalance(g_csr, deg_th)
 
     init_node_rate = 0.1
     init_node_num = round(len(node_q) * init_node_rate)
@@ -449,6 +472,9 @@ def main(args):
     print('\n>> Task {:s} execution time: {:.4}s'.format(args.dataset,
                                                          time.perf_counter() - Task_time_start))
 
+    for i in range(len(accuracy)):
+        print(i, round(accuracy[i][3], 2))
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='GCN')
@@ -472,13 +498,13 @@ if __name__ == '__main__':
     parser.set_defaults(self_loop=False)
     args = parser.parse_args()
 
-    # args.dataset = 'pubmed'
-    # args.n_epochs = 200
-    # args.deg_threshold = 30
-    # args.gpu = 0
+    args.dataset = 'cora'
+    args.n_epochs = 1
+    args.gpu = 0
+    args.n_layers = 0
 
-    dump_accuracy_flag = 1
-    dump_mem_trace_flag = 0
+    dump_accuracy_flag = 0
+    dump_mem_trace_flag = 1
     dump_node_access_flag = 0
 
     print('\n************ {:s} ************'.format(args.dataset))

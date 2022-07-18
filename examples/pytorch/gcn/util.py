@@ -622,3 +622,149 @@ def dump_mem_trace(queue, file_path):
         for item in queue:
             f.write(str(item))
             f.write('\n')
+
+
+def gen_trace_sorted_by_node_deg(g_csr, node_q):
+    """
+    Gen node traverse trace sorted by node degree (low degree -> high degree)
+    """
+    indptr = g_csr[0].numpy().tolist()
+    indices = g_csr[1].numpy().tolist()
+    deg_nodes = dict()
+    degs = set()
+    node_trace = list()
+    for node in node_q:
+        ngh_begin = indptr[node]
+        ngh_end = indptr[node + 1]
+        deg = ngh_end - ngh_begin
+        degs.add(deg)
+        deg_nodes.setdefault(deg, list()).extend(indices[ngh_begin:ngh_end])
+
+    deg_list = list(degs)
+    deg_list.sort()
+    for deg in deg_list:
+        """
+        Node trace format [deg, node_id, node_id, ....]
+        """
+        li = [deg]
+        li.extend(deg_nodes[deg])
+        node_trace.append(li)
+
+    return node_trace
+
+
+def get_index_of_minvalue(list):
+    min_val = min(list)
+    min_index = list.index(min_val)
+    return min_index
+
+
+def gen_trace_without_sorted(g_csr, node_q):
+    # """
+    # Gen node traverse trace sorted by node degree (low degree -> high degree)
+    # """
+    # indptr = g_csr[0].numpy().tolist()
+    # indices = g_csr[1].numpy().tolist()
+    # deg_nodes = []
+    # for node in node_q:
+    #     ngh_begin = indptr[node]
+    #     ngh_end = indptr[node + 1]
+    #     deg = ngh_end - ngh_begin
+    #     deg_nodes.append([deg] + indices[ngh_begin:ngh_end])
+
+    # return deg_nodes
+
+    ##
+    """
+    Emulate interleave node access among different degs (model cache thrash)
+    """
+    indptr = g_csr[0].numpy().tolist()
+    indices = g_csr[1].numpy().tolist()
+    deg_nodes = []
+    for node in node_q:
+        ngh_begin = indptr[node]
+        ngh_end = indptr[node + 1]
+        deg = ngh_end - ngh_begin
+        deg_nodes.append([deg] + indices[ngh_begin:ngh_end])
+
+    parallel = 8
+    nodes_size_bin = [0 for i in range(parallel)]
+    nodes_bin = [[] for i in range(parallel)]
+    deg_bin = [[] for i in range(parallel)]
+
+    for row in deg_nodes:
+        index = get_index_of_minvalue(nodes_size_bin)  # Select the bin which has the min workload
+        nodes_size_bin[index] += len(row) - 1  # Update workload size
+        nodes_bin[index].extend(row[1:])  # Push workload
+        deg_bin[index].extend([row[0]
+                               for i in range(len(row) - 1)])  # Record degree of this workload
+
+    node_trace = []
+    min_workload_size = min(nodes_size_bin)
+    for j in range(min_workload_size):
+        for bin_id in range(len(nodes_bin)):
+            node_trace.append([deg_bin[bin_id][j], nodes_bin[bin_id][j]])
+
+    return node_trace
+
+
+def rm_repeat_data(node_trace):
+    for row_id in range(len(node_trace)):
+        row = node_trace[row_id]
+        # for row in node_trace:
+        tmp_row = [row[0], row[1]]  # row[0]: deg, row[1]: first element
+        if len(row) > 2:
+            for i in range(len(row) - 2):
+                if row[i + 2] != row[i + 1]:
+                    tmp_row.append(row[i + 2])
+        # row = tmp_row
+        node_trace[row_id] = tmp_row
+
+
+def eval_node_locality(node_trace):
+    """
+    Evaluate node access locality. The miss rate is emulated under a direct-mapping cache.
+    """
+    cacheline_size = 64  # Byte
+    cacheline_bias = int(math.log2(cacheline_size))
+    data_size = 4  # Byte
+    hit_miss_degs = dict()
+    hit_rate_degs = []
+    degs = set()
+    cacheline_id_prev = 0
+
+    for row in node_trace:
+        deg = row[0]
+        degs.add(deg)
+        item = {'hit': 0, 'miss': 0}
+        if deg not in hit_miss_degs:
+            hit_miss_degs[deg] = item
+        for i in range(len(row) - 1):
+            node_id = row[i + 1]
+            node_addr = node_id * data_size
+            cacheline_id = node_addr >> cacheline_bias
+            if cacheline_id != cacheline_id_prev:
+                hit_miss_degs[deg]['miss'] += 1
+                cacheline_id_prev = cacheline_id
+            else:
+                hit_miss_degs[deg]['hit'] += 1
+
+    degs = list(degs)
+    degs.sort()
+
+    for deg in degs:
+        hit = hit_miss_degs[deg]['hit']
+        miss = hit_miss_degs[deg]['miss']
+        hit_rate = round(hit / (hit + miss) * 100, 2)
+        hit_rate_degs.append(hit_rate)
+
+    return hit_rate_degs
+
+
+def save_txt_2d(path, data):
+    with open(path, 'w') as f:
+        for i in data:
+            for j in i:
+                f.write(str(j))
+                f.write(' ')
+            f.write('\n')
