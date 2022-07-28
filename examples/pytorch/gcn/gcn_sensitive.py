@@ -17,8 +17,7 @@ import copy
 import util
 
 
-def train(model, features, n_edges, train_mask, val_mask, labels, loss_fcn,
-          optimizer):
+def train(model, features, n_edges, train_mask, val_mask, labels, loss_fcn, optimizer):
     # initialize graph
     dur = []
     for epoch in range(args.n_epochs):
@@ -66,19 +65,23 @@ def degree_distribute(g):
     return degree_list
 
 
-def add_noise(g, degree_list, degree_begin, degree_end, num):
+def add_noise(g, degree_list, degree_begin, degree_end, intensity, node_ratio):
     print()
     in_feats = g.ndata['feat'].shape[1]
+    degree_end = min(degree_end, len(degree_list))  # Avoid over boundary
     for degree_val in range(degree_begin, degree_end):
         node_list = degree_list[degree_val]
+        node_num = len(node_list)
+        num = round(node_num * node_ratio)
         loc_list = range(len(node_list))
-        print('>> Deg: ', degree_val, ' Node num: ', len(loc_list),
-              ' Selet node num: ', num)
-        loc = random.sample(loc_list, min(num, len(loc_list)))
+        print('>> Deg: ', degree_val, ' Node num: ', len(loc_list), ' Selet node num: ', num)
+        # loc = random.sample(loc_list, min(num, len(loc_list)))
+        loc = random.sample(loc_list, num)
         for i in loc:
             node_id = node_list[i]
             # Add random noise on node feature
-            g.ndata['feat'][node_id] = torch.rand(1, in_feats)
+            # print(g.ndata['feat'][node_id].tolist())
+            g.ndata['feat'][node_id] += intensity * torch.rand(in_feats)
 
 
 def main(args):
@@ -100,7 +103,7 @@ def main(args):
     #     g = g.int().to(args.gpu)
 
     g = data[0]
-    util.save_graph_csr(g, args.dataset)
+    # util.save_graph_csr(g, args.dataset)
 
     task_round = 10
     acc_task = [0] * task_round
@@ -115,8 +118,8 @@ def main(args):
 
         # Add noise
         degree_list = degree_distribute(g)
-        plt_graph.plot_degree_distribution(degree_list)
-        add_noise(g, degree_list, 8, 100, 166)
+        # plt_graph.plot_degree_distribution(degree_list)
+        # add_noise(g, degree_list, 8, 9, 0.1, 33)
 
         features = g.ndata['feat']
         # torch.set_printoptions(profile="full")
@@ -153,17 +156,14 @@ def main(args):
         g.ndata['norm'] = norm.unsqueeze(1)
 
         # create GCN model
-        model = GCN(g, in_feats, args.n_hidden, n_classes, args.n_layers,
-                    F.relu, args.dropout)
+        model = GCN(g, in_feats, args.n_hidden, n_classes, args.n_layers, F.relu, args.dropout)
 
         if cuda:
             model.cuda()
         loss_fcn = torch.nn.CrossEntropyLoss()
 
         # use optimizer
-        optimizer = torch.optim.Adam(model.parameters(),
-                                     lr=args.lr,
-                                     weight_decay=args.weight_decay)
+        optimizer = torch.optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
 
         # # initialize graph
         # dur = []
@@ -186,8 +186,15 @@ def main(args):
         #     print("Epoch {:05d} | Time(s) {:.4f} | Loss {:.4f} | Accuracy {:.4f} | "
         #           "ETputs(KTEPS) {:.2f}".format(epoch, np.mean(dur), loss.item(), acc, n_edges / np.mean(dur) / 1000))
 
-        train(model, features, model.g.number_of_edges(), train_mask, val_mask,
-              labels, loss_fcn, optimizer)
+        train(model, features, model.g.number_of_edges(), train_mask, val_mask, labels, loss_fcn,
+              optimizer)
+
+        deg_begin = args.deg_begin
+        deg_end = args.deg_end
+        noise_intensity = args.noise_intensity
+        node_ratio = args.node_ratio
+        add_noise(g, degree_list, deg_begin, deg_end, noise_intensity, node_ratio)
+        features = g.ndata['feat']
 
         print()
         acc = evaluate(model, features, labels, test_mask)
@@ -197,8 +204,10 @@ def main(args):
     acc_total = 0
     for i in acc_task:
         acc_total += i
-    print("Task round: {:d}, Test accuracy {:.2%}".format(
-        task_round, acc_total / task_round))
+
+    print()
+    print("Deg: [{:d}, {:d}), Node_ratio: {:.2f}, Intensity: {:.2f}".format(deg_begin, deg_end, node_ratio, noise_intensity))
+    print("Task round: {:d}, Test accuracy {:.2%}".format(task_round, acc_total / task_round))
 
 
 if __name__ == '__main__':
@@ -207,35 +216,32 @@ if __name__ == '__main__':
                         type=str,
                         default="cora",
                         help="Dataset name ('cora', 'citeseer', 'pubmed').")
-    parser.add_argument("--dropout",
-                        type=float,
-                        default=0.5,
-                        help="dropout probability")
+    parser.add_argument("--dropout", type=float, default=0.5, help="dropout probability")
     parser.add_argument("--gpu", type=int, default=-1, help="gpu")
     parser.add_argument("--lr", type=float, default=1e-2, help="learning rate")
-    parser.add_argument("--n-epochs",
-                        type=int,
-                        default=200,
-                        help="number of training epochs")
-    parser.add_argument("--n-hidden",
-                        type=int,
-                        default=16,
-                        help="number of hidden gcn units")
-    parser.add_argument("--n-layers",
-                        type=int,
-                        default=1,
-                        help="number of hidden gcn layers")
-    parser.add_argument("--weight-decay",
+    parser.add_argument("--n-epochs", type=int, default=200, help="number of training epochs")
+    parser.add_argument("--n-hidden", type=int, default=16, help="number of hidden gcn units")
+    parser.add_argument("--n-layers", type=int, default=1, help="number of hidden gcn layers")
+    parser.add_argument("--weight-decay", type=float, default=5e-4, help="Weight for L2 loss")
+    parser.add_argument("--self-loop", action='store_true', help="graph self-loop (default=False)")
+    parser.add_argument("--noise-intensity",
                         type=float,
-                        default=5e-4,
-                        help="Weight for L2 loss")
-    parser.add_argument("--self-loop",
-                        action='store_true',
-                        help="graph self-loop (default=False)")
+                        default=0,
+                        help="intensity of the noise error")
+    parser.add_argument("--deg-begin", type=int, default=0, help="inital of the degree interval")
+    parser.add_argument("--deg-end", type=int, default=0, help="tail of the degree interval")
+    parser.add_argument("--node-ratio",
+                        type=float,
+                        default=0,
+                        help="the ratio of the nodes added noise")
     parser.set_defaults(self_loop=False)
     args = parser.parse_args()
 
-    args.dataset = 'pubmed'
+    args.dataset = 'cora'
+    args.noise_intensity = 0.1
+    args.node_ratio = 0.6
+    args.deg_begin = 2
+    args.deg_end = 3
     print(args)
 
     main(args)
