@@ -1,5 +1,6 @@
 import matplotlib.pyplot as plt
 import numpy as np
+from matplotlib.ticker import MultipleLocator, FormatStrFormatter
 
 
 def plt_workload_imbalance(g_csr, deg_th):
@@ -17,12 +18,15 @@ def plt_workload_imbalance(g_csr, deg_th):
 
     items = ['Full-retrain', 'Delta-retrain']
 
+    # workload = [0, 1, 5, 6, 9, 78]
+    # workload_delta = [5, 8, 9, 63, 1, 2]
+
     data = [workload, workload_delta]
 
     # Group size in each label
     group_size = len(items)
 
-    total_width = 0.35
+    total_width = len(workload)*1.3
     label_num = len(workload)
     width = total_width / label_num
     # Bar offset
@@ -43,7 +47,7 @@ def plt_workload_imbalance(g_csr, deg_th):
             data[i],
             width=width,
             alpha=.99,
-            edgecolor='w',
+            # edgecolor='w',
             label=items[i],
             zorder=2,
             #    color=color[i]
@@ -74,19 +78,21 @@ def plt_workload_imbalance(g_csr, deg_th):
     ax1.set_xticks(x)
     # ax1.set_xticklabels(labels, va="center", position=(0, -0.05), fontsize=14)
     # ax1.xaxis.set_visible(False)
-    # ax1.xaxis.set_tick_params(direction='in')
-    # ax1.axes.get_xaxis().set_visible(False)
+    ax1.xaxis.set_tick_params(direction='in')
+    # ax1.xaxis.minorticks_off()
+    xmajorLocator = MultipleLocator(500) #将x主刻度标签设置为500的倍数
+    ax1.xaxis.set_major_locator(xmajorLocator)
 
     # plt.yticks(size=10)
     # plt.xticks(size = 10)
 
-    # ax1.set_ylim([0.1, 9e5])
+    ax1.set_ylim([0, 40])
     # ax1.set_yscale('log')
 
     # my_y_ticks = np.arange(0, 120, 20)
     # plt.yticks(my_y_ticks)
 
-    plt.legend(ncol=4, labelspacing=0, handlelength=1, fontsize=12, loc="best")
+    plt.legend(ncol=2, labelspacing=0, handlelength=1, fontsize=12, loc="best")
     # ax1.get_legend().remove()
 
     #plt.axhline(y=1, color='k', linestyle='-', linewidth=0.8)
@@ -95,8 +101,8 @@ def plt_workload_imbalance(g_csr, deg_th):
     # ax1.yaxis.set_major_formatter(yticks)
 
     fontsize = 16
-    #plt.xlabel('Unroll number',fontsize = fontsize)
-    plt.ylabel('Speedup', fontsize=fontsize)
+    plt.xlabel('Node ID',fontsize = fontsize)
+    plt.ylabel('Workload size', fontsize=fontsize)
 
     plt.tight_layout()
     plt.savefig('./figure/workload_imbalance.pdf', dpi=600, bbox_inches="tight", pad_inches=0)

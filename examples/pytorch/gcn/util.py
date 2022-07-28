@@ -768,3 +768,25 @@ def save_txt_2d(path, data):
                 f.write(str(j))
                 f.write(' ')
             f.write('\n')
+
+
+def gen_degree_distribution(g_csr):
+    """
+    Gen node distribution with degree
+    """
+    indptr = g_csr[0].numpy().tolist()
+
+    deg_list = []
+    max_deg = 0
+    for i in range(len(indptr) - 1):
+        begin = indptr[i]
+        end = indptr[i + 1]
+        deg = end - begin
+        deg_list.append(deg)
+        max_deg = deg if deg > max_deg else max_deg
+
+    deg_distribution = [0 for i in range(max_deg + 1)]
+    for i in deg_list:
+        deg_distribution[i] += 1
+
+    return deg_distribution

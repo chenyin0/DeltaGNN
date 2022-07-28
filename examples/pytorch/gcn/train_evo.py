@@ -17,6 +17,7 @@ from gcn import GCN_delta
 
 import os
 import plt_workload
+import plt_graph
 
 
 def train(model, features, n_edges, train_mask, val_mask, labels, loss_fcn, optimizer):
@@ -137,7 +138,7 @@ def main(args):
     #        val_mask.int().sum().item(), test_mask.int().sum().item()))
 
     ##
-    """ Construct evolve graph """
+    """ Traverse to get graph evolving snapshot """
     g_csr = g.adj_sparse('csr')
     root_node_q = util.gen_root_node_queue(g)
     node_q = util.bfs_traverse(g_csr, root_node_q)
@@ -162,10 +163,24 @@ def main(args):
     #                  deg_node_trace_sorted)
 
     ##
+    """ Plot degree distribution """
+    deg_dist = util.gen_degree_distribution(g_csr)
+    plt_graph.plot_degree_distribution(deg_dist)
+
+    cnt = 0
+    total = len(node_q)
+    for i in range(len(deg_dist)):
+        cnt += deg_dist[i]
+        percentage = round(cnt/total * 100, 2)
+        print(i, percentage)
+
+    ##
     """ Profiling workloads imbalance """
-    deg_th = 10
+    deg_th = 6
     plt_workload.plt_workload_imbalance(g_csr, deg_th)
 
+    ##
+    """ Initial Graph """
     init_node_rate = 0.1
     init_node_num = round(len(node_q) * init_node_rate)
     init_nodes = node_q[0:init_node_num]
