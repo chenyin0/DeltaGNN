@@ -2,6 +2,7 @@ import argparse
 import time
 import numpy as np
 import torch
+import torch as th
 import torch.nn.functional as F
 import dgl
 from dgl.data import CoraGraphDataset, CiteseerGraphDataset, PubmedGraphDataset
@@ -75,13 +76,19 @@ def add_noise(g, degree_list, degree_begin, degree_end, intensity, node_ratio):
         num = round(node_num * node_ratio)
         loc_list = range(len(node_list))
         print('>> Deg: ', degree_val, ' Node num: ', len(loc_list), ' Selet node num: ', num)
+
+        noise = torch.rand(in_feats)
+        device = g.device
+        noise = noise.to(device)
+        noise = th.mul(noise, intensity)
         # loc = random.sample(loc_list, min(num, len(loc_list)))
         loc = random.sample(loc_list, num)
         for i in loc:
             node_id = node_list[i]
             # Add random noise on node feature
             # print(g.ndata['feat'][node_id].tolist())
-            g.ndata['feat'][node_id] += intensity * torch.rand(in_feats)
+
+            g.ndata['feat'][node_id] = th.add(noise, g.ndata['feat'][node_id])
 
 
 def main(args):
@@ -206,7 +213,8 @@ def main(args):
         acc_total += i
 
     print()
-    print("Deg: [{:d}, {:d}), Node_ratio: {:.2f}, Intensity: {:.2f}".format(deg_begin, deg_end, node_ratio, noise_intensity))
+    print("Deg: [{:d}, {:d}), Node_ratio: {:.2f}, Intensity: {:.2f}".format(
+        deg_begin, deg_end, node_ratio, noise_intensity))
     print("Task round: {:d}, Test accuracy {:.2%}".format(task_round, acc_total / task_round))
 
 
@@ -237,11 +245,13 @@ if __name__ == '__main__':
     parser.set_defaults(self_loop=False)
     args = parser.parse_args()
 
-    args.dataset = 'cora'
-    args.noise_intensity = 0.1
-    args.node_ratio = 0.6
-    args.deg_begin = 2
-    args.deg_end = 3
+    args.gpu = 0
+    # args.dataset = 'cora'
+    # args.noise_intensity = 0.1
+    # args.node_ratio = 0.6
+    # args.deg_begin = 2
+    # args.deg_end = 3
+
     print(args)
 
     main(args)

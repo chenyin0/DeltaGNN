@@ -34,8 +34,7 @@ for deg_region in deg_interval:
             # intensity = str(intensity)
             # ratio = str(node_ratio)
 
-            os.system(
-                'python ./examples/pytorch/gcn/gcn_sensitive.py --dataset=cora --n-epochs=' +
-                epoch_str + ' --deg-begin=' + str(deg_begin) + ' --deg-end=' + str(deg_end) +
-                ' --noise-intensity=' + str(intensity) + ' --node-ratio=' + str(ratio) + ' | tee -a ' +
-                log_path)
+            os.system('python ./examples/pytorch/gcn/gcn_sensitive.py --dataset=cora --n-epochs=' +
+                      epoch_str + ' --deg-begin=' + str(deg_begin) + ' --deg-end=' + str(deg_end) +
+                      ' --noise-intensity=' + str(intensity) + ' --node-ratio=' + str(ratio) +
+                      ' | tee -a ' + log_path)
