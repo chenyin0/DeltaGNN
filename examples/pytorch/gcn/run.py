@@ -1,5 +1,6 @@
 import os
 import datetime
+import time
 
 deg_th_list = [1, 2, 5, 10, 20, 30]
 deg_th_list_large_dataset = [50, 100, 300, 500, 1000, 2000]
@@ -9,6 +10,8 @@ task_num = len(deg_th_list)
 ISOTIMEFORMAT = '%m%d_%H%M'
 theTime = datetime.datetime.now().strftime(ISOTIMEFORMAT)
 theTime = str(theTime)
+
+Task_time_start = time.perf_counter()
 
 # Predefined
 log_path = './results/' + theTime + '_log.txt'
@@ -78,3 +81,5 @@ for task_id in range(task_num):
     # os.system('python ./examples/pytorch/gcn/plt_acc_decline.py')
     # # Plot retrain cost
     # os.system('python ./examples/pytorch/gcn/plt_retrain_cost.py')
+
+print('\n>> Task execution time: {:.4}s'.format(time.perf_counter() - Task_time_start))
