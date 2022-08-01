@@ -40,8 +40,8 @@ def bfs_traverse(g_csr, root_node_q):
         sequence.append(root)
         while len(queue) > 0:
             vetex = queue.pop(0)
-            begin = indptr[root]
-            end = indptr[root + 1]
+            begin = indptr[vetex]
+            end = indptr[vetex + 1]
             nodes = indices[begin:end].tolist()
             # print(nodes)
             for w in nodes:
