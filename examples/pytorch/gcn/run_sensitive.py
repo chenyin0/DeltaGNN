@@ -1,16 +1,21 @@
 import os
 import datetime
+import time
 
 deg_interval = [[0, 1], [1, 2], [2, 3], [3, 4], [4, 5], [5, 6], [6, 7], [7, 8], [8, 9], [9, 11],
                 [11, 16], [16, 168]]
-noise_intensity = [0.1, 0.5, 1, 2, 5]
-node_ratio = [0.1, 0.2, 0.5, 1]
+# noise_intensity = [0.1, 0.5, 1, 2, 5]
+noise_intensity = [0.1, 0.5, 1]
+# node_ratio = [0.1, 0.2, 0.5, 1]
+node_ratio = [0.02]
 epoch = 200
 # task_num = len(deg_interval) * len(noise_intensity)
 
 ISOTIMEFORMAT = '%m%d_%H%M'
 theTime = datetime.datetime.now().strftime(ISOTIMEFORMAT)
 theTime = str(theTime)
+
+Task_time_start = time.perf_counter()
 
 # Predefined
 log_path = './results/' + theTime + '_log.txt'
@@ -38,3 +43,5 @@ for deg_region in deg_interval:
                       epoch_str + ' --deg-begin=' + str(deg_begin) + ' --deg-end=' + str(deg_end) +
                       ' --noise-intensity=' + str(intensity) + ' --node-ratio=' + str(ratio) +
                       ' | tee -a ' + log_path)
+
+print('\n>> Task execution time: {:.4}s'.format(time.perf_counter() - Task_time_start))

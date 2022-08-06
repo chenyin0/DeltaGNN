@@ -56,6 +56,10 @@ def evaluate(model, features, labels, mask):
 def degree_distribute(g):
     # Statistic graph typology
     in_degree = g.in_degrees()
+    # print(in_degree.tolist())
+    # out_degree = g.out_degrees()
+    # print()
+    # print(out_degree.tolist())
     in_degree_max = torch.max(in_degree, 0)[0]
     in_degree_min = torch.min(in_degree, 0)[0]
 
@@ -66,14 +70,19 @@ def degree_distribute(g):
     return degree_list
 
 
-def add_noise(g, degree_list, degree_begin, degree_end, intensity, node_ratio):
+def add_noise_out_deg(g, degree_list, degree_begin, degree_end, intensity, node_ratio):
+    """
+    node ratio: the proportion of the total nodes which added noise
+    intensity: the proportion of the noise amplitude with the original feature value
+    """
     print()
     in_feats = g.ndata['feat'].shape[1]
     degree_end = min(degree_end, len(degree_list))  # Avoid over boundary
+    num = round(g.number_of_nodes() * node_ratio)
     for degree_val in range(degree_begin, degree_end):
         node_list = degree_list[degree_val]
-        node_num = len(node_list)
-        num = round(node_num * node_ratio)
+        # node_num = len(node_list)
+        # num = round(node_num * node_ratio)
         loc_list = range(len(node_list))
         print('>> Deg: ', degree_val, ' Node num: ', len(loc_list), ' Selet node num: ', num)
 
@@ -81,8 +90,40 @@ def add_noise(g, degree_list, degree_begin, degree_end, intensity, node_ratio):
         device = g.device
         noise = noise.to(device)
         noise = th.mul(noise, intensity)
-        # loc = random.sample(loc_list, min(num, len(loc_list)))
-        loc = random.sample(loc_list, num)
+        loc = random.sample(loc_list, min(num, len(loc_list)))
+        # loc = random.sample(loc_list, num)
+        for i in loc:
+            node_id = node_list[i]
+            # Add random noise on node feature
+            # print(g.ndata['feat'][node_id].tolist())
+
+            g.ndata['feat'][node_id] = th.add(noise, g.ndata['feat'][node_id])
+
+
+def add_noise_in_deg(g, degree_list, degree_begin, degree_end, intensity, node_ratio):
+    """
+    node ratio: the proportion of the total nodes which added noise
+    intensity: the proportion of the noise amplitude with the original feature value
+
+    Note: intensity should be amortized by degree
+    """
+    print()
+    in_feats = g.ndata['feat'].shape[1]
+    degree_end = min(degree_end, len(degree_list))  # Avoid over boundary
+    num = round(g.number_of_nodes() * node_ratio)
+    for degree_val in range(degree_begin, degree_end):
+        node_list = degree_list[degree_val]
+        # node_num = len(node_list)
+        # num = round(node_num * node_ratio)
+        loc_list = range(len(node_list))
+        print('>> Deg: ', degree_val, ' Node num: ', len(loc_list), ' Selet node num: ', num)
+
+        noise = torch.rand(in_feats)
+        device = g.device
+        noise = noise.to(device)
+        noise = th.mul(noise, intensity / max(degree_val, 1))  # Avoid division by zero (degree = 0)
+        loc = random.sample(loc_list, min(num, len(loc_list)))
+        # loc = random.sample(loc_list, num)
         for i in loc:
             node_id = node_list[i]
             # Add random noise on node feature
@@ -94,11 +135,11 @@ def add_noise(g, degree_list, degree_begin, degree_end, intensity, node_ratio):
 def main(args):
     # load and preprocess dataset
     if args.dataset == 'cora':
-        data = CoraGraphDataset(raw_dir='./dataset')
+        data = CoraGraphDataset(raw_dir='./dataset', reverse_edge=False)
     elif args.dataset == 'citeseer':
-        data = CiteseerGraphDataset(raw_dir='./dataset')
+        data = CiteseerGraphDataset(raw_dir='./dataset', reverse_edge=False)
     elif args.dataset == 'pubmed':
-        data = PubmedGraphDataset(raw_dir='./dataset')
+        data = PubmedGraphDataset(raw_dir='./dataset', reverse_edge=False)
     else:
         raise ValueError('Unknown dataset: {}'.format(args.dataset))
 
@@ -112,7 +153,7 @@ def main(args):
     g = data[0]
     # util.save_graph_csr(g, args.dataset)
 
-    task_round = 10
+    task_round = 5
     acc_task = [0] * task_round
     for task_round_id in range(task_round):
 
@@ -200,7 +241,10 @@ def main(args):
         deg_end = args.deg_end
         noise_intensity = args.noise_intensity
         node_ratio = args.node_ratio
-        add_noise(g, degree_list, deg_begin, deg_end, noise_intensity, node_ratio)
+        """ Add noise according to out-degree """
+        # add_noise_out_deg(g, degree_list, deg_begin, deg_end, noise_intensity, node_ratio)
+        """ Add noise according to in-degree """
+        add_noise_in_deg(g, degree_list, deg_begin, deg_end, noise_intensity * 4, node_ratio)
         features = g.ndata['feat']
 
         print()
@@ -216,6 +260,7 @@ def main(args):
     print("Deg: [{:d}, {:d}), Node_ratio: {:.2f}, Intensity: {:.2f}".format(
         deg_begin, deg_end, node_ratio, noise_intensity))
     print("Task round: {:d}, Test accuracy {:.2%}".format(task_round, acc_total / task_round))
+    print()
 
 
 if __name__ == '__main__':
@@ -245,13 +290,13 @@ if __name__ == '__main__':
     parser.set_defaults(self_loop=False)
     args = parser.parse_args()
 
-    args.gpu = 0
+    # args.gpu = 0
     # args.dataset = 'cora'
     # args.noise_intensity = 0.1
     # args.node_ratio = 0.6
     # args.deg_begin = 2
     # args.deg_end = 3
 
-    print(args)
+    # print(args)
 
     main(args)
