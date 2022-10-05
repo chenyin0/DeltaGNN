@@ -318,13 +318,14 @@ def main(args):
 
         if dump_node_access_flag or dump_mem_trace_flag:
             # Count ngh access
-            g_csr_evo = model.g.adj_sparse('csr')
+            # g_csr_evo = model.g.adj_sparse('csr')
+            g_csr_evo = model_delta_all_ngh.g.adj_sparse('csr')
             # They are all full graph retrain in the initial time
             if i == 0:
                 # Statistic neighbor edges and nodes
                 node_full_retrain, edge_full_retrain = util.count_neighbor(
-                    model.g.nodes().tolist(), g_csr_evo, node_map_orig2evo, args.n_layers + 1,
-                    mem_access_q_delta_ngh)
+                    model_delta_all_ngh.g.nodes().tolist(), g_csr_evo, node_map_orig2evo,
+                    args.n_layers + 1, mem_access_q_delta_ngh)
 
                 delta_neighbor.append([node_full_retrain, edge_full_retrain])
             else:
@@ -454,13 +455,13 @@ if __name__ == '__main__':
 
     args.dataset = 'cora'
     args.n_epochs = 200
-    args.deg_threshold = 20
-    args.gpu = 0
+    args.deg_threshold = 8
+    args.gpu = -1
     args.n_layers = 0
 
-    dump_accuracy_flag = 1
+    dump_accuracy_flag = 0
     dump_mem_trace_flag = 0
-    dump_node_access_flag = 0
+    dump_node_access_flag = 1
 
     print('\n************ {:s} ************'.format(args.dataset))
     print(args)

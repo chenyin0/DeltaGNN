@@ -534,6 +534,7 @@ def count_neighbor_delta(nodes, g_csr, node_map_orig2evo, layer_num, deg_th=0, m
     edge_access_num = 0
     indptr = g_csr[0].numpy().tolist()
     indices = g_csr[1].numpy().tolist()
+    print(">> indptr_len: ", len(indptr))
     node_queue = cp.copy(nodes)
     # ngh_queue = []
     ngh_queue = set()
@@ -555,8 +556,8 @@ def count_neighbor_delta(nodes, g_csr, node_map_orig2evo, layer_num, deg_th=0, m
                 ngh_queue.add(node_ngh)
             # Only count delta access for low degree nodes
             else:
-                node_access_num += 1
-                edge_access_num += 1
+                node_access_num += 2  # For accessing this node's new feature and its neighbor's previous feature
+                edge_access_num += 2  # For accessing this node's new feature and its neighbor's previous feature
                 mem_access_q.append(node_ngh)
                 # node_queue_seen.add(node_ngh)
 

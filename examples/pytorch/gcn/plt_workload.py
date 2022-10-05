@@ -16,7 +16,7 @@ def plt_workload_imbalance(g_csr, deg_th):
         else:
             workload_delta.append(1)
 
-    items = ['Full-retrain', 'Delta-retrain']
+    items = ['Full-ngh updating', 'Delta updating']
 
     # workload = [0, 1, 5, 6, 9, 78]
     # workload_delta = [5, 8, 9, 63, 1, 2]
@@ -26,7 +26,7 @@ def plt_workload_imbalance(g_csr, deg_th):
     # Group size in each label
     group_size = len(items)
 
-    total_width = len(workload)*1.3
+    total_width = len(workload) * 1.3
     label_num = len(workload)
     width = total_width / label_num
     # Bar offset
@@ -80,7 +80,7 @@ def plt_workload_imbalance(g_csr, deg_th):
     # ax1.xaxis.set_visible(False)
     ax1.xaxis.set_tick_params(direction='in')
     # ax1.xaxis.minorticks_off()
-    xmajorLocator = MultipleLocator(500) #将x主刻度标签设置为500的倍数
+    xmajorLocator = MultipleLocator(500)  #将x主刻度标签设置为500的倍数
     ax1.xaxis.set_major_locator(xmajorLocator)
 
     # plt.yticks(size=10)
@@ -92,7 +92,7 @@ def plt_workload_imbalance(g_csr, deg_th):
     # my_y_ticks = np.arange(0, 120, 20)
     # plt.yticks(my_y_ticks)
 
-    plt.legend(ncol=2, labelspacing=0, handlelength=1, fontsize=12, loc="best")
+    plt.legend(labelspacing=0, handlelength=1, fontsize=12, loc="best")
     # ax1.get_legend().remove()
 
     #plt.axhline(y=1, color='k', linestyle='-', linewidth=0.8)
@@ -101,7 +101,7 @@ def plt_workload_imbalance(g_csr, deg_th):
     # ax1.yaxis.set_major_formatter(yticks)
 
     fontsize = 16
-    plt.xlabel('Node ID',fontsize = fontsize)
+    plt.xlabel('Node ID', fontsize=fontsize)
     plt.ylabel('Workload size', fontsize=fontsize)
 
     plt.tight_layout()

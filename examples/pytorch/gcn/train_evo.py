@@ -514,13 +514,13 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     args.dataset = 'cora'
-    args.n_epochs = 1
-    args.gpu = 0
-    args.n_layers = 0
+    args.n_epochs = 200
+    args.gpu = -1
+    args.n_layers = 1
 
     dump_accuracy_flag = 0
-    dump_mem_trace_flag = 1
-    dump_node_access_flag = 0
+    dump_mem_trace_flag = 0
+    dump_node_access_flag = 1
 
     print('\n************ {:s} ************'.format(args.dataset))
     print(args)
