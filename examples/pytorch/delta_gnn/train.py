@@ -133,8 +133,8 @@ if __name__ == '__main__':
                         help="number of hidden gcn units")
     parser.add_argument("--n-layers",
                         type=int,
-                        default=1,
-                        help="number of hidden gcn layers")
+                        default=2,
+                        help="number of gcn layers")
     parser.add_argument("--weight-decay",
                         type=float,
                         default=5e-4,
