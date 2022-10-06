@@ -145,10 +145,11 @@ def main(args):
         cuda = False
     else:
         cuda = True
+        gpu_id = args.gpu
         # g = g.int().to(args.gpu)
 
     # device = th.device("cuda:0" if th.cuda.is_available() else "cpu")
-    device = th.device("cuda:0" if cuda else "cpu")
+    device = th.device("cuda:" + str(gpu_id) if cuda else "cpu")
 
     # features = g.ndata['feat']
     # # print(features)
@@ -214,8 +215,8 @@ def main(args):
     norm = torch.pow(degs, -0.5)
     norm[torch.isinf(norm)] = 0
     if cuda:
-        norm = norm.cuda()
-        g_evo = g_evo.to(args.gpu)
+        norm = norm.to(gpu_id)
+        g_evo = g_evo.to(gpu_id)
     g_evo.ndata['norm'] = norm.unsqueeze(1)
 
     # create GCN model
@@ -456,12 +457,12 @@ if __name__ == '__main__':
     args.dataset = 'cora'
     args.n_epochs = 200
     args.deg_threshold = 8
-    args.gpu = -1
+    args.gpu = 0
     args.n_layers = 0
 
-    dump_accuracy_flag = 0
+    dump_accuracy_flag = 1
     dump_mem_trace_flag = 0
-    dump_node_access_flag = 1
+    dump_node_access_flag = 0
 
     print('\n************ {:s} ************'.format(args.dataset))
     print(args)
