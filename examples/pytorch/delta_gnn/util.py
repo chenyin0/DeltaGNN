@@ -496,8 +496,8 @@ def count_neighbor(nodes, g_csr, node_map_orig2evo, layer_num, mem_access_q=None
     # node_set = set(nodes)
     node_access_num = 0
     edge_access_num = 0
-    indptr = g_csr[0].numpy().tolist()
-    indices = g_csr[1].numpy().tolist()
+    indptr = g_csr[0].cpu().numpy().tolist()
+    indices = g_csr[1].cpu().numpy().tolist()
     # node_queue = nodes
     # node_queue_seen = set()
     node_queue = cp.copy(nodes)
@@ -532,8 +532,8 @@ def count_neighbor_delta(nodes, g_csr, node_map_orig2evo, layer_num, deg_th=0, m
     """
     node_access_num = 0
     edge_access_num = 0
-    indptr = g_csr[0].numpy().tolist()
-    indices = g_csr[1].numpy().tolist()
+    indptr = g_csr[0].cpu().numpy().tolist()
+    indices = g_csr[1].cpu().numpy().tolist()
     print(">> indptr_len: ", len(indptr))
     node_queue = cp.copy(nodes)
     # ngh_queue = []
