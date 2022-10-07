@@ -1,0 +1,12 @@
+{
+    "--n-hidden": 16,
+    "--n-layers": 2,
+    "--num-negs": 1,
+    "--neg-share": "False",
+    "--fan-out": "10,25",
+    "--batch-size": 10000,
+    "--log-every": 20,
+    "--eval-every": 1000,
+    "--lr": 0.003,
+    "--dropout": 0.5
+}
