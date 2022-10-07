@@ -13,11 +13,13 @@ import time
 import random
 
 from model.gcn import GCN
-from model.gcn import GCN_delta
+# from model.gcn import GCN_delta
 
 import os
 import plt.plt_workload
 import plt.plt_graph
+
+import json
 
 
 def train(model, features, n_edges, train_mask, val_mask, labels, loss_fcn, optimizer):
@@ -94,6 +96,23 @@ def main(args):
     # Overall task execution time
     Task_time_start = time.perf_counter()
 
+    # Load GNN model parameter
+    if args.model == 'gcn':
+        path = os.getcwd()
+        print(path)
+        with open("./examples/pytorch/delta_gnn/gcn_para.json", 'r') as f:
+            para = json.load(f)
+            n_hidden = para['--n-hidden']
+            n_layers = para['--n-layers']
+            weight_decay = para['--weight-decay']
+            lr = para['--lr']
+            dropout = para['--dropout']
+    elif args.model == 'graphsage':
+        with open('graphsage_para.json', 'r') as f:
+            para = json.load(f)
+    else:
+        assert ('Not define GNN model')
+
     # load and preprocess dataset
     if args.dataset == 'cora':
         data = CoraGraphDataset(raw_dir='./dataset')
@@ -163,10 +182,12 @@ def main(args):
     # util.save_txt_2d('./results/mem_trace/' + args.dataset + '_node_deg_trace' + '.txt',
     #                  deg_node_trace_sorted)
 
-    ##
-    """ Plot degree distribution """
+    # ##
+    # """ Plot degree distribution """
     deg_dist = util.gen_degree_distribution(g_csr)
     plt.plt_graph.plot_degree_distribution(deg_dist)
+
+    print("!!!!!!!")
 
     cnt = 0
     total = len(node_q)
@@ -228,12 +249,9 @@ def main(args):
     g_evo.ndata['norm'] = norm.unsqueeze(1)
 
     # create GCN model
-    model = GCN(g_evo, in_feats, args.n_hidden, n_classes, args.n_layers, F.relu,
-                args.dropout).to(device)
-    model_retrain = GCN(g_evo, in_feats, args.n_hidden, n_classes, args.n_layers, F.relu,
-                        args.dropout).to(device)
-    model_delta = GCN(g_evo, in_feats, args.n_hidden, n_classes, args.n_layers, F.relu,
-                      args.dropout).to(device)
+    model = GCN(g_evo, in_feats, n_hidden, n_classes, n_layers, F.relu, dropout).to(device)
+    model_retrain = GCN(g_evo, in_feats, n_hidden, n_classes, n_layers, F.relu, dropout).to(device)
+    model_delta = GCN(g_evo, in_feats, n_hidden, n_classes, n_layers, F.relu, dropout).to(device)
 
     # for param in model.parameters():
     #     print(param)
@@ -244,17 +262,15 @@ def main(args):
         model.cpu()
 
     loss_fcn = torch.nn.CrossEntropyLoss()
-    optimizer = torch.optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
+    optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
 
     loss_fcn_retrain = torch.nn.CrossEntropyLoss()
     optimizer_retrain = torch.optim.Adam(model_retrain.parameters(),
-                                         lr=args.lr,
-                                         weight_decay=args.weight_decay)
+                                         lr=lr,
+                                         weight_decay=weight_decay)
 
     loss_fcn_delta = torch.nn.CrossEntropyLoss()
-    optimizer_delta = torch.optim.Adam(model_delta.parameters(),
-                                       lr=args.lr,
-                                       weight_decay=args.weight_decay)
+    optimizer_delta = torch.optim.Adam(model_delta.parameters(), lr=lr, weight_decay=weight_decay)
 
     # for name, param in model.named_parameters(): # View optimizable parameter
     #     if param.requires_grad:
@@ -352,7 +368,7 @@ def main(args):
             g_csr_evo = model.g.adj_sparse('csr')
             # Statistic neighbor edges and nodes
             node_full_retrain, edge_full_retrain = util.count_neighbor(
-                model.g.nodes().tolist(), g_csr_evo, node_map_orig2evo, args.n_layers + 1,
+                model.g.nodes().tolist(), g_csr_evo, node_map_orig2evo, n_layers,
                 mem_access_q_full_retrain)
 
             if i == 0:
@@ -373,7 +389,7 @@ def main(args):
             else:
                 if dump_node_access_flag:
                     node_ngh_all, edge_ngh_all = util.count_neighbor_delta(
-                        inserted_nodes_evo, g_csr_evo, node_map_orig2evo, args.n_layers + 1, 0,
+                        inserted_nodes_evo, g_csr_evo, node_map_orig2evo, n_layers, 0,
                         mem_access_q_all_ngh)
 
                     print('>>', node_full_retrain, edge_full_retrain, node_ngh_all, edge_ngh_all)
@@ -493,19 +509,23 @@ def main(args):
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='GCN')
+    parser = argparse.ArgumentParser(description='GNN')
+    parser.add_argument("--model",
+                        type=str,
+                        default=None,
+                        help="Model name ('gcn', 'graphsage', 'gin', 'gat').")
     parser.add_argument(
         "--dataset",
         type=str,
         default="cora",
         help="Dataset name ('cora', 'citeseer', 'pubmed', 'reddit', 'amazon_comp').")
-    parser.add_argument("--dropout", type=float, default=0.5, help="dropout probability")
+    # parser.add_argument("--dropout", type=float, default=0.5, help="dropout probability")
     parser.add_argument("--gpu", type=int, default=-1, help="gpu")
-    parser.add_argument("--lr", type=float, default=1e-2, help="learning rate")
+    # parser.add_argument("--lr", type=float, default=1e-2, help="learning rate")
     parser.add_argument("--n-epochs", type=int, default=200, help="number of training epochs")
-    parser.add_argument("--n-hidden", type=int, default=16, help="number of hidden gcn units")
-    parser.add_argument("--n-layers", type=int, default=2, help="number of gcn layers")
-    parser.add_argument("--weight-decay", type=float, default=5e-4, help="Weight for L2 loss")
+    # parser.add_argument("--n-hidden", type=int, default=16, help="number of hidden gcn units")
+    # parser.add_argument("--n-layers", type=int, default=2, help="number of gcn layers")
+    # parser.add_argument("--weight-decay", type=float, default=5e-4, help="Weight for L2 loss")
     parser.add_argument("--self-loop", action='store_true', help="graph self-loop (default=False)")
     parser.add_argument("--deg-threshold",
                         type=int,
@@ -514,10 +534,10 @@ if __name__ == '__main__':
     parser.set_defaults(self_loop=False)
     args = parser.parse_args()
 
+    args.model = 'gcn'
     args.dataset = 'cora'
     args.n_epochs = 200
-    args.gpu = 0
-    args.n_layers = 1
+    args.gpu = -1
 
     dump_accuracy_flag = 1
     dump_mem_trace_flag = 0
