@@ -41,7 +41,7 @@ class GCN(nn.Module):
                 GraphConv(n_hidden, n_hidden, activation=activation, allow_zero_in_degree=True))
             self.layers.append(GraphConv(n_hidden, n_classes, allow_zero_in_degree=True))
         else:
-            self.layers.append(GraphConv(in_feats, n_classes, allow_zero_in_degree=True))
+            self.layers.append(GraphConv(in_feats, n_classes, activation=activation, allow_zero_in_degree=True))
 
         self.dropout = nn.Dropout(p=dropout)
 
@@ -67,13 +67,25 @@ class GCN_delta(nn.Module):
         super(GCN_delta, self).__init__()
         self.g = g
         self.layers = nn.ModuleList()
-        # input layer
-        self.layers.append(GraphConv_delta(in_feats, n_hidden, activation=activation))
-        # hidden layers
-        for i in range(n_layers - 1):
-            self.layers.append(GraphConv_delta(n_hidden, n_hidden, activation=activation))
-        # output layer
-        self.layers.append(GraphConv_delta(n_hidden, n_classes))
+
+        # # input layer
+        # self.layers.append(GraphConv_delta(in_feats, n_hidden, activation=activation))
+        # # hidden layers
+        # for i in range(n_layers - 1):
+        #     self.layers.append(GraphConv_delta(n_hidden, n_hidden, activation=activation))
+        # # output layer
+        # self.layers.append(GraphConv_delta(n_hidden, n_classes))
+
+        if n_layers > 1:
+            self.layers.append(
+                GraphConv(in_feats, n_hidden, activation=activation, allow_zero_in_degree=True))
+            for i in range(1, n_layers-1):
+                self.layers.append(
+                GraphConv(n_hidden, n_hidden, activation=activation, allow_zero_in_degree=True))
+            self.layers.append(GraphConv(n_hidden, n_classes, allow_zero_in_degree=True))
+        else:
+            self.layers.append(GraphConv(in_feats, n_classes, activation=activation, allow_zero_in_degree=True))
+
         self.dropout = nn.Dropout(p=dropout)
 
         # # Record whether a node has been inferenced embedding
