@@ -7,11 +7,11 @@ import torch as th
 from torch import nn
 from torch.nn import init
 
-from dgl import function as fn
-from dgl import DGLError
-# from dgl.transform import reverse
-from dgl.convert import block_to_graph
-from dgl.heterograph import DGLBlock
+# from dgl import function as fn
+# from dgl import DGLError
+# # from dgl.transform import reverse
+# from dgl.convert import block_to_graph
+# from dgl.heterograph import DGLBlock
 
 
 class GraphConv_delta(GraphConv):
@@ -39,5 +39,5 @@ class GraphConv_delta(GraphConv):
             return rst_delta
         else:
             rst = super().forward(graph, feat)
-            self.feat = nn.Parameter(rst)
+            # self.feat = nn.Parameter(rst)
             return rst
