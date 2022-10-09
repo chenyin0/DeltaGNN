@@ -4,6 +4,8 @@ import numpy as np
 import torch
 import torch as th
 import torch.nn.functional as F
+from torch.nn import CrossEntropyLoss
+from torch.optim import Adam
 
 import dgl
 from dgl.data import CoraGraphDataset, CiteseerGraphDataset, PubmedGraphDataset, RedditDataset, AmazonCoBuyComputerDataset
@@ -13,6 +15,7 @@ import time
 import random
 
 from model.gcn import GCN
+from model.graphsage import SAGE
 # from model.gcn import GCN_delta
 
 import os
@@ -33,20 +36,9 @@ def train(model, features, n_edges, train_mask, val_mask, labels, loss_fcn, opti
         logits = model(features)
         loss = loss_fcn(logits[train_mask], labels[train_mask])
 
-        # w1 = copy.deepcopy(model.layers[0].weight)
-        # print('\n>> Before train:')
-        # for param in model.parameters():
-        #     print(param)
-
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
-
-        # print('\n>> After train:')
-        # for param in model.parameters():
-        #     print(param)
-        # w2 = model.layers[0].weight
-        # print(w1.equal(w2))
 
         if epoch >= 3:
             dur.append(time.time() - t0)
@@ -97,7 +89,8 @@ def main(args):
     Task_time_start = time.perf_counter()
 
     # Load GNN model parameter
-    if args.model == 'gcn':
+    model_name = args.model
+    if model_name == 'gcn':
         path = os.getcwd()
         print(path)
         with open("./examples/pytorch/delta_gnn/gcn_para.json", 'r') as f:
@@ -107,9 +100,18 @@ def main(args):
             weight_decay = para['--weight-decay']
             lr = para['--lr']
             dropout = para['--dropout']
-    elif args.model == 'graphsage':
-        with open('graphsage_para.json', 'r') as f:
+    elif model_name == 'graphsage':
+        with open('./examples/pytorch/delta_gnn/graphsage_para.json', 'r') as f:
             para = json.load(f)
+            n_hidden = para['--n-hidden']
+            n_layers = para['--n-layers']
+            num_negs = para['--num-negs']
+            fan_out = str(para['--fan-out'])
+            batch_size = para['--batch-size']
+            log_every = para['--log-every']
+            eval_every = para['--eval-every']
+            lr = para['--lr']
+            dropout = para['--dropout']
     else:
         assert ('Not define GNN model')
 
@@ -134,9 +136,7 @@ def main(args):
     else:
         cuda = True
         gpu_id = args.gpu
-        # g = g.int().to(args.gpu)
 
-    # device = th.device("cuda:0" if th.cuda.is_available() else "cpu")
     device = th.device("cuda:" + str(gpu_id) if cuda else "cpu")
 
     # features = g.ndata['feat']
@@ -183,11 +183,9 @@ def main(args):
     #                  deg_node_trace_sorted)
 
     # ##
-    # """ Plot degree distribution """
+    """ Plot degree distribution """
     deg_dist = util.gen_degree_distribution(g_csr)
     plt.plt_graph.plot_degree_distribution(deg_dist)
-
-    print("!!!!!!!")
 
     cnt = 0
     total = len(node_q)
@@ -248,10 +246,34 @@ def main(args):
         g_evo = g_evo.to(gpu_id)
     g_evo.ndata['norm'] = norm.unsqueeze(1)
 
-    # create GCN model
-    model = GCN(g_evo, in_feats, n_hidden, n_classes, n_layers, F.relu, dropout).to(device)
-    model_retrain = GCN(g_evo, in_feats, n_hidden, n_classes, n_layers, F.relu, dropout).to(device)
-    model_delta = GCN(g_evo, in_feats, n_hidden, n_classes, n_layers, F.relu, dropout).to(device)
+    # create GNN model
+    if model_name == 'gcn':
+        model = GCN(g_evo, in_feats, n_hidden, n_classes, n_layers, F.relu, dropout).to(device)
+        loss_fcn = CrossEntropyLoss()
+        optimizer = Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
+
+        model_retrain = GCN(g_evo, in_feats, n_hidden, n_classes, n_layers, F.relu,
+                            dropout).to(device)
+        loss_fcn_retrain = CrossEntropyLoss()
+        optimizer_retrain = Adam(model_retrain.parameters(), lr=lr, weight_decay=weight_decay)
+
+        model_delta = GCN(g_evo, in_feats, n_hidden, n_classes, n_layers, F.relu,
+                          dropout).to(device)
+        loss_fcn_delta = CrossEntropyLoss()
+        optimizer_delta = Adam(model_delta.parameters(), lr=lr, weight_decay=weight_decay)
+
+    elif model_name == 'graphsage':
+        model = SAGE(in_feats, n_hidden, n_classes, n_layers, F.relu, dropout).to(device)
+        loss_fcn = CrossEntropyLoss()
+        optimizer = Adam(model.parameters(), lr=lr)
+
+        model_retrain = SAGE(in_feats, n_hidden, n_classes, n_layers, F.relu, dropout).to(device)
+        loss_fcn_retrain = CrossEntropyLoss()
+        optimizer_retrain = Adam(model.parameters(), lr=lr)
+
+        model_delta = SAGE(in_feats, n_hidden, n_classes, n_layers, F.relu, dropout).to(device)
+        loss_fcn_delta = CrossEntropyLoss()
+        optimizer_delta = Adam(model.parameters(), lr=lr)
 
     # for param in model.parameters():
     #     print(param)
@@ -261,43 +283,13 @@ def main(args):
     else:
         model.cpu()
 
-    loss_fcn = torch.nn.CrossEntropyLoss()
-    optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
-
-    loss_fcn_retrain = torch.nn.CrossEntropyLoss()
-    optimizer_retrain = torch.optim.Adam(model_retrain.parameters(),
-                                         lr=lr,
-                                         weight_decay=weight_decay)
-
-    loss_fcn_delta = torch.nn.CrossEntropyLoss()
-    optimizer_delta = torch.optim.Adam(model_delta.parameters(), lr=lr, weight_decay=weight_decay)
-
     # for name, param in model.named_parameters(): # View optimizable parameter
     #     if param.requires_grad:
     #         print(name)
 
-    # initialize graph
-    dur = []
-    for epoch in range(args.n_epochs):
-        model.train()
-        if epoch >= 3:
-            t0 = time.time()
-        # forward
-        logits = model(features)
-        loss = loss_fcn(logits[train_mask], labels[train_mask])
-
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
-
-        if epoch >= 3:
-            dur.append(time.time() - t0)
-
-        acc = evaluate(model, features, labels, val_mask)
-        # print("Epoch {:05d} | Time(s) {:.4f} | Loss {:.4f} | Accuracy {:.4f} | "
-        #       "ETputs(KTEPS) {:.2f}".format(epoch, np.mean(dur), loss.item(), acc,
-        #                                     n_edges / np.mean(dur) / 1000))
-
+    # Train original graph
+    train(model, features, model.g.number_of_edges(), train_mask, val_mask, labels, loss_fcn,
+          optimizer)
     print()
     print(">>> Accuracy on original graph: ")
     acc = evaluate(model, features, labels, test_mask)
@@ -534,7 +526,7 @@ if __name__ == '__main__':
     parser.set_defaults(self_loop=False)
     args = parser.parse_args()
 
-    args.model = 'gcn'
+    args.model = 'graphsage'
     args.dataset = 'cora'
     args.n_epochs = 200
     args.gpu = -1
