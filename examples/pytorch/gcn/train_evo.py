@@ -171,7 +171,7 @@ def main(args):
     total = len(node_q)
     for i in range(len(deg_dist)):
         cnt += deg_dist[i]
-        percentage = round(cnt/total * 100, 2)
+        percentage = round(cnt / total * 100, 2)
         print(i, percentage)
 
     ##
@@ -282,12 +282,12 @@ def main(args):
         #                                     n_edges / np.mean(dur) / 1000))
 
     print()
-    print(">>> Accuracy on original graph: ")
+    print(">>> Accuracy on initial graph (timestamp=0):")
     acc = evaluate(model, features, labels, test_mask)
     print("Test accuracy {:.2%}".format(acc))
 
     # Evolve graph
-    print(">>> Accuracy on evolove graph: ")
+    print("\n>>> Accuracy on evolove graph: ")
 
     # Add new edges
     # n_nodes = model.g.number_of_nodes()
@@ -518,9 +518,9 @@ if __name__ == '__main__':
     args.gpu = -1
     args.n_layers = 1
 
-    dump_accuracy_flag = 0
+    dump_accuracy_flag = 1
     dump_mem_trace_flag = 0
-    dump_node_access_flag = 1
+    dump_node_access_flag = 0
 
     print('\n************ {:s} ************'.format(args.dataset))
     print(args)
