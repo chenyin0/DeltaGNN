@@ -10,38 +10,26 @@ import torch as th
 import torch.nn as nn
 from dgl.nn.pytorch import GraphConv
 from .graphconv_delta import GraphConv_delta
+import time
 
 
 class GCN(nn.Module):
+
     def __init__(self, g, in_feats, n_hidden, n_classes, n_layers, activation, dropout):
         super(GCN, self).__init__()
         self.g = g
         self.layers = nn.ModuleList()
-        
-        # # input layer
-        # # self.layers.append(GraphConv(in_feats, n_hidden, activation=activation))
-        # self.layers.append(
-        #     GraphConv(in_feats, n_hidden, activation=activation, allow_zero_in_degree=True))
-        # # hidden layers
-        # for i in range(n_layers - 1):
-        #     # self.layers.append(
-        #     #     GraphConv(n_hidden, n_hidden, activation=activation))
-        #     self.layers.append(
-        #         GraphConv(n_hidden, n_hidden, activation=activation, allow_zero_in_degree=True))
-        # # output layer
-        # # self.layers.append(
-        # #     GraphConv(n_hidden, n_classes))
-        # self.layers.append(GraphConv(n_hidden, n_classes, allow_zero_in_degree=True))
 
         if n_layers > 1:
             self.layers.append(
                 GraphConv(in_feats, n_hidden, activation=activation, allow_zero_in_degree=True))
-            for i in range(1, n_layers-1):
+            for i in range(1, n_layers - 1):
                 self.layers.append(
-                GraphConv(n_hidden, n_hidden, activation=activation, allow_zero_in_degree=True))
+                    GraphConv(n_hidden, n_hidden, activation=activation, allow_zero_in_degree=True))
             self.layers.append(GraphConv(n_hidden, n_classes, allow_zero_in_degree=True))
         else:
-            self.layers.append(GraphConv(in_feats, n_classes, activation=activation, allow_zero_in_degree=True))
+            self.layers.append(
+                GraphConv(in_feats, n_classes, activation=activation, allow_zero_in_degree=True))
 
         self.dropout = nn.Dropout(p=dropout)
 
@@ -57,43 +45,100 @@ class GCN(nn.Module):
         return h
 
 
+def train(args, model, features, n_edges, train_mask, val_mask, labels, loss_fcn, optimizer):
+    # initialize graph
+    dur = []
+    for epoch in range(args.n_epochs):
+        model.train()
+        if epoch >= 3:
+            t0 = time.time()
+        # forward
+        logits = model(features)
+        loss = loss_fcn(logits[train_mask], labels[train_mask])
+
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+
+        if epoch >= 3:
+            dur.append(time.time() - t0)
+
+        acc = evaluate(model, features, labels, val_mask)
+        # print("Epoch {:05d} | Time(s) {:.4f} | Loss {:.4f} | Accuracy {:.4f} | "
+        #       "ETputs(KTEPS) {:.2f}".format(epoch, np.mean(dur), loss.item(),
+        #                                     acc, n_edges / np.mean(dur) / 1000))
+
+
+def evaluate(model, features, labels, mask):
+    model.eval()
+    with torch.no_grad():
+        logits = model(features)
+        logits = logits[mask]
+        labels = labels[mask]
+        _, indices = torch.max(logits, dim=1)
+        correct = torch.sum(indices == labels)
+        return correct.item() * 1.0 / len(labels)
+
+
+def evaluate_delta(model, features, labels, mask, updated_nodes):
+    r"""
+    Only update feature of updated nodes in inference
+    """
+    model.eval()
+    with torch.no_grad():
+        logits_prev = model.logits
+        logits = model(features)
+        # logits = logits[mask]
+
+        logits_updated = logits
+        logits_updated[0:logits_prev.size()[0]] = logits_prev
+        for node_id in updated_nodes:
+            logits_updated[node_id] = logits[node_id]
+
+        model.logits = logits_updated  # Record updated logits
+
+        logits_updated = logits_updated[mask]
+        labels = labels[mask]
+        _, indices = torch.max(logits_updated, dim=1)
+        correct = torch.sum(indices == labels)
+        return correct.item() * 1.0 / len(labels)
+
+
 class GCN_delta(nn.Module):
     r"""
     Initial para:
         g: subgraph of original graph
         in_feats: feature matrix of current subgraph
     """
+
     def __init__(self, g, in_feats, n_hidden, n_classes, n_layers, activation, dropout):
         super(GCN_delta, self).__init__()
         self.g = g
         self.layers = nn.ModuleList()
 
-        # # input layer
-        # self.layers.append(GraphConv_delta(in_feats, n_hidden, activation=activation))
-        # # hidden layers
-        # for i in range(n_layers - 1):
-        #     self.layers.append(GraphConv_delta(n_hidden, n_hidden, activation=activation))
-        # # output layer
-        # self.layers.append(GraphConv_delta(n_hidden, n_classes))
-
         if n_layers > 1:
             self.layers.append(
-                GraphConv(in_feats, n_hidden, activation=activation, allow_zero_in_degree=True))
-            for i in range(1, n_layers-1):
+                GraphConv_delta(in_feats,
+                                n_hidden,
+                                activation=activation,
+                                allow_zero_in_degree=True))
+            for i in range(1, n_layers - 1):
                 self.layers.append(
-                GraphConv(n_hidden, n_hidden, activation=activation, allow_zero_in_degree=True))
-            self.layers.append(GraphConv(n_hidden, n_classes, allow_zero_in_degree=True))
+                    GraphConv_delta(n_hidden,
+                                    n_hidden,
+                                    activation=activation,
+                                    allow_zero_in_degree=True))
+            self.layers.append(GraphConv_delta(n_hidden, n_classes, allow_zero_in_degree=True))
         else:
-            self.layers.append(GraphConv(in_feats, n_classes, activation=activation, allow_zero_in_degree=True))
+            self.layers.append(
+                GraphConv_delta(in_feats,
+                                n_classes,
+                                activation=activation,
+                                allow_zero_in_degree=True))
 
         self.dropout = nn.Dropout(p=dropout)
 
-        # # Record whether a node has been inferenced embedding
-        # self.nodes_has_inferenced_mask = [0 for i in range(g.number_of_nodes())]
-
         # Record previous embedding
-        # self.embedding = nn.Parameter(
-        #     th.Tensor([[0 for i in range(n_classes)] for j in range(g.number_of_nodes())]))
         self.embedding = th.Tensor([[0 for i in range(n_classes)]
                                     for j in range(g.number_of_nodes())]).requires_grad_(True)
 
@@ -103,12 +148,6 @@ class GCN_delta(nn.Module):
             if i != 0:
                 h = self.dropout(h)
             h = layer(self.g, h, ngh_high_deg, ngh_low_deg)
-
-        # for name, parameters in self.named_parameters():
-        #     print(name, ':', parameters.size())
-        #     print(parameters.detach().is_leaf)
-        #     print(parameters.detach().grad)
-        #     print(parameters.detach().grad_fn)
 
         if (ngh_high_deg is not None) or (ngh_low_deg is not None):
             # Combine delta-inferenced embedding and previous embedding
@@ -122,9 +161,22 @@ class GCN_delta(nn.Module):
         feat = feat.to('cpu')
         embedding_prev = embedding_prev.to('cpu')
 
+        ##
+        r"""
+        Para:
+        1. feat_prev: features in the last time
+        2. feat: updated features under edge_mask (all-neighbor updating for high degree, and delta-neighbor updating for low degree)
+        3. feat_low_deg: updated features with low degree
+
+        Method:
+        1. First, replace items in "feat" to which in "feat_prev" with the corresponding node_id
+        2. Then, merge "feat_low_deg" with "add" operation to "feat"
+        """
+
         # Combine delta rst with feat_prev
         feat_prev_ind = list(i for i in range(embedding_prev.shape[0]))
-        feat_prev_keep_ind = list(set(feat_prev_ind) - set(ngh_high_deg) - set(ngh_low_deg))
+        # feat_prev_keep_ind = list(set(feat_prev_ind) - set(ngh_high_deg) - set(ngh_low_deg))
+        feat_prev_keep_ind = list(set(feat_prev_ind) - set(ngh_high_deg))
 
         feat_prev_keep_ind = th.tensor(feat_prev_keep_ind, dtype=th.long)
         # ngh_high_deg_ind = th.tensor(ngh_high_deg, dtype=th.long)
@@ -155,3 +207,69 @@ class GCN_delta(nn.Module):
         feat = feat.to(device)
 
         return feat
+
+
+def train_delta_edge_masked(args,
+                            model,
+                            features,
+                            n_edges,
+                            train_mask,
+                            val_mask,
+                            labels,
+                            loss_fcn,
+                            optimizer,
+                            ngh_high_deg=None,
+                            ngh_low_deg=None):
+
+    # initialize graph
+    dur = []
+    for epoch in range(args.n_epochs):
+        model.train()
+        if epoch >= 3:
+            t0 = time.time()
+        # forward
+        logits = model(features, ngh_high_deg, ngh_low_deg)
+        loss = loss_fcn(logits[train_mask], labels[train_mask])
+
+        # print('\n>> Grad', [x.grad for x in optimizer.param_groups[0]['params']])
+
+        # print()
+        # for name, parameters in model.named_parameters():
+        #     print('\n' + name, ':', parameters)
+
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+
+        if epoch >= 3:
+            dur.append(time.time() - t0)
+
+        acc = evaluate_delta_edge_masked(model, features, labels, val_mask, ngh_high_deg,
+                                         ngh_low_deg)
+        # print("Epoch {:05d} | Time(s) {:.4f} | Loss {:.4f} | Accuracy {:.4f} | "
+        #       "ETputs(KTEPS) {:.2f}".format(epoch, np.mean(dur), loss.item(), acc,
+        #                                     n_edges / np.mean(dur) / 1000))
+
+    # Update embedding
+    model.embedding = torch.nn.Parameter(logits)
+
+
+def evaluate_delta_edge_masked(model,
+                               features,
+                               labels,
+                               mask,
+                               nodes_high_deg=None,
+                               nodes_low_deg=None):
+    r"""
+    Update feature of updated nodes according to node degree
+
+    "model" should be GCN_delta
+    """
+    model.eval()
+    with torch.no_grad():
+        logits = model(features, nodes_high_deg, nodes_low_deg)
+        logits = logits[mask]
+        labels = labels[mask]
+        _, indices = torch.max(logits, dim=1)
+        correct = torch.sum(indices == labels)
+        return correct.item() * 1.0 / len(labels)
