@@ -13,7 +13,7 @@ def load_reddit(self_loop=True):
     return g, data.num_classes
 
 
-def load_ogb(name, root='dataset'):
+def load_ogb(name, root='./dataset'):
     from ogb.nodeproppred import DglNodePropPredDataset
 
     print('load', name)
