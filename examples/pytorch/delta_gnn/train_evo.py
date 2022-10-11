@@ -1,5 +1,6 @@
 import argparse
 import time
+import xxlimited
 import numpy as np
 import torch
 import torch as th
@@ -15,7 +16,9 @@ import time
 import random
 
 from model.gcn import GCN
+import model.gcn as gcn
 from model.graphsage import SAGE
+import model.graphsage as graphsage
 # from model.gcn import GCN_delta
 
 import os
@@ -23,65 +26,63 @@ import plt.plt_workload
 import plt.plt_graph
 
 import json
+import pathlib
 
+# def train(model, features, n_edges, train_mask, val_mask, labels, loss_fcn, optimizer):
+#     # initialize graph
+#     dur = []
+#     for epoch in range(args.n_epochs):
+#         model.train()
+#         if epoch >= 3:
+#             t0 = time.time()
+#         # forward
+#         logits = model(features)
+#         loss = loss_fcn(logits[train_mask], labels[train_mask])
 
-def train(model, features, n_edges, train_mask, val_mask, labels, loss_fcn, optimizer):
-    # initialize graph
-    dur = []
-    for epoch in range(args.n_epochs):
-        model.train()
-        if epoch >= 3:
-            t0 = time.time()
-        # forward
-        logits = model(features)
-        loss = loss_fcn(logits[train_mask], labels[train_mask])
+#         optimizer.zero_grad()
+#         loss.backward()
+#         optimizer.step()
 
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
+#         if epoch >= 3:
+#             dur.append(time.time() - t0)
 
-        if epoch >= 3:
-            dur.append(time.time() - t0)
+#         acc = evaluate(model, features, labels, val_mask)
+#         # print("Epoch {:05d} | Time(s) {:.4f} | Loss {:.4f} | Accuracy {:.4f} | "
+#         #       "ETputs(KTEPS) {:.2f}".format(epoch, np.mean(dur), loss.item(),
+#         #                                     acc, n_edges / np.mean(dur) / 1000))
 
-        acc = evaluate(model, features, labels, val_mask)
-        # print("Epoch {:05d} | Time(s) {:.4f} | Loss {:.4f} | Accuracy {:.4f} | "
-        #       "ETputs(KTEPS) {:.2f}".format(epoch, np.mean(dur), loss.item(),
-        #                                     acc, n_edges / np.mean(dur) / 1000))
+# def evaluate(model, features, labels, mask):
+#     model.eval()
+#     with torch.no_grad():
+#         logits = model(features)
+#         logits = logits[mask]
+#         labels = labels[mask]
+#         _, indices = torch.max(logits, dim=1)
+#         correct = torch.sum(indices == labels)
+#         return correct.item() * 1.0 / len(labels)
 
+# def evaluate_delta(model, features, labels, mask, updated_nodes):
+#     r"""
+#     Only update feature of updated nodes in inference
+#     """
+#     model.eval()
+#     with torch.no_grad():
+#         logits_prev = model.logits
+#         logits = model(features)
+#         # logits = logits[mask]
 
-def evaluate(model, features, labels, mask):
-    model.eval()
-    with torch.no_grad():
-        logits = model(features)
-        logits = logits[mask]
-        labels = labels[mask]
-        _, indices = torch.max(logits, dim=1)
-        correct = torch.sum(indices == labels)
-        return correct.item() * 1.0 / len(labels)
+#         logits_updated = logits
+#         logits_updated[0:logits_prev.size()[0]] = logits_prev
+#         for node_id in updated_nodes:
+#             logits_updated[node_id] = logits[node_id]
 
+#         model.logits = logits_updated  # Record updated logits
 
-def evaluate_delta(model, features, labels, mask, updated_nodes):
-    r"""
-    Only update feature of updated nodes in inference
-    """
-    model.eval()
-    with torch.no_grad():
-        logits_prev = model.logits
-        logits = model(features)
-        # logits = logits[mask]
-
-        logits_updated = logits
-        logits_updated[0:logits_prev.size()[0]] = logits_prev
-        for node_id in updated_nodes:
-            logits_updated[node_id] = logits[node_id]
-
-        model.logits = logits_updated  # Record updated logits
-
-        logits_updated = logits_updated[mask]
-        labels = labels[mask]
-        _, indices = torch.max(logits_updated, dim=1)
-        correct = torch.sum(indices == labels)
-        return correct.item() * 1.0 / len(labels)
+#         logits_updated = logits_updated[mask]
+#         labels = labels[mask]
+#         _, indices = torch.max(logits_updated, dim=1)
+#         correct = torch.sum(indices == labels)
+#         return correct.item() * 1.0 / len(labels)
 
 
 def main(args):
@@ -97,8 +98,8 @@ def main(args):
             para = json.load(f)
             n_hidden = para['--n-hidden']
             n_layers = para['--n-layers']
-            weight_decay = para['--weight-decay']
             lr = para['--lr']
+            weight_decay = para['--weight-decay']
             dropout = para['--dropout']
     elif model_name == 'graphsage':
         with open('./examples/pytorch/delta_gnn/graphsage_para.json', 'r') as f:
@@ -111,25 +112,26 @@ def main(args):
             log_every = para['--log-every']
             eval_every = para['--eval-every']
             lr = para['--lr']
+            weight_decay = para['--weight-decay']
             dropout = para['--dropout']
     else:
         assert ('Not define GNN model')
 
     # load and preprocess dataset
     if args.dataset == 'cora':
-        data = CoraGraphDataset(raw_dir='./dataset')
+        dataset = CoraGraphDataset(raw_dir='./dataset')
     elif args.dataset == 'citeseer':
-        data = CiteseerGraphDataset(raw_dir='./dataset')
+        dataset = CiteseerGraphDataset(raw_dir='./dataset')
     elif args.dataset == 'pubmed':
-        data = PubmedGraphDataset(raw_dir='./dataset')
+        dataset = PubmedGraphDataset(raw_dir='./dataset')
     elif args.dataset == 'reddit':
-        data = RedditDataset(raw_dir='./dataset')
+        dataset = RedditDataset(raw_dir='./dataset')
     elif args.dataset == 'amazon_comp':
-        data = AmazonCoBuyComputerDataset(raw_dir='./dataset')
+        dataset = AmazonCoBuyComputerDataset(raw_dir='./dataset')
     else:
         raise ValueError('Unknown dataset: {}'.format(args.dataset))
 
-    g = data[0]
+    g = dataset[0]
 
     if args.gpu < 0:
         cuda = False
@@ -146,8 +148,8 @@ def main(args):
     # val_mask = g.ndata['val_mask']
     # test_mask = g.ndata['test_mask']
     # in_feats = features.shape[1]
-    # n_classes = data.num_labels
-    # n_edges = data.graph.number_of_edges()
+    # n_classes = dataset.num_labels
+    # n_edges = dataset.graph.number_of_edges()
     # print("""----Data statistics------'
     #   #Edges %d
     #   #Classes %d
@@ -158,46 +160,60 @@ def main(args):
     #        val_mask.int().sum().item(), test_mask.int().sum().item()))
 
     ##
-    """ Traverse to get graph evolving snapshot """
+
     g_csr = g.adj_sparse('csr')
-    root_node_q = util.gen_root_node_queue(g)
-    node_q = util.bfs_traverse(g_csr, root_node_q)
+    """ Traverse to get graph evolving snapshot """
+    node_q = []
+    file_ = pathlib.Path('./dataset/' + args.dataset + '_evo_seq.txt')
+    if file_.exists():
+        f = open(file_, "r")
+        lines = f.readlines()
+        for line in lines:
+            line = line.strip('\n')  # Delete '\n'
+            node_q.append(int(line))
+    else:
+        root_node_q = util.gen_root_node_queue(g)
+        node_q = util.bfs_traverse(g_csr, root_node_q)
 
-    ##
-    """ Profiling node locality with degree """
-    node_q_tmp = util.bfs_traverse(g_csr, [i for i in range(len(node_q))])
-    deg_node_trace_sorted = util.gen_trace_sorted_by_node_deg(g_csr, node_q_tmp)
-    util.rm_repeat_data(deg_node_trace_sorted)
-    deg_node_trace_wo_sort = util.gen_trace_without_sorted(g_csr, node_q_tmp)
-
-    locality_node_degs_sorted = util.eval_node_locality(deg_node_trace_sorted)
-    print(locality_node_degs_sorted)
-
-    # for i in deg_node_trace_wo_sort:
-    #     print(i[0])
-
-    locality_node_degs_wo_sort = util.eval_node_locality(deg_node_trace_wo_sort)
-    print(locality_node_degs_wo_sort)
-
-    # util.save_txt_2d('./results/mem_trace/' + args.dataset + '_node_deg_trace' + '.txt',
-    #                  deg_node_trace_sorted)
+        with open(file_, 'w') as f:
+            for i in node_q:
+                f.write(str(i) + '\n')
 
     # ##
-    """ Plot degree distribution """
-    deg_dist = util.gen_degree_distribution(g_csr)
-    plt.plt_graph.plot_degree_distribution(deg_dist)
+    # """ Profiling node locality with degree """
+    # node_q_tmp = util.bfs_traverse(g_csr, [i for i in range(len(node_q))])
+    # deg_node_trace_sorted = util.gen_trace_sorted_by_node_deg(g_csr, node_q_tmp)
+    # util.rm_repeat_data(deg_node_trace_sorted)
+    # deg_node_trace_wo_sort = util.gen_trace_without_sorted(g_csr, node_q_tmp)
 
-    cnt = 0
-    total = len(node_q)
-    for i in range(len(deg_dist)):
-        cnt += deg_dist[i]
-        percentage = round(cnt / total * 100, 2)
-        print(i, percentage)
+    # locality_node_degs_sorted = util.eval_node_locality(deg_node_trace_sorted)
+    # print(locality_node_degs_sorted)
 
-    ##
-    """ Profiling workloads imbalance """
-    deg_th = 6
-    plt.plt_workload.plt_workload_imbalance(g_csr, deg_th)
+    # # for i in deg_node_trace_wo_sort:
+    # #     print(i[0])
+
+    # locality_node_degs_wo_sort = util.eval_node_locality(deg_node_trace_wo_sort)
+    # print(locality_node_degs_wo_sort)
+
+    # # util.save_txt_2d('./results/mem_trace/' + args.dataset + '_node_deg_trace' + '.txt',
+    # #                  deg_node_trace_sorted)
+
+    # # ##
+    # """ Plot degree distribution """
+    # deg_dist = util.gen_degree_distribution(g_csr)
+    # plt.plt_graph.plot_degree_distribution(deg_dist)
+
+    # cnt = 0
+    # total = len(node_q)
+    # for i in range(len(deg_dist)):
+    #     cnt += deg_dist[i]
+    #     percentage = round(cnt / total * 100, 2)
+    #     print(i, percentage)
+
+    # ##
+    # """ Profiling workloads imbalance """
+    # deg_th = 6
+    # plt.plt_workload.plt_workload_imbalance(g_csr, deg_th)
 
     ##
     """ Initial Graph """
@@ -228,7 +244,7 @@ def main(args):
     # test_mask = g.ndata['test_mask']
 
     in_feats = features.shape[1]
-    n_classes = data.num_classes
+    n_classes = dataset.num_classes
 
     # add self loop
     if args.self_loop:
@@ -263,17 +279,26 @@ def main(args):
         optimizer_delta = Adam(model_delta.parameters(), lr=lr, weight_decay=weight_decay)
 
     elif model_name == 'graphsage':
-        model = SAGE(in_feats, n_hidden, n_classes, n_layers, F.relu, dropout).to(device)
+        # model = SAGE(g_evo, in_feats, n_hidden, n_classes, n_layers, F.relu, dropout).to(device)
+
+        ## Debug_yin
+        dataset = RedditDataset(raw_dir='./dataset', self_loop=True)
+        g = dataset[0]
+        model = SAGE(g, g.ndata['feat'].shape[1], n_hidden, n_classes, n_layers, F.relu,
+                     dropout).to(device)
+
         loss_fcn = CrossEntropyLoss()
-        optimizer = Adam(model.parameters(), lr=lr)
+        optimizer = Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
 
-        model_retrain = SAGE(in_feats, n_hidden, n_classes, n_layers, F.relu, dropout).to(device)
+        model_retrain = SAGE(g_evo, in_feats, n_hidden, n_classes, n_layers, F.relu,
+                             dropout).to(device)
         loss_fcn_retrain = CrossEntropyLoss()
-        optimizer_retrain = Adam(model.parameters(), lr=lr)
+        optimizer_retrain = Adam(model_retrain.parameters(), lr=lr, weight_decay=weight_decay)
 
-        model_delta = SAGE(in_feats, n_hidden, n_classes, n_layers, F.relu, dropout).to(device)
+        model_delta = SAGE(g_evo, in_feats, n_hidden, n_classes, n_layers, F.relu,
+                           dropout).to(device)
         loss_fcn_delta = CrossEntropyLoss()
-        optimizer_delta = Adam(model.parameters(), lr=lr)
+        optimizer_delta = Adam(model_delta.parameters(), lr=lr, weight_decay=weight_decay)
 
     # for param in model.parameters():
     #     print(param)
@@ -287,16 +312,20 @@ def main(args):
     #     if param.requires_grad:
     #         print(name)
 
-    # Train original graph
-    train(model, features, model.g.number_of_edges(), train_mask, val_mask, labels, loss_fcn,
-          optimizer)
-    print()
-    print(">>> Accuracy on original graph: ")
-    acc = evaluate(model, features, labels, test_mask)
-    print("Test accuracy {:.2%}".format(acc))
+    # Train the initial graph (timestamp = 0)
+    print("\n>>> Accuracy on initial graph (timestamp=0):")
+    if model_name == 'gcn':
+        gcn.train(args, model, features, model.g.number_of_edges(), train_mask, val_mask, labels,
+                  loss_fcn, optimizer)
+        acc = gcn.evaluate(model, features, labels, test_mask)
+    elif model_name == 'graphsage':
+        graphsage.train(args, model.g, model, device, fan_out, batch_size, loss_fcn, optimizer)
+        acc = graphsage.evaluate(model, model.g, labels, test_mask, batch_size, device)
 
+    print("Test accuracy {:.2%}".format(acc))
+    
     # Evolve graph
-    print(">>> Accuracy on evolove graph: ")
+    print("\n>>> Accuracy on evolove graph: ")
 
     # Add new edges
     # n_nodes = model.g.number_of_nodes()
@@ -347,7 +376,10 @@ def main(args):
         val_mask = model.g.ndata['val_mask']
         test_mask = model.g.ndata['test_mask']
 
-        acc = evaluate(model, features, labels, test_mask)
+        if model_name == 'gcn':
+            acc = gcn.evaluate(model, features, labels, test_mask)
+        elif model_name == 'graphsage':
+            acc = graphsage.evaluate(model, model.g, labels, test_mask, batch_size, device)
         print("Test accuracy of non-retrain @ {:d} nodes {:.2%}".format(
             model.g.number_of_nodes(), acc))
         acc_no_retrain = acc * 100
@@ -427,12 +459,18 @@ def main(args):
             #           optimizer_retrain)
 
             time_start = time.perf_counter()
-            train(model_retrain, features, model_retrain.g.number_of_edges(), train_mask, val_mask,
-                  labels, loss_fcn_retrain, optimizer_retrain)
+            if model_name == 'gcn':
+                gcn.train(args, model_retrain, features, model_retrain.g.number_of_edges(),
+                          train_mask, val_mask, labels, loss_fcn_retrain, optimizer_retrain)
+                acc = gcn.evaluate(model_retrain, features, labels, test_mask)
+            elif model_name == 'graphsage':
+                graphsage.train(args, model_retrain.g, model_retrain, device, fan_out, batch_size,
+                                loss_fcn, optimizer)
+                acc = graphsage.evaluate(model_retrain, model_retrain.g, labels, test_mask,
+                                         batch_size, device)
+
             time_full_retrain = time.perf_counter() - time_start
             print('>> Epoch training time with full nodes: {:.4}s'.format(time_full_retrain))
-
-            acc = evaluate(model_retrain, features, labels, test_mask)
             print("Test accuracy of retrain @ {:d} nodes {:.2%}".format(
                 model_retrain.g.number_of_nodes(), acc))
             acc_retrain = acc * 100
@@ -458,20 +496,26 @@ def main(args):
 
             if len(node_q) > 0:
                 time_start = time.perf_counter()
-                train(model_delta, features, model_delta.g.number_of_edges(), train_mask, val_mask,
-                      labels, loss_fcn_delta, optimizer_delta)
+                if model_name == 'gcn':
+                    gcn.train(args, model_delta, features, model_delta.g.number_of_edges(),
+                              train_mask, val_mask, labels, loss_fcn_delta, optimizer_delta)
+                    if i <= 3:
+                        acc = gcn.evaluate(model_delta, features, labels, test_mask)
+                    else:
+                        acc = gcn.evaluate_delta(model_delta, features, labels, test_mask,
+                                                 inserted_nodes_evo)
+                        # acc = evaluate(model_delta, features, labels, test_mask)
+                elif model_name == 'graphsage':
+                    graphsage.train(args, model_delta.g, model_delta, device, fan_out, batch_size,
+                                    loss_fcn, optimizer)
+                    acc = graphsage.evaluate(model_delta, model_delta.g, labels, test_mask,
+                                             batch_size, device)
+
                 time_delta_retrain = time.perf_counter() - time_start
                 print('>> Epoch training time in delta: {:.4}s'.format(time_delta_retrain))
-
-            if i <= 3:
-                acc = evaluate(model_delta, features, labels, test_mask)
-            else:
-                acc = evaluate_delta(model_delta, features, labels, test_mask, inserted_nodes_evo)
-                # acc = evaluate(model_delta, features, labels, test_mask)
-            # acc = evaluate(model_delta, features, labels, test_mask)
-            print("Test accuracy of delta @ {:d} nodes {:.2%}".format(
-                model_delta.g.number_of_nodes(), acc))
-            acc_retrain_delta = acc * 100
+                print("Test accuracy of delta @ {:d} nodes {:.2%}".format(
+                    model_delta.g.number_of_nodes(), acc))
+                acc_retrain_delta = acc * 100
 
             accuracy.append([
                 model.g.number_of_nodes(),
@@ -519,6 +563,13 @@ if __name__ == '__main__':
     # parser.add_argument("--n-layers", type=int, default=2, help="number of gcn layers")
     # parser.add_argument("--weight-decay", type=float, default=5e-4, help="Weight for L2 loss")
     parser.add_argument("--self-loop", action='store_true', help="graph self-loop (default=False)")
+    parser.add_argument(
+        "--mode",
+        default='mixed',
+        choices=['cpu', 'mixed', 'puregpu'],
+        help=
+        "Training mode. 'cpu' for CPU training, 'mixed' for CPU-GPU mixed training, 'puregpu' for pure-GPU training."
+    )
     parser.add_argument("--deg-threshold",
                         type=int,
                         default=None,
@@ -528,7 +579,7 @@ if __name__ == '__main__':
 
     args.model = 'graphsage'
     args.dataset = 'cora'
-    args.n_epochs = 200
+    args.n_epochs = 20
     args.gpu = -1
 
     dump_accuracy_flag = 1

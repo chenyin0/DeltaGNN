@@ -7,6 +7,7 @@
     "--batch-size": 10000,
     "--log-every": 20,
     "--eval-every": 1000,
-    "--lr": 0.003,
+    "--weight-decay": 5e-4,
+    "--lr": 1e-3,
     "--dropout": 0.5
 }
