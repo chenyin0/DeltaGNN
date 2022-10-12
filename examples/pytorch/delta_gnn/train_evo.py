@@ -29,62 +29,6 @@ import plt.plt_graph
 import json
 import pathlib
 
-# def train(model, features, n_edges, train_mask, val_mask, labels, loss_fcn, optimizer):
-#     # initialize graph
-#     dur = []
-#     for epoch in range(args.n_epochs):
-#         model.train()
-#         if epoch >= 3:
-#             t0 = time.time()
-#         # forward
-#         logits = model(features)
-#         loss = loss_fcn(logits[train_mask], labels[train_mask])
-
-#         optimizer.zero_grad()
-#         loss.backward()
-#         optimizer.step()
-
-#         if epoch >= 3:
-#             dur.append(time.time() - t0)
-
-#         acc = evaluate(model, features, labels, val_mask)
-#         # print("Epoch {:05d} | Time(s) {:.4f} | Loss {:.4f} | Accuracy {:.4f} | "
-#         #       "ETputs(KTEPS) {:.2f}".format(epoch, np.mean(dur), loss.item(),
-#         #                                     acc, n_edges / np.mean(dur) / 1000))
-
-# def evaluate(model, features, labels, mask):
-#     model.eval()
-#     with torch.no_grad():
-#         logits = model(features)
-#         logits = logits[mask]
-#         labels = labels[mask]
-#         _, indices = torch.max(logits, dim=1)
-#         correct = torch.sum(indices == labels)
-#         return correct.item() * 1.0 / len(labels)
-
-# def evaluate_delta(model, features, labels, mask, updated_nodes):
-#     r"""
-#     Only update feature of updated nodes in inference
-#     """
-#     model.eval()
-#     with torch.no_grad():
-#         logits_prev = model.logits
-#         logits = model(features)
-#         # logits = logits[mask]
-
-#         logits_updated = logits
-#         logits_updated[0:logits_prev.size()[0]] = logits_prev
-#         for node_id in updated_nodes:
-#             logits_updated[node_id] = logits[node_id]
-
-#         model.logits = logits_updated  # Record updated logits
-
-#         logits_updated = logits_updated[mask]
-#         labels = labels[mask]
-#         _, indices = torch.max(logits_updated, dim=1)
-#         correct = torch.sum(indices == labels)
-#         return correct.item() * 1.0 / len(labels)
-
 
 def main(args):
     # Overall task execution time
@@ -107,13 +51,13 @@ def main(args):
             para = json.load(f)
             n_hidden = para['--n-hidden']
             n_layers = para['--n-layers']
-            num_negs = para['--num-negs']
+            # num_negs = para['--num-negs']
             fan_out = str(para['--fan-out'])
             batch_size = para['--batch-size']
-            log_every = para['--log-every']
-            eval_every = para['--eval-every']
+            # log_every = para['--log-every']
+            # eval_every = para['--eval-every']
             lr = para['--lr']
-            # weight_decay = para['--weight-decay']
+            weight_decay = para['--weight-decay']
             dropout = para['--dropout']
     else:
         assert ('Not define GNN model')
@@ -284,23 +228,19 @@ def main(args):
         # model = SAGE(g_evo, in_feats, n_hidden, n_classes, n_layers, F.relu, dropout).to(device)
 
         ## Debug_yin
-        # dataset = RedditDataset(raw_dir='./dataset', self_loop=True)
         g = dataset[0]
         model = SAGE(g, g.ndata['feat'].shape[1], n_hidden, n_classes, n_layers, F.relu,
                      dropout).to(device)
 
-        loss_fcn = CrossEntropyLoss()
-        optimizer = Adam(model.parameters(), lr=lr)
+        optimizer = Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
 
         model_retrain = SAGE(g_evo, in_feats, n_hidden, n_classes, n_layers, F.relu,
                              dropout).to(device)
-        loss_fcn_retrain = CrossEntropyLoss()
-        optimizer_retrain = Adam(model_retrain.parameters(), lr=lr)
+        optimizer_retrain = Adam(model_retrain.parameters(), lr=lr, weight_decay=weight_decay)
 
         model_delta = SAGE(g_evo, in_feats, n_hidden, n_classes, n_layers, F.relu,
                            dropout).to(device)
-        loss_fcn_delta = CrossEntropyLoss()
-        optimizer_delta = Adam(model_delta.parameters(), lr=lr)
+        optimizer_delta = Adam(model_delta.parameters(), lr=lr, weight_decay=weight_decay)
 
     # for param in model.parameters():
     #     print(param)
@@ -321,8 +261,8 @@ def main(args):
                   loss_fcn, optimizer)
         acc = gcn.evaluate(model, features, labels, test_mask)
     elif model_name == 'graphsage':
-        graphsage.train(args, model.g, model, device, fan_out, batch_size, loss_fcn, optimizer)
-        acc = graphsage.evaluate(model, model.g, labels, test_mask, batch_size, device, mode)
+        graphsage.train(args, model.g, model, device, fan_out, batch_size, optimizer)
+        acc = graphsage.evaluate(device, model, model.g, test_mask, batch_size)
 
     print("Test accuracy {:.2%}".format(acc))
 
@@ -381,7 +321,7 @@ def main(args):
         if model_name == 'gcn':
             acc = gcn.evaluate(model, features, labels, test_mask)
         elif model_name == 'graphsage':
-            acc = graphsage.evaluate(model, model.g, labels, test_mask, batch_size, device, mode)
+            acc = graphsage.evaluate(device, model, model.g, test_mask, batch_size)
         print("Test accuracy of non-retrain @ {:d} nodes {:.2%}".format(
             model.g.number_of_nodes(), acc))
         acc_no_retrain = acc * 100
@@ -467,9 +407,9 @@ def main(args):
                 acc = gcn.evaluate(model_retrain, features, labels, test_mask)
             elif model_name == 'graphsage':
                 graphsage.train(args, model_retrain.g, model_retrain, device, fan_out, batch_size,
-                                loss_fcn, optimizer)
-                acc = graphsage.evaluate(model_retrain, model_retrain.g, labels, test_mask,
-                                         batch_size, device, mode)
+                                optimizer)
+                acc = graphsage.evaluate(device, model_retrain, model_retrain.g, test_mask,
+                                         batch_size)
 
             time_full_retrain = time.perf_counter() - time_start
             print('>> Epoch training time with full nodes: {:.4}s'.format(time_full_retrain))
@@ -509,9 +449,9 @@ def main(args):
                         # acc = evaluate(model_delta, features, labels, test_mask)
                 elif model_name == 'graphsage':
                     graphsage.train(args, model_delta.g, model_delta, device, fan_out, batch_size,
-                                    loss_fcn, optimizer)
-                    acc = graphsage.evaluate(model_delta, model_delta.g, labels, test_mask,
-                                             batch_size, device, mode)
+                                    optimizer)
+                    acc = graphsage.evaluate(device, model_delta, model_delta.g, test_mask,
+                                             batch_size)
 
                 time_delta_retrain = time.perf_counter() - time_start
                 print('>> Epoch training time in delta: {:.4}s'.format(time_delta_retrain))
