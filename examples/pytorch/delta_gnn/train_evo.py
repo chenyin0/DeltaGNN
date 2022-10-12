@@ -5,12 +5,9 @@ import numpy as np
 import torch
 import torch as th
 import torch.nn.functional as F
-from torch.nn import CrossEntropyLoss
-from torch.optim import Adam
 
 import dgl
 from dgl.data import CoraGraphDataset, CiteseerGraphDataset, PubmedGraphDataset, RedditDataset, AmazonCoBuyComputerDataset
-from dgl.data import AsNodePredDataset
 
 import util
 import time
@@ -20,7 +17,6 @@ from model.gcn import GCN
 import model.gcn as gcn
 from model.graphsage import SAGE
 import model.graphsage as graphsage
-# from model.gcn import GCN_delta
 
 import os
 import plt.plt_workload
@@ -217,19 +213,10 @@ def main(args):
     # create GNN model
     if model_name == 'gcn':
         model = GCN(g_evo, in_feats, n_hidden, n_classes, n_layers, F.relu, dropout).to(device)
-        loss_fcn = CrossEntropyLoss()
-        optimizer = Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
-
         model_retrain = GCN(g_evo, in_feats, n_hidden, n_classes, n_layers, F.relu,
                             dropout).to(device)
-        loss_fcn_retrain = CrossEntropyLoss()
-        optimizer_retrain = Adam(model_retrain.parameters(), lr=lr, weight_decay=weight_decay)
-
         model_delta = GCN(g_evo, in_feats, n_hidden, n_classes, n_layers, F.relu,
                           dropout).to(device)
-        loss_fcn_delta = CrossEntropyLoss()
-        optimizer_delta = Adam(model_delta.parameters(), lr=lr, weight_decay=weight_decay)
-
     elif model_name == 'graphsage':
         model = SAGE(g_evo, in_feats, n_hidden, n_classes, n_layers, F.relu, dropout).to(device)
         model_retrain = SAGE(g_evo, in_feats, n_hidden, n_classes, n_layers, F.relu,
@@ -253,7 +240,7 @@ def main(args):
     print("\n>>> Accuracy on initial graph (timestamp=0):")
     if model_name == 'gcn':
         gcn.train(args, model, features, model.g.number_of_edges(), train_mask, val_mask, labels,
-                  loss_fcn, optimizer)
+                  lr, weight_decay)
         acc = gcn.evaluate(model, features, labels, test_mask)
     elif model_name == 'graphsage':
         graphsage.train(args, model.g, model, device, fan_out, batch_size, lr, weight_decay)
@@ -398,7 +385,7 @@ def main(args):
             time_start = time.perf_counter()
             if model_name == 'gcn':
                 gcn.train(args, model_retrain, features, model_retrain.g.number_of_edges(),
-                          train_mask, val_mask, labels, loss_fcn_retrain, optimizer_retrain)
+                          train_mask, val_mask, labels, lr, weight_decay)
                 acc = gcn.evaluate(model_retrain, features, labels, test_mask)
             elif model_name == 'graphsage':
                 graphsage.train(args, model_retrain.g, model_retrain, device, fan_out, batch_size,
@@ -435,7 +422,7 @@ def main(args):
                 time_start = time.perf_counter()
                 if model_name == 'gcn':
                     gcn.train(args, model_delta, features, model_delta.g.number_of_edges(),
-                              train_mask, val_mask, labels, loss_fcn_delta, optimizer_delta)
+                              train_mask, val_mask, labels, lr, weight_decay)
                     if i <= 3:
                         acc = gcn.evaluate(model_delta, features, labels, test_mask)
                     else:
@@ -514,8 +501,8 @@ if __name__ == '__main__':
     parser.set_defaults(self_loop=False)
     args = parser.parse_args()
 
-    args.model = 'graphsage'
-    args.dataset = 'citeseer'
+    args.model = 'gcn'
+    args.dataset = 'cora'
     args.n_epochs = 200
     args.gpu = 0
     # args.mode = 'mixed'

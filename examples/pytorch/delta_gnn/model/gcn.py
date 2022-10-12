@@ -10,6 +10,8 @@ import torch as th
 import torch.nn as nn
 from dgl.nn.pytorch import GraphConv
 from .graphconv_delta import GraphConv_delta
+import torch.nn.functional as F
+from torch.optim import Adam
 import time
 
 
@@ -45,7 +47,8 @@ class GCN(nn.Module):
         return h
 
 
-def train(args, model, features, n_edges, train_mask, val_mask, labels, loss_fcn, optimizer):
+def train(args, model, features, n_edges, train_mask, val_mask, labels, lr, weight_decay):
+    optimizer = Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
     # initialize graph
     dur = []
     for epoch in range(args.n_epochs):
@@ -54,7 +57,7 @@ def train(args, model, features, n_edges, train_mask, val_mask, labels, loss_fcn
             t0 = time.time()
         # forward
         logits = model(features)
-        loss = loss_fcn(logits[train_mask], labels[train_mask])
+        loss = F.cross_entropy(logits[train_mask], labels[train_mask])
 
         optimizer.zero_grad()
         loss.backward()
@@ -216,11 +219,12 @@ def train_delta_edge_masked(args,
                             train_mask,
                             val_mask,
                             labels,
-                            loss_fcn,
-                            optimizer,
+                            lr,
+                            weight_decay,
                             ngh_high_deg=None,
                             ngh_low_deg=None):
 
+    optimizer = Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
     # initialize graph
     dur = []
     for epoch in range(args.n_epochs):
@@ -229,13 +233,7 @@ def train_delta_edge_masked(args,
             t0 = time.time()
         # forward
         logits = model(features, ngh_high_deg, ngh_low_deg)
-        loss = loss_fcn(logits[train_mask], labels[train_mask])
-
-        # print('\n>> Grad', [x.grad for x in optimizer.param_groups[0]['params']])
-
-        # print()
-        # for name, parameters in model.named_parameters():
-        #     print('\n' + name, ':', parameters)
+        loss = F.cross_entropy(logits[train_mask], labels[train_mask])
 
         optimizer.zero_grad()
         loss.backward()
