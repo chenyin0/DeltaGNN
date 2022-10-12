@@ -1,13 +1,13 @@
 {
-    "--n-hidden": 16,
+    "--n-hidden": 512,
     "--n-layers": 2,
     "--num-negs": 1,
     "--neg-share": "False",
     "--fan-out": "10,25",
-    "--batch-size": 10000,
+    "--batch-size": 4096,
     "--log-every": 20,
     "--eval-every": 1000,
     "--weight-decay": 5e-4,
-    "--lr": 1e-3,
+    "--lr": 0.003,
     "--dropout": 0.5
 }

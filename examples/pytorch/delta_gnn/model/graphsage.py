@@ -77,7 +77,7 @@ class SAGE(nn.Module):
     #         feat = y
     #     return y
 
-    def inference(self, g, x, device, batch_size, num_workers):
+    def inference(self, g, x, device, mode, batch_size, num_workers):
         """
         Inference with the GraphSAGE model on full neighbors (i.e. without neighbor sampling).
         g : the entire graph.
@@ -100,6 +100,7 @@ class SAGE(nn.Module):
                                                         th.arange(g.num_nodes()).to(g.device),
                                                         sampler,
                                                         device=device if num_workers == 0 else None,
+                                                        use_uva=(mode == 'mixed'),
                                                         batch_size=batch_size,
                                                         shuffle=False,
                                                         drop_last=False,
@@ -332,48 +333,50 @@ def train(args, g, model, device, fanout, batch_size, loss_fcn, optimizer):
     #                                       rank=proc_id)
     # train_nid, val_nid, test_nid, n_classes, g, nfeat, labels = data
 
-    # batch_size = 10000
-
-    train_nid = g.ndata['train_mask'].to(device)
-    val_mask = g.ndata['val_mask'].to(device)
-    test_nid = g.ndata['test_mask'].to(device)
+    train_mask = g.ndata['train_mask']
+    val_mask = g.ndata['val_mask']
+    # test_nid = g.ndata['test_mask']
     nfeat = g.ndata['feat']
     labels = g.ndata['label']
 
-    # if args.data_device == 'gpu':
-    #     nfeat = nfeat.to(device)
-    #     labels = labels.to(device)
-    # elif args.data_device == 'uva':
-    #     nfeat = dgl.contrib.UnifiedTensor(nfeat, device=device)
-    #     labels = dgl.contrib.UnifiedTensor(labels, device=device)
-    in_feats = nfeat.shape[1]
+    mode = args.mode
+
+    if mode == 'puregpu':
+        nfeat = nfeat.to(device)
+        labels = labels.to(device)
+    elif mode == 'mixed':
+        nfeat = dgl.contrib.UnifiedTensor(nfeat, device=device)
+        labels = dgl.contrib.UnifiedTensor(labels, device=device)
 
     # Create PyTorch DataLoader for constructing blocks
     n_edges = g.num_edges()
-    train_seeds = th.arange(n_edges)
+    # train_nid = th.arange(n_edges)
+    train_nid = th.Tensor(np.nonzero(train_mask.numpy())[0]).long()
+    # train_nid = g.ndata['train_idx']
 
-    # if args.graph_device == 'gpu':
-    #     train_seeds = train_seeds.to(device)
-    #     g = g.to(device)
-    #     args.num_workers = 0
-    # elif args.graph_device == 'uva':
-    #     train_seeds = train_seeds.to(device)
-    #     g.pin_memory_()
-    #     args.num_workers = 0
+    if mode == 'puregpu':
+        train_nid = train_nid.to(device)
+        g = g.to(device)
+        # args.num_workers = 0
+    elif mode == 'mixed':
+        train_nid = train_nid.to(device)
+        g.pin_memory_()
+        # args.num_workers = 0
 
     # Create sampler
     sampler = dgl.dataloading.MultiLayerNeighborSampler(
         [int(fanout_) for fanout_ in fanout.split(',')])
     dataloader = dgl.dataloading.EdgeDataLoader(
         g,
-        train_seeds,
+        train_nid,
         sampler,
         exclude='reverse_id',
         # For each edge with ID e in Reddit dataset, the reverse edge is e ± |E|/2.
         reverse_eids=th.cat([th.arange(n_edges // 2, n_edges),
-                             th.arange(0, n_edges // 2)]).to(train_seeds),
-        negative_sampler=NegativeSampler(g, 1),
+                             th.arange(0, n_edges // 2)]).to(train_nid),
+        negative_sampler=NegativeSampler(g, k=1, device=(device if mode == 'mixed' else None)),
         device=device,
+        use_uva=(mode == 'mixed'),
         # use_ddp=n_gpus > 1,
         batch_size=batch_size,
         shuffle=True,
@@ -381,15 +384,11 @@ def train(args, g, model, device, fanout, batch_size, loss_fcn, optimizer):
         # num_workers=args.num_workers
     )
 
-    # Define model and optimizer
-    # model = SAGE(in_feats, args.n_hidden, args.n_hidden, args.n_layers, F.relu, args.dropout)
     model = model.to(device)
     # if n_gpus > 1:
     #     model = DistributedDataParallel(model,
     #                                     device_ids=[device],
     #                                     output_device=device)
-    # loss_fcn = CrossEntropyLoss()
-    # optimizer = optim.Adam(model.parameters(), lr=args.lr)
 
     proc_id = 0
     # Training loop
@@ -443,7 +442,7 @@ def train(args, g, model, device, fanout, batch_size, loss_fcn, optimizer):
             tic_step = time.time()
 
             if step % eval_every == 0 and proc_id == 0:
-                acc = evaluate(model, g, labels, val_mask, batch_size, device)
+                acc = evaluate(model, g, labels, val_mask, batch_size, device, mode)
                 print('Eval Acc {:.4f}'.format(acc))
                 if acc > best_acc:
                     best_acc = acc
@@ -512,7 +511,7 @@ def compute_acc(emb, labels, train_nids, acc_mask):
     return f1_micro_eval
 
 
-def evaluate(model, g, labels, mask, batch_size, device, num_workers=0):
+def evaluate(model, g, labels, mask, batch_size, device, mode, num_workers=0):
     """
     Evaluate the model on the validation set specified by ``val_mask``.
     g : The entire graph.
@@ -528,12 +527,13 @@ def evaluate(model, g, labels, mask, batch_size, device, num_workers=0):
     with th.no_grad():
         # single gpu
         if isinstance(model, SAGE):
-            pred = model.inference(g, nfeat, device, batch_size, num_workers)
+            pred = model.inference(g, nfeat, device, mode, batch_size, num_workers)
         # multi gpu
         else:
             pred = model.module.inference(g, nfeat, device, batch_size, num_workers)
     model.train()
     return compute_acc(pred, labels, train_nids, mask)
+    # return MF.accuracy(pred, labels)
 
 
 class SAGE_delta(nn.Module):
