@@ -13,6 +13,17 @@ def load_reddit(self_loop=True):
     return g, data.num_classes
 
 
+def load_cora():
+    from dgl.data import CoraGraphDataset
+
+    # load reddit data
+    data = CoraGraphDataset(raw_dir='./dataset')
+    g = data[0]
+    g.ndata['features'] = g.ndata.pop('feat')
+    g.ndata['labels'] = g.ndata.pop('label')
+    return g, data.num_classes
+
+
 def load_ogb(name, root='./dataset'):
     from ogb.nodeproppred import DglNodePropPredDataset
 
