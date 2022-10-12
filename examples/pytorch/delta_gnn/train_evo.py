@@ -203,9 +203,15 @@ def main(args):
     norm = torch.pow(degs, -0.5)
     norm[torch.isinf(norm)] = 0
     if cuda:
-        norm = norm.to(gpu_id)
-        g = g.to(gpu_id)
-        g_evo = g_evo.to(gpu_id)
+        if model_name == 'graphsage':
+            if mode == 'puregpu':
+                norm = norm.to(gpu_id)
+                g = g.to(gpu_id)
+                g_evo = g_evo.to(gpu_id)
+        else:
+            norm = norm.to(gpu_id)
+            g = g.to(gpu_id)
+            g_evo = g_evo.to(gpu_id)
     g_evo.ndata['norm'] = norm.unsqueeze(1)
 
     # create GNN model
@@ -225,22 +231,11 @@ def main(args):
         optimizer_delta = Adam(model_delta.parameters(), lr=lr, weight_decay=weight_decay)
 
     elif model_name == 'graphsage':
-        # model = SAGE(g_evo, in_feats, n_hidden, n_classes, n_layers, F.relu, dropout).to(device)
-
-        ## Debug_yin
-        g = dataset[0]
-        model = SAGE(g, g.ndata['feat'].shape[1], n_hidden, n_classes, n_layers, F.relu,
-                     dropout).to(device)
-
-        optimizer = Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
-
+        model = SAGE(g_evo, in_feats, n_hidden, n_classes, n_layers, F.relu, dropout).to(device)
         model_retrain = SAGE(g_evo, in_feats, n_hidden, n_classes, n_layers, F.relu,
                              dropout).to(device)
-        optimizer_retrain = Adam(model_retrain.parameters(), lr=lr, weight_decay=weight_decay)
-
         model_delta = SAGE(g_evo, in_feats, n_hidden, n_classes, n_layers, F.relu,
                            dropout).to(device)
-        optimizer_delta = Adam(model_delta.parameters(), lr=lr, weight_decay=weight_decay)
 
     # for param in model.parameters():
     #     print(param)
@@ -261,7 +256,7 @@ def main(args):
                   loss_fcn, optimizer)
         acc = gcn.evaluate(model, features, labels, test_mask)
     elif model_name == 'graphsage':
-        graphsage.train(args, model.g, model, device, fan_out, batch_size, optimizer)
+        graphsage.train(args, model.g, model, device, fan_out, batch_size, lr, weight_decay)
         acc = graphsage.evaluate(device, model, model.g, test_mask, batch_size)
 
     print("Test accuracy {:.2%}".format(acc))
@@ -407,7 +402,7 @@ def main(args):
                 acc = gcn.evaluate(model_retrain, features, labels, test_mask)
             elif model_name == 'graphsage':
                 graphsage.train(args, model_retrain.g, model_retrain, device, fan_out, batch_size,
-                                optimizer)
+                                lr, weight_decay)
                 acc = graphsage.evaluate(device, model_retrain, model_retrain.g, test_mask,
                                          batch_size)
 
@@ -449,7 +444,7 @@ def main(args):
                         # acc = evaluate(model_delta, features, labels, test_mask)
                 elif model_name == 'graphsage':
                     graphsage.train(args, model_delta.g, model_delta, device, fan_out, batch_size,
-                                    optimizer)
+                                    lr, weight_decay)
                     acc = graphsage.evaluate(device, model_delta, model_delta.g, test_mask,
                                              batch_size)
 
@@ -520,9 +515,10 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     args.model = 'graphsage'
-    args.dataset = 'cora'
+    args.dataset = 'citeseer'
     args.n_epochs = 200
     args.gpu = 0
+    # args.mode = 'mixed'
 
     dump_accuracy_flag = 1
     dump_mem_trace_flag = 0

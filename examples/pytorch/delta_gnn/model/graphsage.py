@@ -63,7 +63,8 @@ class SAGE(nn.Module):
                          device=buffer_device,
                          pin_memory=pin_memory)
             feat = feat.to(device)
-            for input_nodes, output_nodes, blocks in tqdm.tqdm(dataloader):
+            # for input_nodes, output_nodes, blocks in tqdm.tqdm(dataloader):
+            for input_nodes, output_nodes, blocks in dataloader:
                 x = feat[input_nodes]
                 h = layer(blocks[0], x)  # len(blocks) = 1
                 if l != len(self.layers) - 1:
@@ -75,12 +76,12 @@ class SAGE(nn.Module):
         return y
 
 
-def train(args, g, model, device, fanout, batch_size, optimizer):
+def train(args, g, model, device, fanout, batch_size, lr, weight_decay):
     # create sampler & dataloader
-    train_mask = g.ndata['train_mask']
-    train_idx = th.Tensor(np.nonzero(train_mask.numpy())[0]).long()
-    val_mask = g.ndata['val_mask']
-    val_idx = th.Tensor(np.nonzero(val_mask.numpy())[0]).long()
+    train_mask = g.ndata['train_mask'].to('cpu')
+    train_idx = th.Tensor(np.nonzero(train_mask.numpy())[0]).long().to(device)
+    val_mask = g.ndata['val_mask'].to('cpu')
+    val_idx = th.Tensor(np.nonzero(val_mask.numpy())[0]).long().to(device)
 
     sampler = NeighborSampler([int(fanout_) for fanout_ in fanout.split(',')],
                               prefetch_node_feats=['feat'],
@@ -106,6 +107,8 @@ def train(args, g, model, device, fanout, batch_size, optimizer):
                                 num_workers=0,
                                 use_uva=use_uva)
 
+    optimizer = th.optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
+
     for epoch in range(args.n_epochs):
         model.train()
         total_loss = 0
@@ -118,9 +121,9 @@ def train(args, g, model, device, fanout, batch_size, optimizer):
             loss.backward()
             optimizer.step()
             total_loss += loss.item()
-        acc = evaluate_with_sample(model, g, val_dataloader)
-        print("Epoch {:05d} | Loss {:.4f} | Accuracy {:.4f} ".format(epoch, total_loss / (it + 1),
-                                                                     acc.item()))
+        # acc = evaluate_with_sample(model, g, val_dataloader)
+        # print("Epoch {:05d} | Loss {:.4f} | Accuracy {:.4f} ".format(epoch, total_loss / (it + 1),
+        #                                                              acc.item()))
 
 
 def evaluate_with_sample(model, g, dataloader):
@@ -149,7 +152,7 @@ def evaluate(device, model, g, mask, batch_size):
         pred = model.inference(g, device, batch_size)  # pred in buffer_device
         pred = pred[mask]
         label = g.ndata['label'][mask].to(pred.device)
-        return MF.accuracy(pred, label)
+        return MF.accuracy(pred, label).item()
 
 
 class SAGE_delta(nn.Module):
