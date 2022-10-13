@@ -8,6 +8,8 @@ import torch.nn.functional as F
 
 import dgl
 from dgl.data import CoraGraphDataset, CiteseerGraphDataset, PubmedGraphDataset, RedditDataset, AmazonCoBuyComputerDataset
+from dgl.data import AsNodePredDataset
+from ogb.nodeproppred import DglNodePropPredDataset
 
 import util
 import time
@@ -67,6 +69,10 @@ def main(args):
         dataset = PubmedGraphDataset(raw_dir='./dataset')
     elif args.dataset == 'reddit':
         dataset = RedditDataset(raw_dir='./dataset')
+    elif args.dataset == 'ogbn-arxiv':
+        dataset = AsNodePredDataset(DglNodePropPredDataset('ogbn-arxiv', root='./dataset'))
+    # elif args.dataset == 'ogbn-mag':
+    #     dataset = AsNodePredDataset(DglNodePropPredDataset('ogbn-mag', root='./dataset'))
     elif args.dataset == 'amazon_comp':
         dataset = AmazonCoBuyComputerDataset(raw_dir='./dataset')
     else:
@@ -502,7 +508,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     args.model = 'gcn'
-    args.dataset = 'cora'
+    args.dataset = 'ogbn-arxiv'
     args.n_epochs = 200
     args.gpu = 0
     # args.mode = 'mixed'
