@@ -12,6 +12,7 @@ from dgl.nn.pytorch import GraphConv
 from .graphconv_delta import GraphConv_delta
 import torch.nn.functional as F
 from torch.optim import Adam
+import numpy as np
 import time
 
 
@@ -47,7 +48,16 @@ class GCN(nn.Module):
         return h
 
 
-def train(args, model, features, n_edges, train_mask, val_mask, labels, lr, weight_decay):
+def train(args, model, device, lr, weight_decay):
+    g = model.g
+    features = g.ndata['feat'].to(device)
+    train_mask = g.ndata['train_mask'].bool().to(device)
+    val_mask = g.ndata['val_mask'].to(device)
+    labels = g.ndata['label'].to(device)
+    n_edges = g.number_of_edges()
+
+    # print(train_mask, val_mask)
+
     optimizer = Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
     # initialize graph
     dur = []
@@ -66,13 +76,18 @@ def train(args, model, features, n_edges, train_mask, val_mask, labels, lr, weig
         if epoch >= 3:
             dur.append(time.time() - t0)
 
-        acc = evaluate(model, features, labels, val_mask)
+        acc = evaluate(model, val_mask, device)
         # print("Epoch {:05d} | Time(s) {:.4f} | Loss {:.4f} | Accuracy {:.4f} | "
         #       "ETputs(KTEPS) {:.2f}".format(epoch, np.mean(dur), loss.item(),
         #                                     acc, n_edges / np.mean(dur) / 1000))
 
 
-def evaluate(model, features, labels, mask):
+def evaluate(model, mask, device):
+    g = model.g
+    features = g.ndata['feat'].to(device)
+    labels = g.ndata['label'].to(device)
+    mask = mask.bool().to(device)  # Convert int8 to bool
+
     model.eval()
     with torch.no_grad():
         logits = model(features)
@@ -83,10 +98,15 @@ def evaluate(model, features, labels, mask):
         return correct.item() * 1.0 / len(labels)
 
 
-def evaluate_delta(model, features, labels, mask, updated_nodes):
+def evaluate_delta(model, mask, device, updated_nodes):
     r"""
     Only update feature of updated nodes in inference
     """
+    g = model.g
+    features = g.ndata['feat'].to(device)
+    labels = g.ndata['label'].to(device)
+    mask = mask.bool().to(device)  # Convert int8 to bool
+
     model.eval()
     with torch.no_grad():
         logits_prev = model.logits

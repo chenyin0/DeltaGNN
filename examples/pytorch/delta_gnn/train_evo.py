@@ -70,7 +70,8 @@ def main(args):
     elif args.dataset == 'reddit':
         dataset = RedditDataset(raw_dir='./dataset')
     elif args.dataset == 'ogbn-arxiv':
-        dataset = AsNodePredDataset(DglNodePropPredDataset('ogbn-arxiv', root='./dataset'))
+        dataset_raw = DglNodePropPredDataset('ogbn-arxiv', root='./dataset')
+        dataset = AsNodePredDataset(dataset_raw)
     # elif args.dataset == 'ogbn-mag':
     #     dataset = AsNodePredDataset(DglNodePropPredDataset('ogbn-mag', root='./dataset'))
     elif args.dataset == 'amazon_comp':
@@ -179,31 +180,38 @@ def main(args):
     g_evo = util.graph_evolve(init_nodes, g_csr, g, node_map_orig2evo, node_map_evo2orig)
     ##
 
-    features = g_evo.ndata['feat'].to(device)
-    labels = g_evo.ndata['label'].to(device)
-    train_mask = g_evo.ndata['train_mask'].to(device)
-    val_mask = g_evo.ndata['val_mask'].to(device)
-    test_mask = g_evo.ndata['test_mask'].to(device)
+    # # Update train/val/test mask for ogbn-arxiv (Optional)
+    # if args.dataset == 'ogbn-arxiv':
+    #     from dgl.data.utils import generate_mask_tensor
+    #     from dgl.data.citation_graph import _sample_mask
 
-    # features = g.ndata['feat']
-    # labels = g.ndata['label']
-    # train_mask = g.ndata['train_mask']
-    # val_mask = g.ndata['val_mask']
-    # test_mask = g.ndata['test_mask']
+    #     splitted_idx = dataset_raw.get_idx_split()
+    #     train_idx, val_idx, test_idx = splitted_idx["train"], splitted_idx["valid"], splitted_idx[
+    #         "test"]
+    #     labels = g.ndata['label']
 
-    in_feats = features.shape[1]
+    #     train_mask = generate_mask_tensor(_sample_mask(train_idx, labels.shape[0]))
+    #     val_mask = generate_mask_tensor(_sample_mask(val_idx, labels.shape[0]))
+    #     test_mask = generate_mask_tensor(_sample_mask(test_idx, labels.shape[0]))
+
+    #     g.ndata['train_mask'] = train_mask
+    #     g.ndata['val_mask'] = val_mask
+    #     g.ndata['test_mask'] = test_mask
+
+    in_feats = g_evo.ndata['feat'].shape[1]
     n_classes = dataset.num_classes
 
     # add self loop
     if args.self_loop:
         g_evo = dgl.remove_self_loop(g_evo)
         g_evo = dgl.add_self_loop(g_evo)
-    n_edges = g_evo.number_of_edges()
 
     # normalization
     degs = g_evo.in_degrees().float()
     norm = torch.pow(degs, -0.5)
     norm[torch.isinf(norm)] = 0
+    g_evo.ndata['norm'] = norm.unsqueeze(1)
+
     if cuda:
         if model_name == 'graphsage':
             if mode == 'puregpu':
@@ -214,20 +222,17 @@ def main(args):
             norm = norm.to(gpu_id)
             g = g.to(gpu_id)
             g_evo = g_evo.to(gpu_id)
-    g_evo.ndata['norm'] = norm.unsqueeze(1)
 
     # create GNN model
     if model_name == 'gcn':
-        model_golden = GCN(dataset[0], in_feats, n_hidden, n_classes, n_layers, F.relu,
-                           dropout).to(device)
+        model_golden = GCN(g, in_feats, n_hidden, n_classes, n_layers, F.relu, dropout).to(device)
         model = GCN(g_evo, in_feats, n_hidden, n_classes, n_layers, F.relu, dropout).to(device)
         model_retrain = GCN(g_evo, in_feats, n_hidden, n_classes, n_layers, F.relu,
                             dropout).to(device)
         model_delta = GCN(g_evo, in_feats, n_hidden, n_classes, n_layers, F.relu,
                           dropout).to(device)
     elif model_name == 'graphsage':
-        model_golden = SAGE(dataset[0], in_feats, n_hidden, n_classes, n_layers, F.relu,
-                            dropout).to(device)
+        model_golden = SAGE(g, in_feats, n_hidden, n_classes, n_layers, F.relu, dropout).to(device)
         model = SAGE(g_evo, in_feats, n_hidden, n_classes, n_layers, F.relu, dropout).to(device)
         model_retrain = SAGE(g_evo, in_feats, n_hidden, n_classes, n_layers, F.relu,
                              dropout).to(device)
@@ -237,36 +242,28 @@ def main(args):
     # for param in model.parameters():
     #     print(param)
 
-    if cuda:
-        model.cuda()
-    else:
-        model.cpu()
-
     # for name, param in model.named_parameters(): # View optimizable parameter
     #     if param.requires_grad:
     #         print(name)
 
     # Train model_golden
     print("\n>>> Accuracy on full graph with model_golden:")
+    test_mask = model_golden.g.ndata['test_mask']
     if model_name == 'gcn':
-        gcn.train(args, model_golden, model_golden.g.ndata['feat'],
-                  model_golden.g.number_of_edges(), model_golden.g.ndata['train_mask'],
-                  model_golden.g.ndata['val_mask'], model_golden.g.ndata['label'], lr, weight_decay)
-        acc = gcn.evaluate(model_golden, model_golden.g.ndata['feat'],
-                           model_golden.g.ndata['label'], model_golden.g.ndata['test_mask'])
+        gcn.train(args, model_golden, device, lr, weight_decay)
+        acc = gcn.evaluate(model_golden, test_mask, device)
     elif model_name == 'graphsage':
         graphsage.train(args, model_golden, device, fan_out, batch_size, lr, weight_decay)
-        acc = graphsage.evaluate(device, model_golden, model_golden.g.ndata['test_mask'],
-                                 batch_size)
+        acc = graphsage.evaluate(device, model_golden, test_mask, batch_size)
 
     print("Test accuracy {:.2%}".format(acc))
 
     # Train the initial graph (timestamp = 0)
     print("\n>>> Accuracy on initial graph (timestamp=0):")
+    test_mask = model.g.ndata['test_mask']
     if model_name == 'gcn':
-        gcn.train(args, model, features, model.g.number_of_edges(), train_mask, val_mask, labels,
-                  lr, weight_decay)
-        acc = gcn.evaluate(model, features, labels, test_mask)
+        gcn.train(args, model, device, lr, weight_decay)
+        acc = gcn.evaluate(model, test_mask, device)
     elif model_name == 'graphsage':
         graphsage.train(args, model, device, fan_out, batch_size, lr, weight_decay)
         acc = graphsage.evaluate(device, model, test_mask, batch_size)
@@ -319,16 +316,17 @@ def main(args):
         print('Node_number:', model.g.number_of_nodes())
         print('Edge_number:', model.g.number_of_edges())
 
-        features = model.g.ndata['feat']
-        labels = model.g.ndata['label']
-        train_mask = model.g.ndata['train_mask']
-        val_mask = model.g.ndata['val_mask']
-        test_mask = model.g.ndata['test_mask']
+        # features = model.g.ndata['feat']
+        # labels = model.g.ndata['label']
+        # train_mask = model.g.ndata['train_mask']
+        # val_mask = model.g.ndata['val_mask']
 
+        test_mask = model.g.ndata['test_mask']
         if model_name == 'gcn':
-            acc = gcn.evaluate(model, features, labels, test_mask)
+            acc = gcn.evaluate(model, test_mask, device)
         elif model_name == 'graphsage':
             acc = graphsage.evaluate(device, model, test_mask, batch_size)
+
         print("Test accuracy of non-retrain @ {:d} nodes {:.2%}".format(
             model.g.number_of_nodes(), acc))
         acc_no_retrain = acc * 100
@@ -397,21 +395,21 @@ def main(args):
             util.graph_evolve(inserted_nodes, g_csr, g, node_map_orig2evo, node_map_evo2orig,
                               model_retrain.g)
 
-            features = model_retrain.g.ndata['feat']
-            labels = model_retrain.g.ndata['label']
-            train_mask = model_retrain.g.ndata['train_mask']
-            val_mask = model_retrain.g.ndata['val_mask']
-            test_mask = model_retrain.g.ndata['test_mask']
+            # features = model_retrain.g.ndata['feat']
+            # labels = model_retrain.g.ndata['label']
+            # train_mask = model_retrain.g.ndata['train_mask']
+            # val_mask = model_retrain.g.ndata['val_mask']
+            # test_mask = model_retrain.g.ndata['test_mask']
             # if len(node_q) > 0:
             #     train(model_retrain, features, model_retrain.g.number_of_edges(),
             #           train_mask, val_mask, labels, loss_fcn_retrain,
             #           optimizer_retrain)
 
             time_start = time.perf_counter()
+            test_mask = model_retrain.g.ndata['test_mask']
             if model_name == 'gcn':
-                gcn.train(args, model_retrain, features, model_retrain.g.number_of_edges(),
-                          train_mask, val_mask, labels, lr, weight_decay)
-                acc = gcn.evaluate(model_retrain, features, labels, test_mask)
+                gcn.train(args, model_retrain, device, lr, weight_decay)
+                acc = gcn.evaluate(model_retrain, test_mask, device)
             elif model_name == 'graphsage':
                 graphsage.train(args, model_retrain, device, fan_out, batch_size, lr, weight_decay)
                 acc = graphsage.evaluate(device, model_retrain, test_mask, batch_size)
@@ -435,23 +433,22 @@ def main(args):
                 util.graph_evolve_delta(inserted_nodes, g_csr, g, node_map_orig2evo,
                                         node_map_evo2orig, model_delta.g)
 
-            features = model_delta.g.ndata['feat']
-            labels = model_delta.g.ndata['label']
-            train_mask = model_delta.g.ndata['train_mask']
-            val_mask = model_delta.g.ndata['val_mask']
-            test_mask = model_delta.g.ndata['test_mask']
+            # features = model_delta.g.ndata['feat']
+            # labels = model_delta.g.ndata['label']
+            # train_mask = model_delta.g.ndata['train_mask']
+            # val_mask = model_delta.g.ndata['val_mask']
+            # test_mask = model_delta.g.ndata['test_mask']
 
             if len(node_q) > 0:
                 time_start = time.perf_counter()
+                test_mask = model_delta.g.ndata['test_mask']
                 if model_name == 'gcn':
-                    gcn.train(args, model_delta, features, model_delta.g.number_of_edges(),
-                              train_mask, val_mask, labels, lr, weight_decay)
+                    gcn.train(args, model_delta, device, lr, weight_decay)
                     if i <= 3:
-                        acc = gcn.evaluate(model_delta, features, labels, test_mask)
+                        acc = gcn.evaluate(model_delta, test_mask, device)
                     else:
-                        acc = gcn.evaluate_delta(model_delta, features, labels, test_mask,
-                                                 inserted_nodes_evo)
-                        # acc = evaluate(model_delta, features, labels, test_mask)
+                        acc = gcn.evaluate_delta(model_delta, test_mask, device, inserted_nodes_evo)
+                        # acc = evaluate(model_delta, test_mask, device)
                 elif model_name == 'graphsage':
                     graphsage.train(args, model_delta, device, fan_out, batch_size, lr,
                                     weight_decay)
@@ -523,7 +520,8 @@ if __name__ == '__main__':
     parser.set_defaults(self_loop=False)
     args = parser.parse_args()
 
-    args.model = 'graphsage'
+    args.model = 'gcn'
+    # args.dataset = 'cora'
     args.dataset = 'ogbn-arxiv'
     args.n_epochs = 200
     args.gpu = 0
