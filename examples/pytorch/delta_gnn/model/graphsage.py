@@ -146,7 +146,8 @@ def evaluate(device, model, g, mask, batch_size):
     r"""
     Evaluate with all neighbor aggregation (Used in test)
     """
-
+    
+    mask = mask.bool().to(device)  # Convert int8 to bool
     model.eval()
     with th.no_grad():
         pred = model.inference(g, device, batch_size)  # pred in buffer_device
