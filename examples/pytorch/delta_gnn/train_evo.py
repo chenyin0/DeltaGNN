@@ -218,12 +218,16 @@ def main(args):
 
     # create GNN model
     if model_name == 'gcn':
+        model_golden = GCN(dataset[0], in_feats, n_hidden, n_classes, n_layers, F.relu,
+                           dropout).to(device)
         model = GCN(g_evo, in_feats, n_hidden, n_classes, n_layers, F.relu, dropout).to(device)
         model_retrain = GCN(g_evo, in_feats, n_hidden, n_classes, n_layers, F.relu,
                             dropout).to(device)
         model_delta = GCN(g_evo, in_feats, n_hidden, n_classes, n_layers, F.relu,
                           dropout).to(device)
     elif model_name == 'graphsage':
+        model_golden = SAGE(dataset[0], in_feats, n_hidden, n_classes, n_layers, F.relu,
+                            dropout).to(device)
         model = SAGE(g_evo, in_feats, n_hidden, n_classes, n_layers, F.relu, dropout).to(device)
         model_retrain = SAGE(g_evo, in_feats, n_hidden, n_classes, n_layers, F.relu,
                              dropout).to(device)
@@ -242,6 +246,21 @@ def main(args):
     #     if param.requires_grad:
     #         print(name)
 
+    # Train model_golden
+    print("\n>>> Accuracy on full graph with model_golden:")
+    if model_name == 'gcn':
+        gcn.train(args, model_golden, model_golden.g.ndata['feat'],
+                  model_golden.g.number_of_edges(), model_golden.g.ndata['train_mask'],
+                  model_golden.g.ndata['val_mask'], model_golden.g.ndata['label'], lr, weight_decay)
+        acc = gcn.evaluate(model_golden, model_golden.g.ndata['feat'],
+                           model_golden.g.ndata['label'], model_golden.g.ndata['test_mask'])
+    elif model_name == 'graphsage':
+        graphsage.train(args, model_golden, device, fan_out, batch_size, lr, weight_decay)
+        acc = graphsage.evaluate(device, model_golden, model_golden.g.ndata['test_mask'],
+                                 batch_size)
+
+    print("Test accuracy {:.2%}".format(acc))
+
     # Train the initial graph (timestamp = 0)
     print("\n>>> Accuracy on initial graph (timestamp=0):")
     if model_name == 'gcn':
@@ -249,8 +268,8 @@ def main(args):
                   lr, weight_decay)
         acc = gcn.evaluate(model, features, labels, test_mask)
     elif model_name == 'graphsage':
-        graphsage.train(args, model.g, model, device, fan_out, batch_size, lr, weight_decay)
-        acc = graphsage.evaluate(device, model, model.g, test_mask, batch_size)
+        graphsage.train(args, model, device, fan_out, batch_size, lr, weight_decay)
+        acc = graphsage.evaluate(device, model, test_mask, batch_size)
 
     print("Test accuracy {:.2%}".format(acc))
 
@@ -309,7 +328,7 @@ def main(args):
         if model_name == 'gcn':
             acc = gcn.evaluate(model, features, labels, test_mask)
         elif model_name == 'graphsage':
-            acc = graphsage.evaluate(device, model, model.g, test_mask, batch_size)
+            acc = graphsage.evaluate(device, model, test_mask, batch_size)
         print("Test accuracy of non-retrain @ {:d} nodes {:.2%}".format(
             model.g.number_of_nodes(), acc))
         acc_no_retrain = acc * 100
@@ -394,10 +413,8 @@ def main(args):
                           train_mask, val_mask, labels, lr, weight_decay)
                 acc = gcn.evaluate(model_retrain, features, labels, test_mask)
             elif model_name == 'graphsage':
-                graphsage.train(args, model_retrain.g, model_retrain, device, fan_out, batch_size,
-                                lr, weight_decay)
-                acc = graphsage.evaluate(device, model_retrain, model_retrain.g, test_mask,
-                                         batch_size)
+                graphsage.train(args, model_retrain, device, fan_out, batch_size, lr, weight_decay)
+                acc = graphsage.evaluate(device, model_retrain, test_mask, batch_size)
 
             time_full_retrain = time.perf_counter() - time_start
             print('>> Epoch training time with full nodes: {:.4}s'.format(time_full_retrain))
@@ -436,10 +453,9 @@ def main(args):
                                                  inserted_nodes_evo)
                         # acc = evaluate(model_delta, features, labels, test_mask)
                 elif model_name == 'graphsage':
-                    graphsage.train(args, model_delta.g, model_delta, device, fan_out, batch_size,
-                                    lr, weight_decay)
-                    acc = graphsage.evaluate(device, model_delta, model_delta.g, test_mask,
-                                             batch_size)
+                    graphsage.train(args, model_delta, device, fan_out, batch_size, lr,
+                                    weight_decay)
+                    acc = graphsage.evaluate(device, model_delta, test_mask, batch_size)
 
                 time_delta_retrain = time.perf_counter() - time_start
                 print('>> Epoch training time in delta: {:.4}s'.format(time_delta_retrain))
@@ -507,7 +523,7 @@ if __name__ == '__main__':
     parser.set_defaults(self_loop=False)
     args = parser.parse_args()
 
-    args.model = 'gcn'
+    args.model = 'graphsage'
     args.dataset = 'ogbn-arxiv'
     args.n_epochs = 200
     args.gpu = 0

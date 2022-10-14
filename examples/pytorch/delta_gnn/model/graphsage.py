@@ -76,8 +76,9 @@ class SAGE(nn.Module):
         return y
 
 
-def train(args, g, model, device, fanout, batch_size, lr, weight_decay):
+def train(args, model, device, fanout, batch_size, lr, weight_decay):
     # create sampler & dataloader
+    g = model.g
     train_mask = g.ndata['train_mask'].to('cpu')
     train_idx = th.Tensor(np.nonzero(train_mask.numpy())[0]).long().to(device)
     val_mask = g.ndata['val_mask'].to('cpu')
@@ -142,12 +143,13 @@ def evaluate_with_sample(model, g, dataloader):
     return MF.accuracy(th.cat(y_hats), th.cat(ys))
 
 
-def evaluate(device, model, g, mask, batch_size):
+def evaluate(device, model, mask, batch_size):
     r"""
     Evaluate with all neighbor aggregation (Used in test)
     """
-    
+
     mask = mask.bool().to(device)  # Convert int8 to bool
+    g = model.g
     model.eval()
     with th.no_grad():
         pred = model.inference(g, device, batch_size)  # pred in buffer_device
