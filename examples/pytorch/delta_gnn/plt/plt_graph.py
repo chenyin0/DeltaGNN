@@ -7,7 +7,6 @@ from brokenaxes import brokenaxes
 from matplotlib import ticker
 from matplotlib.pyplot import MultipleLocator
 
-
 # def graph_visualize(indptr, indices, data):
 #     print(">>> Graph visualize")
 #     begin = time.time()
@@ -55,7 +54,7 @@ def plot_degree_distribution(degree_list):
     y = [degree_list[i] / node_totol_num for i in range(len(degree_list))]
     # y = [degree_list[i] for i in range(len(degree_list))]
 
-    fig = plt.figure(figsize=(3,4))
+    fig = plt.figure(figsize=(3, 4))
     bax = brokenaxes(xlims=((0, 22), (165, 170)), hspace=1, despine=False)
     bax.bar(x, y)
 
@@ -70,3 +69,20 @@ def plot_degree_distribution(degree_list):
     bax.set_ylabel('Proportion distribution', labelpad=35, fontsize=16)
 
     plt.savefig('./figure/degree_distribution.pdf', dpi=600, bbox_inches="tight", pad_inches=0)
+
+
+def plot_node_degree(degree_list, dataset_name):
+    r"""
+    Plot degree distribution
+    """
+
+    for i in range(len(degree_list)):
+        degree_list[i] = min(degree_list[i], 1000)
+
+    plt.bar(range(len(degree_list)), degree_list)
+    plt.show()
+
+    plt.savefig('./figure/node_degree_' + dataset_name + '.pdf',
+                dpi=600,
+                bbox_inches="tight",
+                pad_inches=0)
