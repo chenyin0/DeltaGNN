@@ -121,12 +121,22 @@ def main(args):
             line = line.strip('\n')  # Delete '\n'
             node_q.append(int(line))
     else:
-        root_node_q = util.gen_root_node_queue(g)
-        node_q = util.bfs_traverse(g_csr, root_node_q)
+        if args.dataset == 'cora' or args.dataset == 'citeseer':
+            root_node_q = util.gen_root_node_queue(g)
+            node_q = util.bfs_traverse(g_csr, root_node_q)
+        elif args.dataset == 'ogbn-arxiv':
+            node_q = util.sort_node_by_timestamp('./dataset/' + args.dataset + '_node_year.csv')
 
         with open(file_, 'w') as f:
             for i in node_q:
                 f.write(str(i) + '\n')
+
+    # ## Plot degree follows node id increasing
+    # nodes = g.nodes()
+    # in_degree = g.in_degrees(nodes)
+    # # in_degree = g.in_degrees(node_q)
+    # plt.plt_graph.plot_node_degree(in_degree.numpy().tolist(), args.dataset)
+    # input('>> input')
 
     # ##
     # """ Profiling node locality with degree """
@@ -332,7 +342,7 @@ def main(args):
         acc_no_retrain = acc * 100
 
         # Get node index of added_nodes in evolve graph
-        inserted_nodes_evo = util.nodes_reindex(node_map_orig2evo, inserted_nodes)
+        inserted_nodes_evo = util.get_nodes_reindex(node_map_orig2evo, inserted_nodes)
         # inserted_nodes_evo.sort()
 
         if dump_node_access_flag or dump_mem_trace_flag:
@@ -351,8 +361,8 @@ def main(args):
 
                 if dump_mem_trace_flag:
                     # Record mem trace
-                    mem_access_q_full_retrain = util.nodes_reindex(node_map_evo2orig,
-                                                                   mem_access_q_full_retrain)
+                    mem_access_q_full_retrain = util.get_nodes_reindex(
+                        node_map_evo2orig, mem_access_q_full_retrain)
                     random.shuffle(mem_access_q_full_retrain)
                     util.dump_mem_trace(mem_access_q_full_retrain, trace_path_full_retrain)
                     util.dump_mem_trace(mem_access_q_full_retrain, trace_path_all_ngh)
@@ -369,10 +379,10 @@ def main(args):
 
                 if dump_mem_trace_flag:
                     # Record mem trace
-                    mem_access_q_full_retrain = util.nodes_reindex(node_map_evo2orig,
-                                                                   mem_access_q_full_retrain)
-                    mem_access_q_all_ngh = util.nodes_reindex(node_map_evo2orig,
-                                                              mem_access_q_all_ngh)
+                    mem_access_q_full_retrain = util.get_nodes_reindex(
+                        node_map_evo2orig, mem_access_q_full_retrain)
+                    mem_access_q_all_ngh = util.get_nodes_reindex(node_map_evo2orig,
+                                                                  mem_access_q_all_ngh)
                     random.shuffle(mem_access_q_full_retrain)
                     random.shuffle(mem_access_q_all_ngh)
                     util.dump_mem_trace(mem_access_q_full_retrain, trace_path_full_retrain)
@@ -520,7 +530,7 @@ if __name__ == '__main__':
     parser.set_defaults(self_loop=False)
     args = parser.parse_args()
 
-    args.model = 'gcn'
+    args.model = 'graphsage'
     # args.dataset = 'cora'
     args.dataset = 'ogbn-arxiv'
     args.n_epochs = 200

@@ -65,6 +65,7 @@ def get_ngh(g_csr, root_nodes):
     indices = g_csr[1]
     ngh = []
     for root_node in root_nodes:
+        # if root_node < indptr.shape[0] - 1:
         begin = indptr[root_node]
         end = indptr[root_node + 1]
         ngh.extend(indices[begin:end].tolist())
@@ -151,18 +152,18 @@ def update_g_struct(new_nodes, g_orig_csr, node_map_orig2evo, node_map_evo2orig,
         # edge_src_nodes.extend(e_dst_nodes.numpy().tolist())
         edge_dst_nodes.extend(e_src_nodes)
         edge_src_nodes.extend(e_dst_nodes)
-
+    
     # Remapping node_id from g_orig -> g_evo, and record mapping from g_evo -> g_orig
     edge_src_nodes_reindex = []
     edge_dst_nodes_reindex = []
     for node in edge_src_nodes:
-        node_id_evo = node_reindex(node_map_orig2evo, node)
+        node_id_evo = gen_node_reindex(node_map_orig2evo, node)
         edge_src_nodes_reindex.append(node_id_evo)
         if node_id_evo not in node_map_evo2orig:
             node_map_evo2orig[node_id_evo] = node
 
     for node in edge_dst_nodes:
-        node_id_evo = node_reindex(node_map_orig2evo, node)
+        node_id_evo = gen_node_reindex(node_map_orig2evo, node)
         edge_dst_nodes_reindex.append(node_id_evo)
         if node_id_evo not in node_map_evo2orig:
             node_map_evo2orig[node_id_evo] = node
@@ -269,7 +270,7 @@ def graph_evolve_delta_all_ngh(new_nodes,
     return g_evo
 
 
-def node_reindex(node_map, node_id_prev):
+def gen_node_reindex(node_map, node_id_prev):
     """
     node_id(g_orig) -> node_id(g_evo)
     """
@@ -282,10 +283,31 @@ def node_reindex(node_map, node_id_prev):
     return node_id_new
 
 
-def nodes_reindex(node_map, nodes_id_prev):
+def gen_nodes_reindex(node_map, nodes_id_prev):
     nodes_id_new = []
     for node_id in nodes_id_prev:
-        nodes_id_new.append(node_reindex(node_map, node_id))
+        nodes_id_new.append(gen_node_reindex(node_map, node_id))
+    return nodes_id_new
+
+
+def get_node_reindex(node_map, node_id_prev):
+    """
+    Find the node reindex; If not exist, return -1
+    """
+    if node_id_prev in node_map:
+        node_id_new = node_map[node_id_prev]
+    else:
+        node_id_new = -1
+
+    return node_id_new
+
+
+def get_nodes_reindex(node_map, nodes_id_prev):
+    nodes_id_new = []
+    for node_id in nodes_id_prev:
+        node_reindex = get_node_reindex(node_map, node_id)
+        if node_reindex != -1:  # If node exist
+            nodes_id_new.append(node_reindex)
     return nodes_id_new
 
 
@@ -339,8 +361,9 @@ def update_g_attr(new_nodes, g_evo, g_orig, node_map_orig2evo, node_map_evo2orig
     idx_test = random.sample(loc_list, math.floor(labels.size()[0] * test_ratio))
 
     # Add new nodes and its neighbors in test set
-    new_nodes_evo = nodes_reindex(node_map_orig2evo, new_nodes)
+    new_nodes_evo = get_nodes_reindex(node_map_orig2evo, new_nodes)
     idx_test.extend(new_nodes_evo)
+
     idx_test.extend(get_ngh(g_evo.adj_sparse('csr'), new_nodes_evo))
     idx_test = list(set(idx_test))
 
@@ -381,7 +404,7 @@ def update_g_attr_delta(new_nodes, g_evo, g_orig, node_map_evo2orig, node_map_or
     # nodes_index_evo = []
     # for node in new_nodes:
     #     nodes_index_evo.append(node_map_orig2evo[node])
-    new_nodes_evo = nodes_reindex(node_map_orig2evo, new_nodes)
+    new_nodes_evo = get_nodes_reindex(node_map_orig2evo, new_nodes)
     nodes_index_evo = new_nodes_evo
     # Restrict neighbor size less than training ratio
     ngh_limit = math.floor(labels.size()[0] * train_ratio)
@@ -447,7 +470,7 @@ def update_g_attr_all_ngh(new_nodes, g_evo, g_orig, node_map_evo2orig, node_map_
     Training mask are set to new inserted vertices and its neighbors
     """
     nodes_index_evo = []
-    new_nodes_evo = nodes_reindex(node_map_orig2evo, new_nodes)
+    new_nodes_evo = get_nodes_reindex(node_map_orig2evo, new_nodes)
     nodes_index_evo.extend(new_nodes_evo)
     nodes_index_evo.extend(get_ngh(g_evo.adj_sparse('csr'), new_nodes_evo))
 
@@ -791,3 +814,27 @@ def gen_degree_distribution(g_csr):
         deg_distribution[i] += 1
 
     return deg_distribution
+
+
+def sort_node_by_timestamp(file_path):
+    import csv
+
+    timestamp = []
+    with open(file_path, 'r', encoding='utf-8') as f:
+        reader = csv.reader(f)
+        for r in reader:
+            timestamp.append(int(r[0]))
+
+    time_min = min(timestamp)
+    time_max = max(timestamp)
+
+    timestamp_bin = [[] for i in range(time_min, time_max + 1)]
+    for i in range(len(timestamp)):
+        index = timestamp[i] - time_min
+        timestamp_bin[index].append(i)
+
+    node_q_sort_by_time = []
+    for i in timestamp_bin:
+        node_q_sort_by_time.extend(i)
+
+    return node_q_sort_by_time
