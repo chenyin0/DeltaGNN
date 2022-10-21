@@ -234,15 +234,17 @@ class GCN_delta(nn.Module):
 
 def train_delta_edge_masked(args,
                             model,
-                            features,
-                            n_edges,
-                            train_mask,
-                            val_mask,
-                            labels,
+                            device,
                             lr,
                             weight_decay,
                             ngh_high_deg=None,
                             ngh_low_deg=None):
+    g = model.g
+    features = g.ndata['feat'].to(device)
+    train_mask = g.ndata['train_mask'].bool().to(device)
+    val_mask = g.ndata['val_mask'].to(device)
+    labels = g.ndata['label'].to(device)
+    n_edges = g.number_of_edges()
 
     optimizer = Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
     # initialize graph
@@ -262,8 +264,7 @@ def train_delta_edge_masked(args,
         if epoch >= 3:
             dur.append(time.time() - t0)
 
-        acc = evaluate_delta_edge_masked(model, features, labels, val_mask, ngh_high_deg,
-                                         ngh_low_deg)
+        acc = evaluate_delta_edge_masked(model, val_mask, device, ngh_high_deg, ngh_low_deg)
         # print("Epoch {:05d} | Time(s) {:.4f} | Loss {:.4f} | Accuracy {:.4f} | "
         #       "ETputs(KTEPS) {:.2f}".format(epoch, np.mean(dur), loss.item(), acc,
         #                                     n_edges / np.mean(dur) / 1000))
@@ -272,17 +273,17 @@ def train_delta_edge_masked(args,
     model.embedding = torch.nn.Parameter(logits)
 
 
-def evaluate_delta_edge_masked(model,
-                               features,
-                               labels,
-                               mask,
-                               nodes_high_deg=None,
-                               nodes_low_deg=None):
+def evaluate_delta_edge_masked(model, mask, device, nodes_high_deg=None, nodes_low_deg=None):
     r"""
     Update feature of updated nodes according to node degree
-
     "model" should be GCN_delta
     """
+
+    g = model.g
+    features = g.ndata['feat'].to(device)
+    labels = g.ndata['label'].to(device)
+    mask = mask.bool().to(device)  # Convert int8 to bool
+
     model.eval()
     with torch.no_grad():
         logits = model(features, nodes_high_deg, nodes_low_deg)
