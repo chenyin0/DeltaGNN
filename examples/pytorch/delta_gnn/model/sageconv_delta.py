@@ -12,8 +12,8 @@ class SAGEConv_delta(SAGEConv):
                  bias=True,
                  norm=None,
                  activation=None):
-        super(SAGEConv_delta, self).__init__(in_feats, out_feats, aggregator_type, feat_drop, norm,
-                                             bias, norm, activation)
+        super(SAGEConv_delta, self).__init__(in_feats, out_feats, aggregator_type, feat_drop, bias,
+                                             norm, activation)
 
     def forward(self, graph, feat, ngh_high_deg=None, ngh_low_deg=None):
         r"""    
