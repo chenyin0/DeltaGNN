@@ -1,6 +1,5 @@
 import argparse
 import time
-import xxlimited
 import numpy as np
 import torch
 import torch as th
@@ -507,7 +506,9 @@ if __name__ == '__main__':
         "--dataset",
         type=str,
         default="cora",
-        help="Dataset name ('cora', 'citeseer', 'pubmed', 'reddit', 'amazon_comp').")
+        help=
+        "Dataset name ('cora', 'citeseer', 'pubmed', 'reddit', 'ogbn-arxiv', 'ogbn-mag', 'amazon_comp')."
+    )
     # parser.add_argument("--dropout", type=float, default=0.5, help="dropout probability")
     parser.add_argument("--gpu", type=int, default=-1, help="gpu")
     # parser.add_argument("--lr", type=float, default=1e-2, help="learning rate")
@@ -527,12 +528,12 @@ if __name__ == '__main__':
                         type=int,
                         default=None,
                         help="degree threshold of neighbors nodes")
-    parser.set_defaults(self_loop=False)
+    # parser.set_defaults(self_loop=False)
     args = parser.parse_args()
 
     args.model = 'graphsage'
-    # args.dataset = 'cora'
-    args.dataset = 'ogbn-arxiv'
+    args.dataset = 'cora'
+    # args.dataset = 'ogbn-arxiv'
     args.n_epochs = 200
     args.gpu = 0
     # args.mode = 'mixed'

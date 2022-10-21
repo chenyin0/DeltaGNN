@@ -203,7 +203,7 @@ class SAGE_delta(nn.Module):
         #     print(parameters.detach().grad)
         #     print(parameters.detach().grad_fn)
 
-        # Extract
+        # Extract ngh_high/low_deg according to the sampled node id
         feat_nodes_id = blocks[-1].dstnodes().cpu().numpy().tolist()
         ngh_high_deg_sampled = [i for i in feat_nodes_id if i in ngh_high_deg]
         ngh_low_deg_sampled = [i for i in feat_nodes_id if i in ngh_low_deg]
@@ -226,20 +226,20 @@ class SAGE_delta(nn.Module):
 
         # Compulsorily execute in CPU (GPU not suits for scalar execution)
         device = feat.device
-        feat = feat.to('cpu')
-        embedding_prev = embedding_prev.to('cpu')
+        # feat = feat.to('cpu')  ## Debug_yin_annotation
+        # embedding_prev = embedding_prev.to('cpu')  ## Debug_yin_annotation
 
         # Combine delta rst with feat_prev
-        # feat_prev_ind = list(i for i in range(embedding_prev.shape[0]))
-        # feat_prev_keep_ind = list(set(feat_prev_ind) - set(ngh_high_deg) - set(ngh_low_deg))
         feat_prev_keep_ind = list(
             set(feat_nodes_sampled) - set(ngh_high_deg_sampled) - set(ngh_low_deg_sampled))
 
         feat_prev_keep_ind = th.tensor(feat_prev_keep_ind, dtype=th.long)
         # ngh_high_deg_ind = th.tensor(ngh_high_deg, dtype=th.long)
         ngh_low_deg_ind = th.tensor(ngh_low_deg_sampled, dtype=th.long)
+        ngh_low_deg_ind = ngh_low_deg_ind.to(device)  ## Debug_yin_add
 
         feat_prev = th.index_select(embedding_prev, 0, feat_prev_keep_ind)
+        feat_prev = feat_prev.to(device)  ## Debug_yin_add
         # feat_high_deg = th.index_select(feat, 0, ngh_high_deg_ind)
         feat_low_deg = th.index_select(feat, 0, ngh_low_deg_ind)
 
@@ -252,8 +252,10 @@ class SAGE_delta(nn.Module):
                          for row in range(ngh_low_deg_ind.shape[0])]
 
         index_feat_prev = th.tensor(index_feat_prev)
+        index_feat_prev = index_feat_prev.to(device)  ## Debug_yin_add
         # index_high_deg = th.tensor(index_high_deg)
         index_low_deg = th.tensor(index_low_deg)
+        index_low_deg = index_low_deg.to(device)  ## Debug_yin_add
 
         # Update feat of the nodes in the high and low degree
         feat.scatter(0, index_feat_prev, feat_prev)
@@ -268,8 +270,8 @@ class SAGE_delta(nn.Module):
     def combine_embedding(self, embedding_prev, feat, ngh_high_deg, ngh_low_deg):
         # Compulsorily execute in CPU (GPU not suits for scalar execution)
         device = feat.device
-        feat = feat.to('cpu')
-        embedding_prev = embedding_prev.to('cpu')
+        # feat = feat.to('cpu')  ## Debug_yin_annotation
+        # embedding_prev = embedding_prev.to('cpu')  ## Debug_yin_annotation
 
         # Combine delta rst with feat_prev
         feat_prev_ind = list(i for i in range(embedding_prev.shape[0]))
@@ -403,10 +405,9 @@ def train_delta_edge_masked(args,
         # print("Epoch {:05d} | Loss {:.4f} | Accuracy {:.4f} ".format(epoch, total_loss / (it + 1),
         #                                                              acc.item()))
 
-
     # model.embedding = th.nn.Parameter(y_hat)
 
-    # Update embedding
+    # Update self embedding
     # Gen index for scatter
     y_hat = y_hat.to('cpu')
     feat_updated_ind = blocks[-1].dstnodes().cpu().numpy().tolist()

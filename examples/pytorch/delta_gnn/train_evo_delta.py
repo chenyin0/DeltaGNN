@@ -1,10 +1,10 @@
 import argparse
 import time
-from matplotlib import test
 import numpy as np
 import torch
 import torch as th
 import torch.nn.functional as F
+
 import dgl
 from dgl.data import CoraGraphDataset, CiteseerGraphDataset, PubmedGraphDataset, RedditDataset, AmazonCoBuyComputerDataset
 from dgl.data import AsNodePredDataset
