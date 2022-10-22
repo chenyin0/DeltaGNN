@@ -1,5 +1,5 @@
 {
-    "--n-hidden": 512,
+    "--n-hidden": 256,
     "--n-layers": 2,
     "--fan-out": "10,25",
     "--batch-size": 1024,
