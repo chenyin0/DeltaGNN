@@ -14,11 +14,12 @@ import util
 import time
 import random
 
-from model.gcn import GCN
-from model.gcn import GCN_delta
+from model.gcn import GCN, GCN_delta
 import model.gcn as gcn
 from model.graphsage import SAGE, SAGE_delta
 import model.graphsage as graphsage
+from model.gat import GAT, GAT_delta
+import model.gat as gat
 
 import os
 import json
@@ -54,6 +55,17 @@ def main(args):
             lr = para['--lr']
             weight_decay = para['--weight-decay']
             dropout = para['--dropout']
+    elif model_name == 'gat':
+        with open('./examples/pytorch/delta_gnn/gat_para.json', 'r') as f:
+            para = json.load(f)
+            n_hidden = para['--n-hidden']
+            n_layers = para['--n-layers']
+            lr = para['--lr']
+            weight_decay = para['--weight-decay']
+            feat_dropout = para['--feat-drop']
+            attn_dropout = para['--attn-drop']
+            heads_str = str(para['--heads'])
+            heads = [int(i) for i in heads_str.split(',')]
     else:
         assert ('Not define GNN model')
 
@@ -191,6 +203,11 @@ def main(args):
         model = SAGE(g_evo, in_feats, n_hidden, n_classes, n_layers, F.relu, dropout).to(device)
         model_delta_all_ngh = SAGE_delta(g_evo, in_feats, n_hidden, n_classes, n_layers, F.relu,
                                          dropout).to(device)
+    elif model_name == 'gat':
+        model = GAT(g_evo, in_feats, n_hidden, n_classes, n_layers, F.relu, feat_dropout,
+                    attn_dropout, heads).to(device)
+        model_delta_all_ngh = GAT_delta(g_evo, in_feats, n_hidden, n_classes, n_layers, F.relu,
+                                        feat_dropout, attn_dropout, heads).to(device)
 
     # Train the initial graph (timestamp = 0)
     print("\n>>> Accuracy on initial graph (timestamp=0):")
@@ -201,6 +218,9 @@ def main(args):
     elif model_name == 'graphsage':
         graphsage.train(args, model, device, fan_out, batch_size, lr, weight_decay)
         acc = graphsage.evaluate(device, model, test_mask, batch_size)
+    elif model_name == 'gat':
+        gat.train(args, model, device, lr, weight_decay)
+        acc = gat.evaluate(model, test_mask, device)
 
     print("Test accuracy {:.2%}".format(acc))
 
@@ -302,11 +322,11 @@ def main(args):
             #Set edge weight (mask) according to node degree
             util.gen_edge_mask(model_delta_all_ngh.g, ngh_dict)
 
-            features = model_delta_all_ngh.g.ndata['feat']
-            labels = model_delta_all_ngh.g.ndata['label']
-            train_mask = model_delta_all_ngh.g.ndata['train_mask']
-            val_mask = model_delta_all_ngh.g.ndata['val_mask']
-            test_mask = model_delta_all_ngh.g.ndata['test_mask']
+            # features = model_delta_all_ngh.g.ndata['feat']
+            # labels = model_delta_all_ngh.g.ndata['label']
+            # train_mask = model_delta_all_ngh.g.ndata['train_mask']
+            # val_mask = model_delta_all_ngh.g.ndata['val_mask']
+            # test_mask = model_delta_all_ngh.g.ndata['test_mask']
 
             if len(node_q) > 0:
                 time_start = time.perf_counter()
@@ -326,6 +346,12 @@ def main(args):
                                                                test_mask, batch_size,
                                                                list(ngh_high_deg.keys()),
                                                                list(ngh_low_deg.keys()))
+                elif model_name == 'gat':
+                    gat.train_delta_edge_masked(args, model_delta_all_ngh, device, lr, weight_decay,
+                                                list(ngh_high_deg.keys()), list(ngh_low_deg.keys()))
+                    acc = gat.evaluate_delta_edge_masked(model_delta_all_ngh, test_mask, device,
+                                                         list(ngh_high_deg.keys()),
+                                                         list(ngh_low_deg.keys()))
 
                 time_full_retrain = time.perf_counter() - time_start
                 print('>> Epoch training time with full nodes: {:.4}s'.format(time_full_retrain))
@@ -395,8 +421,8 @@ if __name__ == '__main__':
     # parser.set_defaults(self_loop=False)
     args = parser.parse_args()
 
-    args.model = 'graphsage'
-    # args.dataset = 'cora'
+    args.model = 'gat'
+    # args.dataset = 'citeseer'
     args.dataset = 'ogbn-arxiv'
     args.n_epochs = 200
     args.deg_threshold = 5
@@ -408,17 +434,5 @@ if __name__ == '__main__':
 
     print('\n************ {:s} ************'.format(args.dataset))
     print(args)
-
-    # new_val = torch.arange(1, 21).reshape((4, 5))
-    # print(new_val)
-    # src = torch.ones(4, 5, dtype=new_val.dtype)
-    # row_id = th.tensor([0, 2, 3])
-    # index = [[row_id[k].item() for i in range(new_val.shape[1])] for k in range(row_id.shape[0])]
-    # print(index)
-    # index=th.tensor(index)
-
-    # # src = torch.arange(1, 11).reshape((2, 5))
-    # # index = torch.tensor([[0, 0, 0, 0, 0], [2,2,2,2, 2]])
-    # print(src.scatter_(0, index, new_val, reduce='add'))
 
     main(args)
