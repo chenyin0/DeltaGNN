@@ -264,7 +264,7 @@ def train_delta_edge_masked(args,
         if epoch >= 3:
             dur.append(time.time() - t0)
 
-        acc = evaluate_delta_edge_masked(model, val_mask, device, ngh_high_deg, ngh_low_deg)
+        # acc = evaluate_delta_edge_masked(model, val_mask, device, ngh_high_deg, ngh_low_deg)
         # print("Epoch {:05d} | Time(s) {:.4f} | Loss {:.4f} | Accuracy {:.4f} | "
         #       "ETputs(KTEPS) {:.2f}".format(epoch, np.mean(dur), loss.item(), acc,
         #                                     n_edges / np.mean(dur) / 1000))

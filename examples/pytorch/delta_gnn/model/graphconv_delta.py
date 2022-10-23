@@ -1,11 +1,4 @@
-import torch
-from torch._C import device
-import torch.nn as nn
 from dgl.nn.pytorch import GraphConv
-
-import torch as th
-from torch import nn
-from torch.nn import init
 
 # from dgl import function as fn
 # from dgl import DGLError
