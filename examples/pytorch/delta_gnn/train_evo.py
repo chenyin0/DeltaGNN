@@ -137,6 +137,7 @@ def main(args):
         if args.dataset == 'cora' or args.dataset == 'citeseer':
             root_node_q = util.gen_root_node_queue(g)
             node_q = util.bfs_traverse(g_csr, root_node_q)
+            # node_q = g.nodes().numpy().tolist()
         elif args.dataset == 'ogbn-arxiv':
             node_q = util.sort_node_by_timestamp('./dataset/' + args.dataset + '_node_year.csv')
 
@@ -189,7 +190,7 @@ def main(args):
 
     ##
     """ Initial Graph """
-    init_node_rate = 0.1
+    init_node_rate = 0.5
     init_node_num = round(len(node_q) * init_node_rate)
     init_nodes = node_q[0:init_node_num]
     print('\n>> Initial node num', len(init_nodes))
@@ -314,8 +315,9 @@ def main(args):
     # Add new edges
     # n_nodes = model.g.number_of_nodes()
     # iter = 8
+    interval = 50
     i = 0
-    node_batch = round(g.number_of_nodes() / 10)  # default = 10
+    node_batch = round(g.number_of_nodes() / interval)  # default = 10
     # edge_epoch = np.arange(0, iter * edge_batch, edge_batch)
     accuracy = []
     deg_th = args.deg_threshold
@@ -547,10 +549,15 @@ if __name__ == '__main__':
     # parser.set_defaults(self_loop=True)
     args = parser.parse_args()
 
-    args.model = 'gat'
-    # args.dataset = 'cora'
-    args.dataset = 'ogbn-arxiv'
-    args.n_epochs = 200
+    args.model = 'gcn'
+    # args.model = 'graphsage'
+    # args.model = 'gat'
+
+    args.dataset = 'cora'
+    # args.dataset = 'citeseer'
+    # args.dataset = 'ogbn-arxiv'
+
+    args.n_epochs = 20
     args.gpu = 0
     # args.mode = 'mixed'
 

@@ -125,7 +125,7 @@ def main(args):
     g_csr = g.adj_sparse('csr')
     """ Traverse to get graph evolving snapshot """
     node_q = []
-    file_ = pathlib.Path('./dataset/' + args.dataset + '_evo_seq.txt')
+    file_ = pathlib.Path('./dataset/' + args.dataset + '_evo_delta_seq.txt')
     if file_.exists():
         f = open(file_, "r")
         lines = f.readlines()
@@ -136,6 +136,7 @@ def main(args):
         if args.dataset == 'cora' or args.dataset == 'citeseer':
             root_node_q = util.gen_root_node_queue(g)
             node_q = util.bfs_traverse(g_csr, root_node_q)
+            # node_q = g.nodes().numpy().tolist()
         elif args.dataset == 'ogbn-arxiv':
             node_q = util.sort_node_by_timestamp('./dataset/' + args.dataset + '_node_year.csv')
 
@@ -421,11 +422,16 @@ if __name__ == '__main__':
     # parser.set_defaults(self_loop=False)
     args = parser.parse_args()
 
-    args.model = 'gat'
+    args.model = 'gcn'
+    # args.model = 'graphsage'
+    # args.model = 'gat'
+
+    args.dataset = 'cora'
     # args.dataset = 'citeseer'
-    args.dataset = 'ogbn-arxiv'
+    # args.dataset = 'ogbn-arxiv'
+
     args.n_epochs = 200
-    args.deg_threshold = 5
+    args.deg_threshold = 0
     args.gpu = 0
 
     dump_accuracy_flag = 1
