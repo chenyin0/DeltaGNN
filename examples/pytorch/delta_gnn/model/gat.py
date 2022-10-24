@@ -286,6 +286,9 @@ def train_delta_edge_masked(args,
         # acc = evaluate_delta_edge_masked(model, val_mask, device, nodes_high_deg, nodes_low_deg)
         # print("Epoch {:05d} | Loss {:.4f} | Accuracy {:.4f} ".format(epoch, loss.item(), acc))
 
+    # Update embedding
+    model.embedding = torch.nn.Parameter(logits)
+
 
 def evaluate_delta_edge_masked(model, mask, device, nodes_high_deg=None, nodes_low_deg=None):
     g = model.g
