@@ -10,6 +10,7 @@ import dgl
 from dgl.data import CoraGraphDataset, CiteseerGraphDataset, PubmedGraphDataset, RedditDataset, AmazonCoBuyComputerDataset
 from dgl.data import AsNodePredDataset
 from ogb.nodeproppred import DglNodePropPredDataset
+from dgl import AddSelfLoop
 
 import util
 import time
@@ -74,14 +75,16 @@ def main(args):
         assert ('Not define GNN model')
 
     # load and preprocess dataset
+    transform = (AddSelfLoop()
+                 )  # by default, it will first remove self-loops to prevent duplication
     if args.dataset == 'cora':
-        dataset = CoraGraphDataset(raw_dir='./dataset')
+        dataset = CoraGraphDataset(raw_dir='./dataset', transform=transform)
     elif args.dataset == 'citeseer':
-        dataset = CiteseerGraphDataset(raw_dir='./dataset')
+        dataset = CiteseerGraphDataset(raw_dir='./dataset', transform=transform)
     elif args.dataset == 'pubmed':
-        dataset = PubmedGraphDataset(raw_dir='./dataset')
+        dataset = PubmedGraphDataset(raw_dir='./dataset', transform=transform)
     elif args.dataset == 'reddit':
-        dataset = RedditDataset(raw_dir='./dataset')
+        dataset = RedditDataset(raw_dir='./dataset', transform=transform)
     elif args.dataset == 'ogbn-arxiv':
         dataset_raw = DglNodePropPredDataset('ogbn-arxiv', root='./dataset')
         dataset = AsNodePredDataset(dataset_raw)
@@ -190,7 +193,7 @@ def main(args):
 
     ##
     """ Initial Graph """
-    init_node_rate = 0.5
+    init_node_rate = 0.1
     init_node_num = round(len(node_q) * init_node_rate)
     init_nodes = node_q[0:init_node_num]
     print('\n>> Initial node num', len(init_nodes))
@@ -315,7 +318,7 @@ def main(args):
     # Add new edges
     # n_nodes = model.g.number_of_nodes()
     # iter = 8
-    interval = 50
+    interval = 10
     i = 0
     node_batch = round(g.number_of_nodes() / interval)  # default = 10
     # edge_epoch = np.arange(0, iter * edge_batch, edge_batch)
@@ -549,15 +552,15 @@ if __name__ == '__main__':
     # parser.set_defaults(self_loop=True)
     args = parser.parse_args()
 
-    args.model = 'gcn'
-    # args.model = 'graphsage'
+    # args.model = 'gcn'
+    args.model = 'graphsage'
     # args.model = 'gat'
 
-    args.dataset = 'cora'
-    # args.dataset = 'citeseer'
+    # args.dataset = 'cora'
+    args.dataset = 'citeseer'
     # args.dataset = 'ogbn-arxiv'
 
-    args.n_epochs = 20
+    args.n_epochs = 200
     args.gpu = 0
     # args.mode = 'mixed'
 

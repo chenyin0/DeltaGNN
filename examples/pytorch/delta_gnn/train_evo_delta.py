@@ -8,6 +8,7 @@ import torch.nn.functional as F
 import dgl
 from dgl.data import CoraGraphDataset, CiteseerGraphDataset, PubmedGraphDataset, RedditDataset, AmazonCoBuyComputerDataset
 from dgl.data import AsNodePredDataset
+from dgl import AddSelfLoop
 from ogb.nodeproppred import DglNodePropPredDataset
 
 import util
@@ -70,14 +71,16 @@ def main(args):
         assert ('Not define GNN model')
 
     # load and preprocess dataset
+    transform = (AddSelfLoop()
+                 )  # by default, it will first remove self-loops to prevent duplication
     if args.dataset == 'cora':
-        dataset = CoraGraphDataset(raw_dir='./dataset')
+        dataset = CoraGraphDataset(raw_dir='./dataset', transform=transform)
     elif args.dataset == 'citeseer':
-        dataset = CiteseerGraphDataset(raw_dir='./dataset')
+        dataset = CiteseerGraphDataset(raw_dir='./dataset', transform=transform)
     elif args.dataset == 'pubmed':
-        dataset = PubmedGraphDataset(raw_dir='./dataset')
+        dataset = PubmedGraphDataset(raw_dir='./dataset', transform=transform)
     elif args.dataset == 'reddit':
-        dataset = RedditDataset(raw_dir='./dataset')
+        dataset = RedditDataset(raw_dir='./dataset', transform=transform)
     elif args.dataset == 'ogbn-arxiv':
         dataset_raw = DglNodePropPredDataset('ogbn-arxiv', root='./dataset')
         dataset = AsNodePredDataset(dataset_raw)
@@ -422,12 +425,12 @@ if __name__ == '__main__':
     # parser.set_defaults(self_loop=False)
     args = parser.parse_args()
 
-    args.model = 'gcn'
-    # args.model = 'graphsage'
+    # args.model = 'gcn'
+    args.model = 'graphsage'
     # args.model = 'gat'
 
-    args.dataset = 'cora'
-    # args.dataset = 'citeseer'
+    # args.dataset = 'cora'
+    args.dataset = 'citeseer'
     # args.dataset = 'ogbn-arxiv'
 
     args.n_epochs = 200
