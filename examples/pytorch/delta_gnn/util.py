@@ -60,15 +60,45 @@ def bfs_traverse(g_csr, root_node_q):
     return sequence
 
 
-def get_ngh(g_csr, root_nodes):
-    indptr = g_csr[0]
-    indices = g_csr[1]
+def get_nghs(g_csr, root_nodes):
+    indptr = g_csr[0].cpu().numpy().tolist()
+    indices = g_csr[1].cpu().numpy().tolist()
     ngh = []
     for root_node in root_nodes:
         # if root_node < indptr.shape[0] - 1:
         begin = indptr[root_node]
         end = indptr[root_node + 1]
-        ngh.extend(indices[begin:end].tolist())
+        ngh.extend(indices[begin:end])
+
+    return ngh
+
+
+def get_nghs_multi_layers(g_csr, root_nodes, layer_num):
+    indptr = g_csr[0].cpu().numpy().tolist()
+    indices = g_csr[1].cpu().numpy().tolist()
+    nodes_q = cp.deepcopy(root_nodes)
+    ngh = []
+    for i in range(layer_num):
+        ngh_nodes = get_nghs(g_csr, nodes_q)
+        ngh.extend(ngh_nodes)
+        nodes_q = ngh_nodes
+
+    ngh = list(set(ngh))
+
+    return ngh
+
+
+def get_dst_nghs_multi_layers(g, root_nodes, layer_num):
+    nodes_q = cp.deepcopy(root_nodes)
+    ngh = []
+    for i in range(layer_num):
+        ngh_per_layer = []
+        for node in nodes_q:
+            ngh_per_layer.extend(g.successors(node).cpu().numpy().tolist())
+            ngh.extend(ngh_per_layer)
+        nodes_q = cp.deepcopy(ngh_per_layer)
+
+    ngh = list(set(ngh))
 
     return ngh
 
@@ -108,529 +138,500 @@ def get_ngh_with_deg_th(g, root_nodes, deg_th):
                     if g.has_edges_between(ngh_node, root_node):
                         ngh_low_deg.setdefault(ngh_node, set()).add(root_node)
 
-    # Add previous vertices in train set into ngh_high_deg
-    train_mask = g.ndata['train_mask']
-    train_nodes_id = train_mask.nonzero().squeeze()
-    train_nodes_id = train_nodes_id.cpu().numpy().tolist()
-    prev_nodes_id = train_nodes_id - ngh_low_deg.keys() - ngh_high_deg.keys()
-    for node in prev_nodes_id:
-        ngh_high_deg.setdefault(node, set()).update(get_ngh(g_csr, [node]))
+    # # Add previous vertices in train set into ngh_high_deg
+    # train_mask = g.ndata['train_mask']
+    # train_nodes_id = train_mask.nonzero().squeeze()
+    # train_nodes_id = train_nodes_id.cpu().numpy().tolist()
+    # prev_nodes_id = train_nodes_id - ngh_low_deg.keys() - ngh_high_deg.keys()
+    # for node in prev_nodes_id:
+    #     ngh_high_deg.setdefault(node, set()).update(get_ngh(g_csr, [node]))
 
     return ngh_high_deg, ngh_low_deg
 
 
-def gen_edge_mask(g, ngh_dict):
+# def gen_nodes_with_deg_th(g, nodes, inserted_nodes, deg_th):
+#     '''
+#     Select out nodes for delta-updating (generate edge mask)
+#     Principle:
+#         1) If the nodes is newly inserted nodes, regard to high-degree nodes
+#         2) Else, determined by the node degree
+
+#     nodes: nodes which need to be classified according to deg_th
+#     inserted_nodes: nodes which are newly inserted in current graph snapshot
+#     deg_th: node degree threshold
+#     '''
+
+#     g_csr = g.adj_sparse('csr')
+#     nodes_high_deg = dict()
+#     nodes_low_deg = dict()
+#     nodes_high_deg_t = [i for i in nodes if i in inserted_nodes]
+#     # Insert inserted nodes as high degree nodes
+#     for node in nodes_high_deg_t:
+#         nodes_high_deg.setdefault(node, set()).update(get_ngh(g_csr, [node]))
+
+#     nodes_t = [i for i in nodes if i not in nodes_high_deg_t]
+#     for node in nodes_t:
+#         deg = count_node_degree(g_csr, node)
+#         if deg >= deg_th:
+#             nodes_high_deg.setdefault(node, set()).update(get_ngh(g_csr, [node]))
+#         else:
+#             nodes_low_deg.setdefault(node, set()).add(node)
+
+#     return nodes_high_deg, nodes_low_deg
+
+# def gen_nodes_with_deg_th(g, nodes, inserted_nodes, deg_th):
+#     '''
+#     Select out nodes for delta-updating (generate edge mask)
+#     Principle:
+#         1) If the nodes is newly inserted nodes, regard to high-degree nodes
+#         2) Else, determined by the node degree
+
+#     nodes: nodes which need to be classified according to deg_th
+#     inserted_nodes: nodes which are newly inserted in current graph snapshot
+#     deg_th: node degree threshold
+#     '''
+
+#     g_csr = g.adj_sparse('csr')
+#     nodes_high_deg = []
+#     nodes_low_deg = []
+#     nodes_high_deg_t = [i for i in nodes if i in inserted_nodes]
+#     # Regard inserted nodes to high degree nodes
+#     nodes_high_deg.extend(nodes_high_deg_t)
+
+#     nodes_t = [i for i in nodes if i not in inserted_nodes]
+#     for node in nodes_t:
+#         deg = count_node_degree(g_csr, node)
+#         if deg >= deg_th:
+#             nodes_high_deg.append(node)
+#         else:
+#             nodes_low_deg.append(node)
+
+#     return nodes_high_deg, nodes_low_deg
+
+# def gen_nodes_with_deg_th(g, nodes, inserted_nodes, deg_th):
+#     '''
+#     Select out nodes for delta-updating (generate edge mask)
+#     Principle:
+#         1) If the nodes is newly inserted nodes, regard to high-degree nodes
+#         2) Else, determined by the node degree
+
+#     nodes: nodes which need to be classified according to deg_th
+#     inserted_nodes: nodes which are newly inserted in current graph snapshot
+#     deg_th: node degree threshold
+#     '''
+
+#     g_csr = g.adj_sparse('csr')
+#     nodes_high_deg = dict()
+#     nodes_low_deg = dict()
+#     nodes_high_deg_t = [i for i in nodes if i in inserted_nodes]
+#     # Insert inserted nodes as high degree nodes
+#     for node in nodes_high_deg_t:
+#         nodes_high_deg.setdefault(node, set()).update(get_nghs(g_csr, [node]))
+
+#     nodes_t = [i for i in nodes if i not in nodes_high_deg_t]
+#     for node in nodes_t:
+#         deg = count_node_degree(g_csr, node)
+#         if deg >= deg_th:
+#             nodes_high_deg.setdefault(node, set()).update(get_nghs(g_csr, [node]))
+#         else:
+#             nodes_low_deg.setdefault(node, set()).update(node)
+
+#     return nodes_high_deg, nodes_low_deg
+
+
+def gen_nodes_with_deg_th(g, nodes, inserted_nodes, deg_th):
+    '''
+    Select out nodes for delta-updating (generate edge mask)
+    Principle:
+        1) If the nodes is newly inserted nodes, regard to high-degree nodes
+        2) Else, determined by the node degree
+
+    nodes: nodes which need to be classified according to deg_th
+    inserted_nodes: nodes which are newly inserted in current graph snapshot    
+    deg_th: node degree threshold
+    '''
+
+    g_csr = g.adj_sparse('csr')
+    nodes_high_deg = dict()
+    nodes_low_deg = dict()
+    nodes_high_deg_t = [i for i in nodes if i in inserted_nodes]
+    # Insert inserted nodes as high degree nodes
+    for node in nodes_high_deg_t:
+        nodes_high_deg.setdefault(node, set()).update(get_nghs(g_csr, [node]))
+
+    nodes_t = [i for i in nodes if i not in nodes_high_deg_t]
+    for node in nodes_t:
+        deg = count_node_degree(g_csr, node)
+        if deg >= deg_th:
+            nodes_high_deg.setdefault(node, set()).update(get_nghs(g_csr, [node]))
+        else:
+            nodes_low_deg.setdefault(node, set()).update(node)
+
+    return nodes_high_deg, nodes_low_deg
+
+
+def gen_train_nodes_with_deg_th(g, inserted_nodes, deg_th):
+    '''
+    Select out train nodes for delta-updating (generate edge mask)
+    Principle:
+        1) If the train_nodes is newly inserted nodes, regard to high-degree nodes
+        2) Else, determined by the node degree
+
+    deg_th: node degree threshold
+    '''
+
+    train_nodes = th.nonzero(g.ndata['train_mask'])
+    train_nodes = train_nodes.squeeze().cpu().numpy().tolist()
+    train_nodes_high_deg, train_nodes_low_deg = gen_nodes_with_deg_th(g, train_nodes,
+                                                                      inserted_nodes, deg_th)
+
+    return train_nodes_high_deg, train_nodes_low_deg
+
+
+def gen_test_nodes_with_deg_th(g, inserted_nodes, deg_th):
+    '''
+    Select out test nodes for delta-updating (generate edge mask)
+    Principle:
+        1) If the test_nodes is newly inserted nodes, regard to high-degree nodes
+        2) Else, determined by the node degree
+
+    deg_th: node degree threshold
+    '''
+
+    test_nodes = th.nonzero(g.ndata['test_mask'])
+    test_nodes = test_nodes.squeeze().cpu().numpy().tolist()
+    test_nodes_high_deg, test_nodes_low_deg = gen_nodes_with_deg_th(g, test_nodes, inserted_nodes,
+                                                                    deg_th)
+
+    return test_nodes_high_deg, test_nodes_low_deg
+
+
+# def gen_edge_mask(g, ngh_dict):
+#     src_nodes = []
+#     dst_nodes = []
+#     for root_node, ngh in ngh_dict.items():
+#         src_nodes.extend([root_node for i in range(len(ngh))])
+#         dst_nodes.extend(ngh)
+
+#     # a = th.tensor(src_nodes, dtype=th.long)
+#     # b = th.tensor(dst_nodes, dtype=th.long)
+#     # print(a, b)
+#     # print(g.edges())
+#     # k = g.edge_ids(th.tensor([0, 0]), th.tensor([1, 3]))
+
+#     # edge_ids = g.edge_ids(th.tensor(src_nodes, dtype=th.long), th.tensor(dst_nodes, dtype=th.long))
+#     src_nodes = th.tensor(src_nodes, dtype=th.long).to(g.device)
+#     dst_nodes = th.tensor(dst_nodes, dtype=th.long).to(g.device)
+#     edge_ids = g.edge_ids(src_nodes, dst_nodes)
+
+#     edge_ids = edge_ids.tolist()
+#     edge_mask = [0 for i in range(g.number_of_edges())]
+#     for id in edge_ids:
+#         edge_mask[id] = 1
+
+#     g.edata['edge_mask'] = th.Tensor(edge_mask).to(g.device)
+
+# def gen_edge_mask(g, ngh_dict):
+#     src_nodes = []
+#     dst_nodes = []
+#     for root_node, ngh in ngh_dict.items():
+#         src_nodes.extend([root_node for i in range(len(ngh))])
+#         dst_nodes.extend(ngh)
+
+#     # a = th.tensor(src_nodes, dtype=th.long)
+#     # b = th.tensor(dst_nodes, dtype=th.long)
+#     # print(a, b)
+#     # print(g.edges())
+#     # k = g.edge_ids(th.tensor([0, 0]), th.tensor([1, 3]))
+
+#     # edge_ids = g.edge_ids(th.tensor(src_nodes, dtype=th.long), th.tensor(dst_nodes, dtype=th.long))
+#     src_nodes = th.tensor(src_nodes, dtype=th.long).to(g.device)
+#     dst_nodes = th.tensor(dst_nodes, dtype=th.long).to(g.device)
+#     edge_ids = g.edge_ids(src_nodes, dst_nodes)
+
+#     edge_ids = edge_ids.tolist()
+#     edge_mask = [0 for i in range(g.number_of_edges())]
+#     for id in edge_ids:
+#         edge_mask[id] = 1
+
+#     return th.Tensor(edge_mask).to(g.device)
+
+# def gen_edge_mask(g, inserted_nodes, deg_th, layer_num):
+# # g_csr = g.adj_sparse('csr')
+# src_nodes = []
+# dst_nodes = []
+# node_total = list(nodes_high_deg.keys()) + list(nodes_low_deg.keys())
+
+# # For layer = 1
+# for node in nodes_high_deg.keys():
+#     src_node = g.predecessors(node).cpu().numpy().tolist()
+#     src_nodes.extend(src_node)
+#     dst_nodes.extend([node for i in range(len(src_node))])
+
+# # for root_node, nghs in nodes_high_deg.items():
+# #     nghs = list(nghs)
+# #     src_nodes.extend(nghs)
+# #     dst_nodes.extend([root_node for i in range(len(nghs))])
+
+# #     ## Debug_yin
+# #     for v in nghs:
+# #         src_v = g.predecessors(v).cpu().numpy().tolist()
+# #         src_nodes.extend(src_v)
+# #         dst_nodes.extend([v for i in range(len(src_v))])
+
+#     # for i in range(len(nghs)):
+#     #     if g.has_edges_between(nghs[i], root_node):
+#     #         src_nodes.append(nghs[i])
+#     #         dst_nodes.append(root_node)
+#     # src_nodes.extend(nghs)
+#     # dst_nodes.extend([root_node for i in range(len(nghs))])
+
+# for root_node, nghs in nodes_low_deg.items():
+#     nghs = list(nghs)
+#     src_nodes.extend(nghs)
+#     dst_nodes.extend([root_node for i in range(len(nghs))])
+
+#     # ## Debug_yin
+#     # for v in nghs:
+#     #     src_v = g.predecessors(v).cpu().numpy().tolist()
+#     #     src_nodes.extend([v for i in range(len(src_v))])
+#     #     dst_nodes.extend(src_v)
+
+#     # for i in range(len(nghs)):
+#     #     if g.has_edges_between(nghs[i], root_node):
+#     #         src_nodes.append(nghs[i])
+#     #         dst_nodes.append(root_node)
+#     # src_nodes.extend(nghs)
+#     # dst_nodes.extend([root_node for i in range(len(nghs))])
+
+# # For layer >= 2 (Only for high_degree nodes)
+# ngh_q = list(nodes_high_deg.keys())
+# for i in range(layer_num -1):
+#     for i in range(len(ngh_q)):
+#         node = ngh_q.pop()
+#         # nghs = get_nghs(g_scr, [node])
+#         nghs = g.predecessors(node).cpu().numpy().tolist()
+#         # Only process on unseen nodes
+#         for ngh in nghs:
+#             if ngh not in node_total:
+#                 src_nodes.append(ngh)
+#                 dst_nodes.append(node)
+#                 ngh_q.append(ngh)
+
+#                 # ## Debug_yin
+#                 # if g.has_edges_between(ngh, node):
+#                 #     src_nodes.append(ngh)
+#                 #     dst_nodes.append(node)
+#     # src_nodes.extend(nghs)
+#     # dst_nodes.extend([root_node for i in range(len(nghs))])
+
+# src_nodes = th.tensor(src_nodes, dtype=th.long).to(g.device)
+# dst_nodes = th.tensor(dst_nodes, dtype=th.long).to(g.device)
+# edge_ids = g.edge_ids(src_nodes, dst_nodes)
+
+# edge_ids = edge_ids.tolist()
+# edge_mask = [0 for i in range(g.number_of_edges())]
+# for id in edge_ids:
+#     edge_mask[id] = 1
+
+# return th.Tensor(edge_mask).to(g.device)
+
+# def gen_edge_mask(g, inserted_nodes, deg_th, layer_num):
+#     """
+#     Only shield the low degree nodes
+#     """
+#     nodes_low_deg = []
+#     src_nodes = []
+#     dst_nodes = []
+#     nodes_q = cp.deepcopy(inserted_nodes)
+#     ngh_per_layer = []
+#     for i in range(layer_num):
+#         for node in nodes_q:
+#             nghs = g.successors(node).cpu().numpy().tolist()
+#             ngh_per_layer.extend(nghs)
+#             for ngh in nghs:
+#                 deg = g.successors(ngh).shape[0]
+#                 if deg < deg_th[i]:
+#                     src_nodes.append(node)
+#                     dst_nodes.append(ngh)
+#                     nodes_low_deg.append(ngh)
+#         nodes_q = ngh_per_layer
+#         ngh_per_layer = []
+
+#     src_nodes = th.tensor(src_nodes, dtype=th.long).to(g.device)
+#     dst_nodes = th.tensor(dst_nodes, dtype=th.long).to(g.device)
+#     edge_ids = g.edge_ids(src_nodes, dst_nodes)
+
+#     edge_ids = edge_ids.tolist()
+
+#     edge_low_deg_num = len(list(set(edge_ids)))
+#     edge_num = g.number_of_edges()
+#     print(edge_num, edge_low_deg_num, 'percentage:', round(edge_low_deg_num / edge_num, 2))
+
+#     edge_mask = [1 for i in range(g.number_of_edges())]
+#     for id in edge_ids:
+#         edge_mask[id] = 0
+
+#     return nodes_low_deg, th.Tensor(edge_mask).to(g.device)
+
+
+def get_predecessor_nghs(g, root_nodes, layer_num):
+    """
+    Traverse multi-layer nghs, and return the [src_nodes] -> [dst_nodes]. 
+    Note that predecessor nodes of the root_nodes are defined as src_nodes
+    """
     src_nodes = []
     dst_nodes = []
-    for root_node, ngh in ngh_dict.items():
-        src_nodes.extend([root_node for i in range(len(ngh))])
-        dst_nodes.extend(ngh)
+    ngh_per_layer = []
+    node_q = cp.deepcopy(root_nodes)
+    for i in range(layer_num):
+        for node in node_q:
+            nghs = g.predecessors(node).cpu().numpy().tolist()
+            ngh_per_layer.extend(nghs)
+            src_nodes.extend(nghs)
+            dst_nodes.extend([node for i in range(len(nghs))])
+        node_q = cp.deepcopy(ngh_per_layer)
+        ngh_per_layer.clear()
 
-    # a = th.tensor(src_nodes, dtype=th.long)
-    # b = th.tensor(dst_nodes, dtype=th.long)
-    # print(a, b)
-    # print(g.edges())
-    # k = g.edge_ids(th.tensor([0, 0]), th.tensor([1, 3]))
+    return src_nodes, dst_nodes
 
-    # edge_ids = g.edge_ids(th.tensor(src_nodes, dtype=th.long), th.tensor(dst_nodes, dtype=th.long))
+
+# def gen_edge_mask(g, inserted_nodes, deg_th, layer_num):
+#     """
+#     Edge_mask: select out processing nodes with high (all-ngh) and low (delta-update) degree
+#     """
+#     nodes_low_deg = []
+#     nodes_high_deg = []
+#     src_nodes = []
+#     dst_nodes = []
+
+#     # Regard inserted nodes as high-deg nodes
+#     nodes_high_deg.extend(inserted_nodes)
+#     for node in inserted_nodes:
+#         pred_nghs = g.predecessors(node).cpu().numpy().tolist()
+#         src_nodes.extend(pred_nghs)
+#         dst_nodes.extend([node for i in range(len(pred_nghs))])
+
+#     nodes_q = cp.deepcopy(inserted_nodes)
+#     ngh_per_layer = []
+#     # Traverse L-hops nghs of inserted nodes
+#     for i in range(layer_num):
+#         for node in nodes_q:
+#             nghs = g.successors(node).cpu().numpy().tolist()
+#             ngh_per_layer.extend(nghs)
+#             for ngh in nghs:
+#                 deg = g.out_degrees(ngh)
+#                 # For high deg nodes
+#                 if deg >= deg_th[i]:
+#                     nodes_high_deg.append(ngh)
+#                     # Traverse L-hop predecessor nghs of high deg nodes
+#                     src_nodes_tmp, dst_nodes_tmp = get_predecessor_nghs(g, [ngh], layer_num)
+#                     src_nodes.extend(src_nodes_tmp)
+#                     dst_nodes.extend(dst_nodes_tmp)
+#                 # For low deg nodes
+#                 else:
+#                     nodes_low_deg.append(ngh)
+#                     src_nodes.append(node)
+#                     dst_nodes.append(ngh)
+
+#         nodes_q = cp.deepcopy(ngh_per_layer)
+#         ngh_per_layer.clear()
+
+#     src_nodes = th.tensor(src_nodes, dtype=th.long).to(g.device)
+#     dst_nodes = th.tensor(dst_nodes, dtype=th.long).to(g.device)
+#     edge_ids = g.edge_ids(src_nodes, dst_nodes)
+
+#     edge_ids = edge_ids.tolist()
+#     edge_masked_num = len(list(set(edge_ids)))
+#     edge_num_total = g.number_of_edges()
+#     print(edge_num_total, edge_masked_num, 'percentage:', round(edge_masked_num / edge_num_total,
+#                                                                 2))
+
+#     edge_mask = [0 for i in range(g.number_of_edges())]
+#     for id in edge_ids:
+#         edge_mask[id] = 1
+
+#     return th.Tensor(edge_mask).to(g.device), nodes_high_deg, nodes_low_deg
+
+
+def gen_edge_mask(g, inserted_nodes, deg_th, layer_num):
+    """
+    Edge_mask: select out processing nodes with high (all-ngh) and low (delta-update) degree 
+    """
+    # g = dgl.remove_self_loop(g)
+    nodes_low_deg = []
+    nodes_high_deg = []
+    # Record edges which need be set to zero
+    src_nodes = []
+    dst_nodes = []
+    # Reserve shield edges for delta updating
+    src_nodes_shield = []
+    dst_nodes_shield = []
+
+    # Regard inserted nodes as high-deg nodes
+    nodes_high_deg.extend(inserted_nodes)
+    # for node in inserted_nodes:
+    #     pred_nghs = g.predecessors(node).cpu().numpy().tolist()
+    # src_nodes.extend(pred_nghs)
+    # dst_nodes.extend([node for i in range(len(pred_nghs))])
+
+    nodes_q = cp.deepcopy(inserted_nodes)
+    ngh_per_layer = []
+    # Traverse L-hops nghs of inserted nodes
+    for i in range(layer_num):
+        for node in nodes_q:
+            nghs = g.successors(node).cpu().numpy().tolist()
+            ngh_per_layer.extend(nghs)
+            for ngh in nghs:
+                deg = g.out_degrees(ngh)
+                # For high deg nodes
+                if deg >= deg_th[i]:
+                    nodes_high_deg.append(ngh)
+                    # # Traverse L-hop predecessor nghs of high deg nodes
+                    # src_nodes_tmp, dst_nodes_tmp = get_predecessor_nghs(g, [ngh], layer_num)
+                    # src_nodes.extend(src_nodes_tmp)
+                    # dst_nodes.extend(dst_nodes_tmp)
+                # For low deg nodes
+                else:
+                    nodes_low_deg.append(ngh)
+                    pred_nghs = g.predecessors(ngh).cpu().numpy().tolist()
+                    src_nodes.extend(pred_nghs)
+                    dst_nodes.extend(ngh for i in range(len(pred_nghs)))
+                    src_nodes_shield.append(node)
+                    dst_nodes_shield.append(ngh)
+
+        nodes_q = cp.deepcopy(ngh_per_layer)
+        ngh_per_layer.clear()
+
     src_nodes = th.tensor(src_nodes, dtype=th.long).to(g.device)
     dst_nodes = th.tensor(dst_nodes, dtype=th.long).to(g.device)
     edge_ids = g.edge_ids(src_nodes, dst_nodes)
 
+    src_nodes_shield = th.tensor(src_nodes_shield, dtype=th.long).to(g.device)
+    dst_nodes_shield = th.tensor(dst_nodes_shield, dtype=th.long).to(g.device)
+    edge_ids_shield = g.edge_ids(src_nodes_shield, dst_nodes_shield)
+
     edge_ids = edge_ids.tolist()
-    edge_mask = [0 for i in range(g.number_of_edges())]
+    edge_ids_shield = edge_ids_shield.tolist()
+    # print(list(set(edge_ids)))
+    # print(list(set(edge_ids_shield)))
+    edge_masked_num = len(list(set(edge_ids))) - len(list(set(edge_ids_shield)))
+    edge_num_total = g.number_of_edges()
+    print(edge_num_total, edge_masked_num, 'percentage:', round(edge_masked_num / edge_num_total,
+                                                                2))
+
+    edge_mask = [1 for i in range(g.number_of_edges())]
     for id in edge_ids:
+        edge_mask[id] = 0
+    for id in edge_ids_shield:
         edge_mask[id] = 1
 
-    g.edata['edge_mask'] = th.Tensor(edge_mask).to(g.device)
-
-
-def update_g_struct(new_nodes, g_orig_csr, node_map_orig2evo, node_map_evo2orig, g_evo=None):
-
-    indptr = g_orig_csr[0].cpu().numpy().tolist()
-    indices = g_orig_csr[1].cpu().numpy().tolist()
-
-    edge_src_nodes = list()
-    edge_dst_nodes = list()
-    for node in new_nodes:
-        e_src_nodes = indices[indptr[node]:indptr[node + 1]]
-        # e_dst_nodes = th.linspace(node, node, len(e_src_nodes))
-        e_dst_nodes = [node] * len(e_src_nodes)
-        # edge_dst_nodes.extend(e_src_nodes.numpy().tolist())
-        # edge_src_nodes.extend(e_dst_nodes.numpy().tolist())
-        edge_dst_nodes.extend(e_src_nodes)
-        edge_src_nodes.extend(e_dst_nodes)
-
-    # Remapping node_id from g_orig -> g_evo, and record mapping from g_evo -> g_orig
-    edge_src_nodes_reindex = []
-    edge_dst_nodes_reindex = []
-    for node in edge_src_nodes:
-        node_id_evo = gen_node_reindex(node_map_orig2evo, node)
-        edge_src_nodes_reindex.append(node_id_evo)
-        if node_id_evo not in node_map_evo2orig:
-            node_map_evo2orig[node_id_evo] = node
-
-    for node in edge_dst_nodes:
-        node_id_evo = gen_node_reindex(node_map_orig2evo, node)
-        edge_dst_nodes_reindex.append(node_id_evo)
-        if node_id_evo not in node_map_evo2orig:
-            node_map_evo2orig[node_id_evo] = node
-
-    # Remove redundant edges
-    edge_src_nodes_tmp = []
-    edge_dst_nodes_tmp = []
-    if g_evo is not None:
-        for i in range(len(edge_src_nodes_reindex)):
-            src_v_id = edge_src_nodes_reindex[i]
-            des_v_id = edge_dst_nodes_reindex[i]
-            if not (g_evo.has_nodes(src_v_id) and g_evo.has_nodes(des_v_id)
-                    and g_evo.has_edges_between(src_v_id, des_v_id)):
-                edge_src_nodes_tmp.append(edge_src_nodes_reindex[i])
-                edge_dst_nodes_tmp.append(edge_dst_nodes_reindex[i])
-
-        edge_src_nodes_reindex = edge_src_nodes_tmp
-        edge_dst_nodes_reindex = edge_dst_nodes_tmp
-
-    # if g_evo is not None:
-    #     for i, item in enumerate(edge_src_nodes_reindex[:]):
-    #         src_v_id = edge_src_nodes_reindex[i]
-    #         des_v_id = edge_dst_nodes_reindex[i]
-    #         if g_evo.has_nodes(src_v_id) and g_evo.has_nodes(
-    #                 des_v_id) and g_evo.has_edges_between(src_v_id, des_v_id):
-    #             edge_src_nodes_tmp.append(edge_src_nodes_reindex[i])
-    #             edge_dst_nodes_tmp.append(edge_dst_nodes_reindex[i])
-
-    #     edge_src_nodes_reindex = edge_src_nodes_tmp
-    #     edge_dst_nodes_reindex = edge_dst_nodes_tmp
-
-    edge_src_nodes_reindex = th.tensor(edge_src_nodes_reindex, dtype=th.int64)
-    edge_dst_nodes_reindex = th.tensor(edge_dst_nodes_reindex, dtype=th.int64)
-
-    if g_evo is None:
-        # Construct a new graph
-        g_evo = dgl.graph((edge_src_nodes_reindex, edge_dst_nodes_reindex))
-    else:
-        # device = th.device("cuda:0" if th.cuda.is_available() else "cpu")
-        edge_src_nodes_reindex = edge_src_nodes_reindex.to(g_evo.device)
-        edge_dst_nodes_reindex = edge_dst_nodes_reindex.to(g_evo.device)
-        g_evo.add_edges(edge_src_nodes_reindex, edge_dst_nodes_reindex)
-
-    return g_evo
-
-
-def graph_evolve(new_nodes, g_orig_csr, g_orig, node_map_orig2evo, node_map_evo2orig, g_evo=None):
-    """
-    Construct evolve graph from an orginal static graph
-    """
-    if g_evo is None:
-        # Construct a new graph
-        g_evo = update_g_struct(new_nodes, g_orig_csr, node_map_orig2evo, node_map_evo2orig)
-    else:
-        g_evo = update_g_struct(new_nodes, g_orig_csr, node_map_orig2evo, node_map_evo2orig, g_evo)
-
-    update_g_attr(new_nodes, g_evo, g_orig, node_map_orig2evo, node_map_evo2orig)
-    # update_g_attr(g_evo, g_orig, node_map_evo2orig)
-    # update_g_attr_delta(new_nodes, g_evo, g_orig, node_map_orig2evo, node_map_evo2orig)
-
-    return g_evo
-
-
-def graph_evolve_delta(new_nodes,
-                       g_orig_csr,
-                       g_orig,
-                       node_map_orig2evo,
-                       node_map_evo2orig,
-                       g_evo=None):
-    """
-    Construct evolve graph from an orginal static graph
-    """
-
-    if g_evo is None:
-        # Construct a new graph
-        g_evo = update_g_struct(new_nodes, g_orig_csr, node_map_orig2evo, node_map_evo2orig)
-    else:
-        g_evo = update_g_struct(new_nodes, g_orig_csr, node_map_orig2evo, node_map_evo2orig, g_evo)
-
-    update_g_attr_delta(new_nodes, g_evo, g_orig, node_map_orig2evo, node_map_evo2orig)
-    # update_g_attr(g_evo, g_orig, node_map_evo2orig)
-
-    return g_evo
-
-
-def graph_evolve_delta_all_ngh(new_nodes,
-                               g_orig_csr,
-                               g_orig,
-                               node_map_orig2evo,
-                               node_map_evo2orig,
-                               g_evo=None):
-    """
-    Construct evolve graph from an orginal static graph
-    """
-
-    if g_evo is None:
-        # Construct a new graph
-        g_evo = update_g_struct(new_nodes, g_orig_csr, node_map_orig2evo, node_map_evo2orig)
-    else:
-        g_evo = update_g_struct(new_nodes, g_orig_csr, node_map_orig2evo, node_map_evo2orig, g_evo)
-
-    update_g_attr_all_ngh(new_nodes, g_evo, g_orig, node_map_orig2evo, node_map_evo2orig)
-    # update_g_attr(g_evo, g_orig, node_map_evo2orig)
-    # update_g_attr(new_nodes, g_evo, g_orig, node_map_orig2evo, node_map_evo2orig)
-
-    return g_evo
-
-
-def gen_node_reindex(node_map, node_id_prev):
-    """
-    node_id(g_orig) -> node_id(g_evo)
-    """
-    if node_id_prev in node_map:
-        node_id_new = node_map[node_id_prev]
-    else:
-        node_id_new = len(node_map)
-        node_map[node_id_prev] = node_id_new
-
-    return node_id_new
-
-
-def gen_nodes_reindex(node_map, nodes_id_prev):
-    nodes_id_new = []
-    for node_id in nodes_id_prev:
-        nodes_id_new.append(gen_node_reindex(node_map, node_id))
-    return nodes_id_new
-
-
-def get_node_reindex(node_map, node_id_prev):
-    """
-    Find the node reindex; If not exist, return -1
-    """
-    if node_id_prev in node_map:
-        node_id_new = node_map[node_id_prev]
-    else:
-        node_id_new = -1
-
-    return node_id_new
-
-
-def get_nodes_reindex(node_map, nodes_id_prev):
-    nodes_id_new = []
-    for node_id in nodes_id_prev:
-        node_reindex = get_node_reindex(node_map, node_id)
-        if node_reindex != -1:  # If node exist
-            nodes_id_new.append(node_reindex)
-    return nodes_id_new
-
-
-def update_g_attr(new_nodes, g_evo, g_orig, node_map_orig2evo, node_map_evo2orig):
-    """
-    Update graph attribution (feature and train/eval/test mask)
-    """
-    # Get orig_node_index of evo_node_index
-    nodes_orig_index = []
-    for node in g_evo.nodes().tolist():
-        nodes_orig_index.append(node_map_evo2orig[node])
-
-    features = g_orig.ndata['feat'][nodes_orig_index, :].to(g_evo.device)
-    g_evo.ndata['feat'] = features
-
-    labels = g_orig.ndata['label'][nodes_orig_index].to(g_evo.device)
-    g_evo.ndata['label'] = labels
-
-    train_ratio = 0.06
-    val_ratio = 0.15
-    test_ratio = 0.3
-
-    # idx_train = range(math.floor(labels.size()[0] * train_ratio))
-    # train_mask = generate_mask_tensor(_sample_mask(idx_train, labels.shape[0]))
-    # g_evo.ndata['train_mask'] = train_mask
-
-    loc_list = range(labels.size()[0])
-    idx_train = random.sample(loc_list, math.floor(labels.size()[0] * train_ratio))
-    print('Train_set size: ', len(idx_train))
-    idx_train.sort()
-    train_mask = generate_mask_tensor(_sample_mask(idx_train, labels.shape[0])).to(g_evo.device)
-    g_evo.ndata['train_mask'] = train_mask
-
-    # idx_val = range(len(idx_train),
-    #                 len(idx_train) + math.floor(labels.size()[0] * val_ratio))
-    # val_mask = generate_mask_tensor(_sample_mask(idx_val, labels.shape[0]))
-    # g_evo.ndata['val_mask'] = val_mask
-
-    loc_list = range(labels.size()[0])
-    idx_val = random.sample(loc_list, math.floor(labels.size()[0] * val_ratio))
-    idx_val.sort()
-    val_mask = generate_mask_tensor(_sample_mask(idx_val, labels.shape[0])).to(g_evo.device)
-    g_evo.ndata['val_mask'] = val_mask
-
-    # idx_test = range(len(idx_val),
-    #                  len(idx_val) + math.floor(labels.size()[0] * test_ratio))
-    # test_mask = generate_mask_tensor(_sample_mask(idx_test, labels.shape[0]))
-    # g_evo.ndata['test_mask'] = test_mask
-
-    loc_list = range(labels.size()[0])
-    idx_test = random.sample(loc_list, math.floor(labels.size()[0] * test_ratio))
-
-    # Add new nodes and its neighbors in test set
-    new_nodes_evo = get_nodes_reindex(node_map_orig2evo, new_nodes)
-    idx_test.extend(new_nodes_evo)
-
-    idx_test.extend(get_ngh(g_evo.adj_sparse('csr'), new_nodes_evo))
-    idx_test = list(set(idx_test))
-
-    idx_test.sort()
-    test_mask = generate_mask_tensor(_sample_mask(idx_test, labels.shape[0])).to(g_evo.device)
-    g_evo.ndata['test_mask'] = test_mask
-
-
-# def update_g_attr(g_evo, g_orig, node_map_evo2orig):
-#     """
-#     Update graph attribution following timestamp (feature and train/eval/test mask)
-#     """
-#     # Get orig_node_index of evo_node_index
-#     nodes_orig_index = []
-#     for node in g_evo.nodes().tolist():
-#         nodes_orig_index.append(node_map_evo2orig[node])
-
-#     features = g_orig.ndata['feat'][nodes_orig_index, :].to(g_evo.device)
-#     g_evo.ndata['feat'] = features
-
-#     labels = g_orig.ndata['label'][nodes_orig_index].to(g_evo.device)
-#     g_evo.ndata['label'] = labels
-
-#     # train_ratio = 0.537
-#     # val_ratio = 0.176
-#     # test_ratio = 0.287
-#     train_ratio = 0.036
-#     val_ratio = 0.15
-#     test_ratio = 0.3
-
-#     train_num = math.floor(labels.size()[0] * train_ratio)
-#     idx_train = th.arange(0, train_num)
-#     loc_list = th.zeros(labels.size()[0])
-#     train_mask = loc_list.scatter(0, idx_train, 1).to(g_evo.device)
-#     g_evo.ndata['train_mask'] = train_mask
-
-#     val_num = math.floor(labels.size()[0] * val_ratio)
-#     idx_val = th.arange(train_num, train_num + val_num)
-#     loc_list = th.zeros(labels.size()[0])
-#     val_mask = loc_list.scatter(0, idx_val, 1).to(g_evo.device)
-#     g_evo.ndata['val_mask'] = val_mask
-
-#     test_num = min(math.floor(labels.size()[0] * test_ratio), labels.size()[0] - train_num - val_num)
-#     idx_test = th.arange(train_num + val_num, train_num + val_num + test_num)
-#     loc_list = th.zeros(labels.size()[0])
-#     test_mask = loc_list.scatter(0, idx_test, 1).to(g_evo.device)
-#     g_evo.ndata['test_mask'] = test_mask
-
-
-def update_g_attr_delta(new_nodes, g_evo, g_orig, node_map_orig2evo, node_map_evo2orig):
-    """
-    Update feature and eval/test mask
-    Set train_mask only with the new inserted vertices
-    """
-    # Get orig_node_index of evo_node_index
-    nodes_orig_index = []
-    for node in g_evo.nodes().tolist():
-        nodes_orig_index.append(node_map_evo2orig[node])
-
-    features = g_orig.ndata['feat'][nodes_orig_index, :]
-    g_evo.ndata['feat'] = features
-
-    labels = g_orig.ndata['label'][nodes_orig_index]
-    g_evo.ndata['label'] = labels
-
-    train_ratio = 0.06
-    val_ratio = 0.15
-    test_ratio = 0.3
-
-    # loc_list = range(labels.size()[0])
-    # idx_train = random.sample(loc_list,
-    #                           math.floor(labels.size()[0] * train_ratio))
-    # idx_train.sort()
-    # train_mask = generate_mask_tensor(_sample_mask(idx_train, labels.shape[0]))
-    # g_evo.ndata['train_mask'] = train_mask
-    """
-    Training mask are set to new inserted vertices 
-    """
-    # nodes_index_evo = []
-    # for node in new_nodes:
-    #     nodes_index_evo.append(node_map_orig2evo[node])
-    new_nodes_evo = get_nodes_reindex(node_map_orig2evo, new_nodes)
-    nodes_index_evo = new_nodes_evo
-    # Restrict neighbor size less than training ratio
-    ngh_limit = math.floor(labels.size()[0] * train_ratio)
-    if len(nodes_index_evo) > ngh_limit:
-        nodes_index_evo = random.sample(nodes_index_evo, ngh_limit)
-
-    # # Add inserted nodes into training set
-    # nodes_index_evo.extend(new_nodes_evo)
-    # nodes_index_evo = list(set(nodes_index_evo))
-
-    print('Train_set size: ', len(nodes_index_evo))
-    nodes_index_evo.sort()
-    idx_train = nodes_index_evo
-    train_mask = generate_mask_tensor(_sample_mask(idx_train, labels.shape[0])).to(g_evo.device)
-    g_evo.ndata['train_mask'] = train_mask
-
-    loc_list = range(labels.size()[0])
-    idx_val = random.sample(loc_list, math.floor(labels.size()[0] * val_ratio))
-    idx_val.sort()
-    val_mask = generate_mask_tensor(_sample_mask(idx_val, labels.shape[0])).to(g_evo.device)
-    g_evo.ndata['val_mask'] = val_mask
-
-    loc_list = range(labels.size()[0])
-    idx_test = random.sample(loc_list, math.floor(labels.size()[0] * test_ratio))
-
-    # Add new nodes and its neighbors in test set
-    idx_test.extend(new_nodes_evo)
-    idx_test.extend(get_ngh(g_evo.adj_sparse('csr'), new_nodes_evo))
-    idx_test = list(set(idx_test))
-
-    idx_test.sort()
-    test_mask = generate_mask_tensor(_sample_mask(idx_test, labels.shape[0])).to(g_evo.device)
-    g_evo.ndata['test_mask'] = test_mask
-
-
-def update_g_attr_all_ngh(new_nodes, g_evo, g_orig, node_map_orig2evo, node_map_evo2orig):
-    """
-    Update feature and eval/test mask
-    Set train_mask with the new inserted vertices and all of its neighbors
-    """
-    # Get orig_node_index of evo_node_index
-    nodes_orig_index = []
-    for node_id in g_evo.nodes().tolist():
-        nodes_orig_index.append(node_map_evo2orig[node_id])
-
-    features = g_orig.ndata['feat'][nodes_orig_index, :].to(g_evo.device)
-    g_evo.ndata['feat'] = features
-
-    labels = g_orig.ndata['label'][nodes_orig_index].to(g_evo.device)
-    g_evo.ndata['label'] = labels
-
-    train_ratio = 0.06
-    val_ratio = 0.15
-    test_ratio = 0.1
-
-    # loc_list = range(labels.size()[0])
-    # idx_train = random.sample(loc_list,
-    #                           math.floor(labels.size()[0] * train_ratio))
-    # idx_train.sort()
-    # train_mask = generate_mask_tensor(_sample_mask(idx_train, labels.shape[0]))
-    # g_evo.ndata['train_mask'] = train_mask
-    """
-    Training mask are set to new inserted vertices and its neighbors
-    """
-    nodes_index_evo = []
-    new_nodes_evo = get_nodes_reindex(node_map_orig2evo, new_nodes)
-    nodes_index_evo.extend(new_nodes_evo)
-    nodes_index_evo.extend(get_ngh(g_evo.adj_sparse('csr'), new_nodes_evo))
-
-    # nodes_index_evo.extend(ngh_queue)
-    nodes_index_evo = list(set(nodes_index_evo))
-    # Restrict neighbor size less than training ratio
-    ngh_limit = math.floor(labels.size()[0] * train_ratio)
-    if len(nodes_index_evo) > ngh_limit:
-        nodes_index_evo = random.sample(nodes_index_evo, ngh_limit)
-
-    print('Train_set size: ', len(nodes_index_evo))
-    nodes_index_evo.sort()
-    idx_train = nodes_index_evo
-    train_mask = generate_mask_tensor(_sample_mask(idx_train, labels.shape[0])).to(g_evo.device)
-    g_evo.ndata['train_mask'] = train_mask
-
-    loc_list = range(labels.size()[0])
-    idx_val = random.sample(loc_list, math.floor(labels.size()[0] * val_ratio))
-    idx_val.sort()
-    val_mask = generate_mask_tensor(_sample_mask(idx_val, labels.shape[0])).to(g_evo.device)
-    g_evo.ndata['val_mask'] = val_mask
-
-    # loc_list = range(labels.size()[0])
-    # idx_test = random.sample(loc_list, math.floor(labels.size()[0] * test_ratio))
-    idx_test = []
-    # Add new nodes and its neighbors in test set
-    idx_test.extend(new_nodes_evo)
-    idx_test.extend(get_ngh(g_evo.adj_sparse('csr'), new_nodes_evo))
-    idx_test = list(set(idx_test))
-    if not idx_test:
-        loc_list = range(labels.size()[0])
-        idx_test = random.sample(loc_list, math.floor(labels.size()[0] * test_ratio))
-
-    idx_test.sort()
-    test_mask = generate_mask_tensor(_sample_mask(idx_test, labels.shape[0])).to(g_evo.device)
-    g_evo.ndata['test_mask'] = test_mask
-
-
-# def update_g_attr_all_ngh(new_nodes, g_evo, g_orig, node_map_orig2evo, node_map_evo2orig):
-#     """
-#     Update feature and eval/test mask
-#     Set train_mask with the new inserted vertices and all of its neighbors
-#     """
-#     # Get orig_node_index of evo_node_index
-#     nodes_orig_index = []
-#     for node_id in g_evo.nodes().tolist():
-#         nodes_orig_index.append(node_map_evo2orig[node_id])
-
-#     features = g_orig.ndata['feat'][nodes_orig_index, :].to(g_evo.device)
-#     g_evo.ndata['feat'] = features
-
-#     labels = g_orig.ndata['label'][nodes_orig_index].to(g_evo.device)
-#     g_evo.ndata['label'] = labels
-
-#     train_ratio = 0.06
-#     val_ratio = 0.15
-#     test_ratio = 0.1
-
-#     # loc_list = range(labels.size()[0])
-#     # idx_train = random.sample(loc_list,
-#     #                           math.floor(labels.size()[0] * train_ratio))
-#     # idx_train.sort()
-#     # train_mask = generate_mask_tensor(_sample_mask(idx_train, labels.shape[0]))
-#     # g_evo.ndata['train_mask'] = train_mask
-#     """
-#     Training mask are set to new inserted vertices and its neighbors, and supplement with previous vertices
-#     """
-#     nodes_index_evo = []
-#     new_nodes_evo = get_nodes_reindex(node_map_orig2evo, new_nodes)
-#     nodes_index_evo.extend(new_nodes_evo)
-#     nodes_index_evo.extend(get_ngh(g_evo.adj_sparse('csr'), new_nodes_evo))
-#     # Supplement train set
-#     loc_list = range(labels.size()[0])
-#     nodes_index_evo.extend(random.sample(loc_list, math.floor(labels.size()[0] * train_ratio)))
-
-#     # nodes_index_evo.extend(ngh_queue)
-#     nodes_index_evo = list(set(nodes_index_evo))
-#     # Restrict neighbor size less than training ratio
-#     train_num_limit = math.floor(labels.size()[0] * train_ratio)
-#     if len(nodes_index_evo) > train_num_limit:
-#         nodes_index_evo = random.sample(nodes_index_evo, train_num_limit)
-
-#     print('Train_set size: ', len(nodes_index_evo))
-#     nodes_index_evo.sort()
-#     idx_train = nodes_index_evo
-#     train_mask = generate_mask_tensor(_sample_mask(idx_train, labels.shape[0])).to(g_evo.device)
-#     g_evo.ndata['train_mask'] = train_mask
-
-#     loc_list = range(labels.size()[0])
-#     idx_val = random.sample(loc_list, math.floor(labels.size()[0] * val_ratio))
-#     idx_val.sort()
-#     val_mask = generate_mask_tensor(_sample_mask(idx_val, labels.shape[0])).to(g_evo.device)
-#     g_evo.ndata['val_mask'] = val_mask
-
-#     # loc_list = range(labels.size()[0])
-#     # idx_test = random.sample(loc_list, math.floor(labels.size()[0] * test_ratio))
-
-#     # Add new nodes and its neighbors in test set
-#     idx_test = []
-#     idx_test.extend(new_nodes_evo)
-#     idx_test.extend(get_ngh(g_evo.adj_sparse('csr'), new_nodes_evo))
-#     idx_test = list(set(idx_test))
-#     if not idx_test:
-#         loc_list = range(labels.size()[0])
-#         idx_test = random.sample(loc_list, math.floor(labels.size()[0] * test_ratio))
-
-#     idx_test.sort()
-#     test_mask = generate_mask_tensor(_sample_mask(idx_test, labels.shape[0])).to(g_evo.device)
-#     g_evo.ndata['test_mask'] = test_mask
+    nodes_high_deg = list(set(nodes_high_deg))
+    nodes_low_deg = list(set(nodes_low_deg))
+    print()
+    print('N_high_deg: {:d}, N_low_deg: {:d}, low_deg_ratio: {:2f}'.format(len(nodes_high_deg), len(nodes_low_deg), len(nodes_low_deg)/len(nodes_high_deg)))
+
+    return th.Tensor(edge_mask).to(g.device), nodes_high_deg, nodes_low_deg
 
 
 def count_neighbor(nodes, g_csr, node_map_orig2evo, layer_num, mem_access_q=None):
@@ -957,8 +958,32 @@ def sort_node_by_timestamp(file_path):
         index = timestamp[i] - time_min
         timestamp_bin[index].append(i)
 
+    # Static the number of accumulated nodes by year
+    total = 0
+    accumulation = []
+
     node_q_sort_by_time = []
     for i in timestamp_bin:
         node_q_sort_by_time.extend(i)
+        total += len(i)
+        accumulation.append(total)
+
+    np.savetxt('./results/graph_struct_evo/graph_structure_evo.txt', accumulation, fmt='%d')
 
     return node_q_sort_by_time
+
+
+def count_node_degree(g_csr, node):
+    indptr = g_csr[0].cpu().numpy().tolist()
+    degree = indptr[node + 1] - indptr[node]
+    return degree
+
+
+def gen_snapshot(init_ratio, snapshot_num, total_node_num):
+    node_num = total_node_num
+    interval = snapshot_num
+    scale_ratio = pow((1 / init_ratio), 1 / interval)
+    node_seq = [round(node_num * init_ratio * scale_ratio**i) for i in range(interval)]
+    node_seq[-1] = node_num
+
+    return node_seq

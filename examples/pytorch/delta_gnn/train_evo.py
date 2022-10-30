@@ -13,6 +13,7 @@ from ogb.nodeproppred import DglNodePropPredDataset
 from dgl import AddSelfLoop
 
 import util
+import g_update
 import time
 import random
 
@@ -138,15 +139,24 @@ def main(args):
             node_q.append(int(line))
     else:
         if args.dataset == 'cora' or args.dataset == 'citeseer':
-            root_node_q = util.gen_root_node_queue(g)
-            node_q = util.bfs_traverse(g_csr, root_node_q)
-            # node_q = g.nodes().numpy().tolist()
+            # root_node_q = util.gen_root_node_queue(g)
+            # node_q = util.bfs_traverse(g_csr, root_node_q)
+            node_q = g.nodes().numpy().tolist()
         elif args.dataset == 'ogbn-arxiv':
             node_q = util.sort_node_by_timestamp('./dataset/' + args.dataset + '_node_year.csv')
 
         with open(file_, 'w') as f:
             for i in node_q:
                 f.write(str(i) + '\n')
+
+    # Gen node_seq
+    node_seq = util.gen_snapshot(0.5, 10, g.number_of_nodes())
+
+    # # Graph evolved size
+    # cora_seq = [540, 691, 892, 1168, 1530, 2036, 2708]
+    # citeseer_seq = [639, 824, 1080, 1414, 1881, 2502, 3327]
+    # ogbn_arxiv_seq = [41125, 53160, 69499, 90941, 120740, 160451, 169343]
+    # ogbn_mag_seq = []
 
     # ## Plot degree follows node id increasing
     # nodes = g.nodes()
@@ -191,20 +201,31 @@ def main(args):
     # deg_th = 6
     # plt.plt_workload.plt_workload_imbalance(g_csr, deg_th)
 
-    ##
-    """ Initial Graph """
-    init_node_rate = 0.1
-    init_node_num = round(len(node_q) * init_node_rate)
-    init_nodes = node_q[0:init_node_num]
-    print('\n>> Initial node num', len(init_nodes))
-    # Pop nodes which have been added
-    node_q = node_q[init_node_num:]
+    # ##
+    # """ Initial Graph """
+    # init_node_rate = 0.1
+    # init_node_num = round(len(node_q) * init_node_rate)
+    # init_nodes = node_q[0:init_node_num]
+    # print('\n>> Initial node num', len(init_nodes))
+    # # Pop nodes which have been added
+    # node_q = node_q[init_node_num:]
+
+    # if args.dataset == 'cora':
+    #     node_seq = cora_seq
+    # elif args.dataset == 'citeseer':
+    #     node_seq = citeseer_seq
+    # elif args.dataset == 'ogbn-arxiv':
+    #     node_seq = ogbn_arxiv_seq
+    # elif args.dataset == 'ogbn-mag':
+    #     node_seq = ogbn_mag_seq
 
     # Gen node_mapping from g_orig to g_evo, for DGL compels consecutive node id
     node_map_orig2evo = dict()
     node_map_evo2orig = dict()
 
-    g_evo = util.graph_evolve(init_nodes, g_csr, g, node_map_orig2evo, node_map_evo2orig)
+    init_nodes = node_q[:node_seq[0]]
+    g_evo = g_update.graph_evolve(init_nodes, g_csr, g, node_map_orig2evo, node_map_evo2orig,
+                                  n_layers)
     ##
 
     # # Update train/val/test mask for ogbn-arxiv (Optional)
@@ -310,19 +331,23 @@ def main(args):
         gat.train(args, model, device, lr, weight_decay)
         acc = gat.evaluate(model, test_mask, device)
 
+    accuracy = []
+    acc_no_retrain = acc_retrain = acc_retrain_delta = acc * 100
+    # accuracy.append([
+    #     model.g.number_of_nodes(),
+    #     model.g.number_of_edges(), acc_no_retrain, acc_retrain, acc_retrain_delta
+    # ])
+
     print("Test accuracy {:.2%}".format(acc))
 
     # Evolve graph
     print("\n>>> Accuracy on evolove graph: ")
+    # # Add new edges
+    # interval = 10
+    # i = 0
+    # node_batch = round(g.number_of_nodes() / interval)  # default = 10
+    # # edge_epoch = np.arange(0, iter * edge_batch, edge_batch)
 
-    # Add new edges
-    # n_nodes = model.g.number_of_nodes()
-    # iter = 8
-    interval = 10
-    i = 0
-    node_batch = round(g.number_of_nodes() / interval)  # default = 10
-    # edge_epoch = np.arange(0, iter * edge_batch, edge_batch)
-    accuracy = []
     deg_th = args.deg_threshold
     delta_neighbor = []
 
@@ -335,36 +360,50 @@ def main(args):
         os.system('rm ' + trace_path_full_retrain)  # Reset mem trace
         os.system('rm ' + trace_path_all_ngh)  # Reset mem trace
 
-    while len(node_q) > 0:
-        print('\n>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
-        print('Add node-batch @ iter = {:d}'.format(i))
-        print('node_q size: {:d}'.format(len(node_q)))
-        # add_node_num = i * node_batch
-        if node_batch < len(node_q):
-            inserted_nodes = node_q[:node_batch]
-            node_q = node_q[node_batch:]
-        else:
-            inserted_nodes = node_q
-            node_q.clear()
+    # while len(node_q) > 0:
+    #     print('\n>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
+    #     print('Add node-batch @ iter = {:d}'.format(i))
+    #     print('node_q size: {:d}'.format(len(node_q)))
+    #     # add_node_num = i * node_batch
+    #     if node_batch < len(node_q):
+    #         inserted_nodes = node_q[:node_batch]
+    #         node_q = node_q[node_batch:]
+    #     else:
+    #         inserted_nodes = node_q
+    #         node_q.clear()
 
-        print('Add node size: ', len(inserted_nodes))
+    # Add new nodes
+    for i in range(len(node_seq[1:])):
+        print('\n>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
+        print('Add nodes @ iter = {:d}'.format(i + 1))
+        inserted_nodes = node_q[node_seq[i]:node_seq[i + 1] - 1]
+        print('Add nodes: {:d}, Total nodes: {:d}'.format(len(inserted_nodes),
+                                                          model_retrain.g.number_of_nodes()))
 
         ##
         """
         # No retraining
         """
         print('\n>> No retraining')
-        util.graph_evolve(inserted_nodes, g_csr, g, node_map_orig2evo, node_map_evo2orig, model.g)
+        model.g = g_update.graph_evolve(inserted_nodes, g_csr, g, node_map_orig2evo,
+                                        node_map_evo2orig, n_layers, model.g)
 
         print('Node_number:', model.g.number_of_nodes())
         print('Edge_number:', model.g.number_of_edges())
 
         test_mask = model.g.ndata['test_mask']
+        retrain_epoch = 3
         if model_name == 'gcn':
+            if (i + 1) % retrain_epoch == 0 or i == 0:
+                gcn.train(args, model, device, lr, weight_decay)
             acc = gcn.evaluate(model, test_mask, device)
         elif model_name == 'graphsage':
+            if (i + 2) % retrain_epoch == 0 or i == 0:
+                graphsage.train(args, model, device, fan_out, batch_size, lr, weight_decay)
             acc = graphsage.evaluate(device, model, test_mask, batch_size)
         elif model_name == 'gat':
+            if (i + 2) % retrain_epoch == 0 or i == 0:
+                gat.train(args, model, device, lr, weight_decay)
             acc = gat.evaluate(model, test_mask, device)
 
         print("Test accuracy of non-retrain @ {:d} nodes {:.2%}".format(
@@ -372,7 +411,7 @@ def main(args):
         acc_no_retrain = acc * 100
 
         # Get node index of added_nodes in evolve graph
-        inserted_nodes_evo = util.get_nodes_reindex(node_map_orig2evo, inserted_nodes)
+        inserted_nodes_evo = g_update.get_nodes_reindex(node_map_orig2evo, inserted_nodes)
         # inserted_nodes_evo.sort()
 
         if dump_node_access_flag or dump_mem_trace_flag:
@@ -432,8 +471,8 @@ def main(args):
             # Full graph retraining
             """
             print('\n>> Full graph retraining')
-            util.graph_evolve(inserted_nodes, g_csr, g, node_map_orig2evo, node_map_evo2orig,
-                              model_retrain.g)
+            model_retrain.g = g_update.graph_evolve(inserted_nodes, g_csr, g, node_map_orig2evo,
+                                                    node_map_evo2orig, n_layers, model_retrain.g)
 
             time_start = time.perf_counter()
             test_mask = model_retrain.g.ndata['test_mask']
@@ -460,35 +499,34 @@ def main(args):
             print('\n>> Delta retraining')
             # Execute full retraining at the beginning
             if i <= 0:
-                util.graph_evolve(inserted_nodes, g_csr, g, node_map_orig2evo, node_map_evo2orig,
-                                  model_delta.g)
+                model_delta.g = g_update.graph_evolve(inserted_nodes, g_csr, g, node_map_orig2evo,
+                                                      node_map_evo2orig, n_layers, model_delta.g)
             else:
-                util.graph_evolve_delta(inserted_nodes, g_csr, g, node_map_orig2evo,
-                                        node_map_evo2orig, model_delta.g)
+                model_delta.g = g_update.graph_evolve_delta(inserted_nodes, g_csr, g,
+                                                            node_map_orig2evo, node_map_evo2orig,
+                                                            model_delta.g)
 
-            if len(node_q) > 0:
-                time_start = time.perf_counter()
-                test_mask = model_delta.g.ndata['test_mask']
-                if model_name == 'gcn':
-                    gcn.train(args, model_delta, device, lr, weight_decay)
-                    if i <= 3:
-                        acc = gcn.evaluate(model_delta, test_mask, device)
-                    else:
-                        acc = gcn.evaluate_delta(model_delta, test_mask, device, inserted_nodes_evo)
-                        # acc = evaluate(model_delta, test_mask, device)
-                elif model_name == 'graphsage':
-                    graphsage.train(args, model_delta, device, fan_out, batch_size, lr,
-                                    weight_decay)
-                    acc = graphsage.evaluate(device, model_delta, test_mask, batch_size)
-                elif model_name == 'gat':
-                    gat.train(args, model_delta, device, lr, weight_decay)
-                    acc = gat.evaluate(model_delta, test_mask, device)
+            time_start = time.perf_counter()
+            test_mask = model_delta.g.ndata['test_mask']
+            if model_name == 'gcn':
+                gcn.train(args, model_delta, device, lr, weight_decay)
+                if i <= 3:
+                    acc = gcn.evaluate(model_delta, test_mask, device)
+                else:
+                    acc = gcn.evaluate_delta(model_delta, test_mask, device, inserted_nodes_evo)
+                    # acc = evaluate(model_delta, test_mask, device)
+            elif model_name == 'graphsage':
+                graphsage.train(args, model_delta, device, fan_out, batch_size, lr, weight_decay)
+                acc = graphsage.evaluate(device, model_delta, test_mask, batch_size)
+            elif model_name == 'gat':
+                gat.train(args, model_delta, device, lr, weight_decay)
+                acc = gat.evaluate(model_delta, test_mask, device)
 
-                time_delta_retrain = time.perf_counter() - time_start
-                print('>> Epoch training time in delta: {:.4}s'.format(time_delta_retrain))
-                print("Test accuracy of delta @ {:d} nodes {:.2%}".format(
-                    model_delta.g.number_of_nodes(), acc))
-                acc_retrain_delta = acc * 100
+            time_delta_retrain = time.perf_counter() - time_start
+            print('>> Epoch training time in delta: {:.4}s'.format(time_delta_retrain))
+            print("Test accuracy of delta @ {:d} nodes {:.2%}".format(
+                model_delta.g.number_of_nodes(), acc))
+            acc_retrain_delta = acc * 100
 
             accuracy.append([
                 model.g.number_of_nodes(),
@@ -514,7 +552,7 @@ def main(args):
                                                          time.perf_counter() - Task_time_start))
 
     for i in range(len(accuracy)):
-        print(i, round(accuracy[i][3], 2))
+        print(i, round(accuracy[i][3], 2), round(accuracy[i][2], 2))
 
 
 if __name__ == '__main__':
@@ -552,13 +590,13 @@ if __name__ == '__main__':
     # parser.set_defaults(self_loop=True)
     args = parser.parse_args()
 
-    # args.model = 'gcn'
-    args.model = 'graphsage'
+    args.model = 'gcn'
+    # args.model = 'graphsage'
     # args.model = 'gat'
 
     # args.dataset = 'cora'
-    args.dataset = 'citeseer'
-    # args.dataset = 'ogbn-arxiv'
+    # args.dataset = 'citeseer'
+    args.dataset = 'ogbn-arxiv'
 
     args.n_epochs = 200
     args.gpu = 0

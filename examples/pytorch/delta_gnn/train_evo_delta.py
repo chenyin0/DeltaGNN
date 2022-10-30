@@ -12,6 +12,7 @@ from dgl import AddSelfLoop
 from ogb.nodeproppred import DglNodePropPredDataset
 
 import util
+import g_update
 import time
 import random
 
@@ -92,6 +93,7 @@ def main(args):
         raise ValueError('Unknown dataset: {}'.format(args.dataset))
 
     g = dataset[0]
+
     if args.gpu < 0:
         cuda = False
     else:
@@ -137,9 +139,9 @@ def main(args):
             node_q.append(int(line))
     else:
         if args.dataset == 'cora' or args.dataset == 'citeseer':
-            root_node_q = util.gen_root_node_queue(g)
-            node_q = util.bfs_traverse(g_csr, root_node_q)
-            # node_q = g.nodes().numpy().tolist()
+            # root_node_q = util.gen_root_node_queue(g)
+            # node_q = util.bfs_traverse(g_csr, root_node_q)
+            node_q = g.nodes().numpy().tolist()
         elif args.dataset == 'ogbn-arxiv':
             node_q = util.sort_node_by_timestamp('./dataset/' + args.dataset + '_node_year.csv')
 
@@ -147,18 +149,38 @@ def main(args):
             for i in node_q:
                 f.write(str(i) + '\n')
 
-    init_node_rate = 0.1
-    init_node_num = round(len(node_q) * init_node_rate)
-    init_nodes = node_q[0:init_node_num]
-    print('\n>> Initial node num', len(init_nodes))
-    # Pop nodes which have been added
-    node_q = node_q[init_node_num:]
+    # Gen node_seq
+    node_seq = util.gen_snapshot(0.5, 10, g.number_of_nodes())
+
+    # # Graph evolved size
+    # cora_seq = [540, 691, 892, 1168, 1530, 2036, 2708]
+    # citeseer_seq = [639, 824, 1080, 1414, 1881, 2502, 3327]
+    # ogbn_arxiv_seq = [41125, 53160, 69499, 90941, 120740, 160451, 169343]
+    # ogbn_mag_seq = []
+
+    # init_node_rate = 0.1
+    # init_node_num = round(len(node_q) * init_node_rate)
+    # init_nodes = node_q[0:init_node_num]
+    # print('\n>> Initial node num', len(init_nodes))
+    # # Pop nodes which have been added
+    # node_q = node_q[init_node_num:]
+
+    # if args.dataset == 'cora':
+    #     node_seq = cora_seq
+    # elif args.dataset == 'citeseer':
+    #     node_seq = citeseer_seq
+    # elif args.dataset == 'ogbn-arxiv':
+    #     node_seq = ogbn_arxiv_seq
+    # elif args.dataset == 'ogbn-mag':
+    #     node_seq = ogbn_mag_seq
 
     # Gen node_mapping from g_orig to g_evo, for DGL compels consecutive node id
     node_map_orig2evo = dict()
     node_map_evo2orig = dict()
 
-    g_evo = util.graph_evolve(init_nodes, g_csr, g, node_map_orig2evo, node_map_evo2orig)
+    init_nodes = node_q[:node_seq[0]]
+    g_evo = g_update.graph_evolve(init_nodes, g_csr, g, node_map_orig2evo, node_map_evo2orig,
+                                  n_layers)
     ##
 
     # features = g_evo.ndata['feat'].to(device)
@@ -226,51 +248,56 @@ def main(args):
         gat.train(args, model, device, lr, weight_decay)
         acc = gat.evaluate(model, test_mask, device)
 
+    acc_init = acc * 100
+    accuracy = []
+    # accuracy.append([model.g.number_of_nodes(), model.g.number_of_edges(), acc_init])
+
     print("Test accuracy {:.2%}".format(acc))
 
     # Evolve graph
     print(">>> Accuracy on evolove graph: ")
-
-    # Add new edges
-    # n_nodes = model.g.number_of_nodes()
-    # iter = 8
-    i = 0
-    node_batch = round(g.number_of_nodes() / 10)  # default = 10
-    # edge_epoch = np.arange(0, iter * edge_batch, edge_batch)
-    accuracy = []
-    deg_th = args.deg_threshold
-    delta_neighbor = []
-
+    ## Record memory trace
     mem_access_q_delta_ngh = []  # For gen mem trace
     if dump_mem_trace_flag:
         trace_path_delta_ngh = './results/mem_trace/' + args.dataset + '_delta_ngh_deg_' + str(
             deg_th) + '.txt'
         os.system('rm ' + trace_path_delta_ngh)  # Reset mem trace
 
-    while len(node_q) > 0:
-        print('\n>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
-        print('Add node-batch @ iter = {:d}'.format(i))
-        print('node_q size: {:d}'.format(len(node_q)))
-        # add_node_num = i * node_batch
-        if node_batch < len(node_q):
-            inserted_nodes = node_q[:node_batch]
-            node_q = node_q[node_batch:]
-        else:
-            inserted_nodes = node_q
-            node_q.clear()
+    # while len(node_q) > 0:
+    #     print('\n>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
+    #     print('Add nodes @ iter = {:d}'.format(i))
+    #     print('node_q size: {:d}'.format(len(node_q)))
+    #     # add_node_num = i * node_batch
+    #     if node_batch < len(node_q):
+    #         inserted_nodes = node_q[:node_batch]
+    #         node_q = node_q[node_batch:]
+    #     else:
+    #         inserted_nodes = node_q
+    #         node_q.clear()
 
-        print('Add node size: ', len(inserted_nodes))
+    deg_th = args.deg_threshold
+    delta_neighbor = []
+
+    # Add new nodes
+    for i in range(len(node_seq[1:])):
+        print('\n>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
+        print('Add nodes @ iter = {:d}'.format(i + 1))
+        inserted_nodes = node_q[node_seq[i]:node_seq[i + 1] - 1]
+        print('Add nodes: {:d}, Total nodes: {:d}'.format(len(inserted_nodes),
+                                                          model_delta_all_ngh.g.number_of_nodes()))
 
         # Execute full retraining at the beginning
         if i <= 0:
-            util.graph_evolve(inserted_nodes, g_csr, g, node_map_orig2evo, node_map_evo2orig,
-                              model_delta_all_ngh.g)
+            model_delta_all_ngh.g = g_update.graph_evolve(inserted_nodes, g_csr, g,
+                                                          node_map_orig2evo, node_map_evo2orig,
+                                                          n_layers, model_delta_all_ngh.g)
         else:
-            util.graph_evolve_delta_all_ngh(inserted_nodes, g_csr, g, node_map_orig2evo,
-                                            node_map_evo2orig, model_delta_all_ngh.g)
+            model_delta_all_ngh.g = g_update.graph_evolve_delta_all_ngh(
+                inserted_nodes, g_csr, g, node_map_orig2evo, node_map_evo2orig, n_layers,
+                model_delta_all_ngh.g)
 
         # Get node index of added_nodes in evolve graph
-        inserted_nodes_evo = util.get_nodes_reindex(node_map_orig2evo, inserted_nodes)
+        inserted_nodes_evo = g_update.get_nodes_reindex(node_map_orig2evo, inserted_nodes)
         # inserted_nodes_evo.sort()
 
         if dump_node_access_flag or dump_mem_trace_flag:
@@ -313,55 +340,64 @@ def main(args):
             # Delta retraining on delta neighbors
             """
             print('\n>> Delta neighbor retraining')
-            # Get ngh with high deg and low deg
-            ngh_high_deg, ngh_low_deg = util.get_ngh_with_deg_th(model_delta_all_ngh.g,
-                                                                 inserted_nodes_evo, deg_th)
-            print('High_deg_ngh_num: {:d}, Low_deg_ngh_num: {:d}'.format(
-                len(ngh_high_deg), len(ngh_low_deg)))
+            edge_mask, nodes_high_deg, nodes_low_deg = util.gen_edge_mask(
+                model_delta_all_ngh.g, inserted_nodes_evo, deg_th, n_layers)
 
-            # Merge ngh_high_deg and ngh_low_deg
-            ngh_dict = ngh_high_deg.copy()
-            ngh_dict.update(ngh_low_deg)
+            model_delta_all_ngh.g.edata['edge_mask'] = edge_mask
 
-            #Set edge weight (mask) according to node degree
-            util.gen_edge_mask(model_delta_all_ngh.g, ngh_dict)
-
-            # features = model_delta_all_ngh.g.ndata['feat']
-            # labels = model_delta_all_ngh.g.ndata['label']
-            # train_mask = model_delta_all_ngh.g.ndata['train_mask']
-            # val_mask = model_delta_all_ngh.g.ndata['val_mask']
-            # test_mask = model_delta_all_ngh.g.ndata['test_mask']
-
-            if len(node_q) > 0:
-                time_start = time.perf_counter()
-                test_mask = model_delta_all_ngh.g.ndata['test_mask']
+            time_start = time.perf_counter()
+            test_mask = model_delta_all_ngh.g.ndata['test_mask']
+            retrain_epoch = 3
+            if i <= 0:
                 if model_name == 'gcn':
-                    gcn.train_delta_edge_masked(args, model_delta_all_ngh, device, lr, weight_decay,
-                                                list(ngh_high_deg.keys()), list(ngh_low_deg.keys()))
-                    acc = gcn.evaluate_delta_edge_masked(model_delta_all_ngh, test_mask, device,
-                                                         list(ngh_high_deg.keys()),
-                                                         list(ngh_low_deg.keys()))
+                    # gcn.train_delta_edge_masked(args, model_delta_all_ngh, device, lr, weight_decay,
+                    #                             nodes_high_deg, nodes_low_deg)
+                    gcn.train_delta_edge_masked(args, model_delta_all_ngh, device, lr, weight_decay)
+                    acc = gcn.evaluate_delta_edge_masked(model_delta_all_ngh, test_mask, device)
                 elif model_name == 'graphsage':
                     graphsage.train_delta_edge_masked(args, model_delta_all_ngh, device, fan_out,
-                                                      batch_size, lr, weight_decay,
-                                                      list(ngh_high_deg.keys()),
-                                                      list(ngh_low_deg.keys()))
+                                                      batch_size, lr, weight_decay, nodes_high_deg,
+                                                      nodes_low_deg)
                     acc = graphsage.evaluate_delta_edge_masked(device, model_delta_all_ngh,
                                                                test_mask, batch_size,
-                                                               list(ngh_high_deg.keys()),
-                                                               list(ngh_low_deg.keys()))
-                elif model_name == 'gat':
-                    gat.train_delta_edge_masked(args, model_delta_all_ngh, device, lr, weight_decay,
-                                                list(ngh_high_deg.keys()), list(ngh_low_deg.keys()))
-                    acc = gat.evaluate_delta_edge_masked(model_delta_all_ngh, test_mask, device,
-                                                         list(ngh_high_deg.keys()),
-                                                         list(ngh_low_deg.keys()))
+                                                               nodes_high_deg, nodes_low_deg)
+                # elif model_name == 'gat':
+                #     gat.train_delta_edge_masked(args, model_delta_all_ngh, device, lr,
+                #                                 weight_decay, list(train_nodes_high_deg.keys()),
+                #                                 nodes_low_deg))
+                #     acc = gat.evaluate_delta_edge_masked(model_delta_all_ngh, test_mask, device,
+                #                                          list(test_nodes_high_deg.keys()),
+                #                                          nodes_low_deg)
+            else:
+                if model_name == 'gcn':
+                    # gcn.train_delta_edge_masked(args, model_delta_all_ngh, device, lr, weight_decay)
+                    if (i + 1) % retrain_epoch == 0 or i == 0:
+                        gcn.train_delta_edge_masked(args, model_delta_all_ngh, device, lr,
+                                                    weight_decay, nodes_high_deg, nodes_low_deg)
+                    acc = gcn.evaluate_delta_edge_masked(model_delta_all_ngh, test_mask, device,
+                                                         nodes_high_deg, nodes_low_deg)
+                    # acc = gcn.evaluate_delta_edge_masked(model_delta_all_ngh, test_mask, device)
 
-                time_full_retrain = time.perf_counter() - time_start
-                print('>> Epoch training time with full nodes: {:.4}s'.format(time_full_retrain))
-                print("Test accuracy of delta_ngh @ {:d} nodes {:.2%}".format(
-                    model_delta_all_ngh.g.number_of_nodes(), acc))
-                acc_retrain_delta_ngh = acc * 100
+                elif model_name == 'graphsage':
+                    # graphsage.train_delta_edge_masked(args, model_delta_all_ngh, device, fan_out,
+                    #                                   batch_size, lr, weight_decay, nodes_high_deg,
+                    #                                   nodes_low_deg)
+                    acc = graphsage.evaluate_delta_edge_masked(device, model_delta_all_ngh,
+                                                               test_mask, batch_size,
+                                                               nodes_high_deg, nodes_low_deg)
+                # elif model_name == 'gat':
+                #     gat.train_delta_edge_masked(args, model_delta_all_ngh, device, lr,
+                #                                 weight_decay, list(train_nodes_high_deg.keys()),
+                #                                 list(train_nodes_low_deg.keys()))
+                #     acc = gat.evaluate_delta_edge_masked(model_delta_all_ngh, test_mask, device,
+                #                                          list(test_nodes_high_deg.keys()),
+                #                                          list(test_nodes_low_deg.keys()))
+
+            time_full_retrain = time.perf_counter() - time_start
+            print('>> Epoch training time with full nodes: {:.4}s'.format(time_full_retrain))
+            print("Test accuracy of delta_ngh @ {:d} nodes {:.2%}".format(
+                model_delta_all_ngh.g.number_of_nodes(), acc))
+            acc_retrain_delta_ngh = acc * 100
 
             accuracy.append(
                 [model.g.number_of_nodes(),
@@ -425,16 +461,16 @@ if __name__ == '__main__':
     # parser.set_defaults(self_loop=False)
     args = parser.parse_args()
 
-    # args.model = 'gcn'
-    args.model = 'graphsage'
+    args.model = 'gcn'
+    # args.model = 'graphsage'
     # args.model = 'gat'
 
     # args.dataset = 'cora'
-    args.dataset = 'citeseer'
-    # args.dataset = 'ogbn-arxiv'
+    # args.dataset = 'citeseer'
+    args.dataset = 'ogbn-arxiv'
 
     args.n_epochs = 200
-    args.deg_threshold = 0
+    args.deg_threshold = [0, 2]
     args.gpu = 0
 
     dump_accuracy_flag = 1
