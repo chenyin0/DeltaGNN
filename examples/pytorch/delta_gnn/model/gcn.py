@@ -60,6 +60,7 @@ def train(args, model, device, lr, weight_decay):
 
     optimizer = Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
     # initialize graph
+    loss_log = []
     dur = []
     for epoch in range(args.n_epochs):
         model.train()
@@ -76,10 +77,14 @@ def train(args, model, device, lr, weight_decay):
         if epoch >= 3:
             dur.append(time.time() - t0)
 
-        acc = evaluate(model, val_mask, device)
-        # print("Epoch {:05d} | Time(s) {:.4f} | Loss {:.4f} | Accuracy {:.4f} | "
-        #       "ETputs(KTEPS) {:.2f}".format(epoch, np.mean(dur), loss.item(),
-        #                                     acc, n_edges / np.mean(dur) / 1000))
+        loss_log.append(round(loss.item(), 2))
+
+    np.savetxt('./results/loss/' + args.dataset + '_evo_loss' + '.txt', loss_log, fmt='%.2f')
+
+    # acc = evaluate(model, val_mask, device)
+    # print("Epoch {:05d} | Time(s) {:.4f} | Loss {:.4f} | Accuracy {:.4f} | "
+    #       "ETputs(KTEPS) {:.2f}".format(epoch, np.mean(dur), loss.item(),
+    #                                     acc, n_edges / np.mean(dur) / 1000))
 
 
 def evaluate(model, mask, device):
@@ -165,14 +170,15 @@ class GCN_delta(nn.Module):
         self.embedding = th.Tensor([[0 for i in range(n_classes)]
                                     for j in range(g.number_of_nodes())]).requires_grad_(True)
 
-    def forward(self, features, ngh_high_deg=None, ngh_low_deg=None):
+    def forward(self, features, ngh_high_deg=None, ngh_low_deg=None, edge_mask=None):
         h = features
         for i, layer in enumerate(self.layers):
             if i != 0:
                 h = self.dropout(h)
-            h = layer(self.g, h, ngh_high_deg, ngh_low_deg)
+            h = layer(self.g, h, edge_mask)
 
-        if (ngh_high_deg is not None) or (ngh_low_deg is not None):
+        # if not self.training:
+        if ngh_high_deg is not None or ngh_low_deg is not None:
             # Combine delta-inferenced embedding and previous embedding
             h = self.combine_embedding(self.embedding, h, ngh_high_deg, ngh_low_deg)
 
@@ -245,16 +251,18 @@ def train_delta_edge_masked(args,
     val_mask = g.ndata['val_mask'].to(device)
     labels = g.ndata['label'].to(device)
     n_edges = g.number_of_edges()
+    edge_mask = g.edata['edge_mask']
 
     optimizer = Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
     # initialize graph
+    loss_log = []
     dur = []
     for epoch in range(args.n_epochs):
         model.train()
         if epoch >= 3:
             t0 = time.time()
         # forward
-        logits = model(features, ngh_high_deg, ngh_low_deg)
+        logits = model(features, ngh_high_deg, ngh_low_deg, edge_mask)
         loss = F.cross_entropy(logits[train_mask], labels[train_mask])
 
         optimizer.zero_grad()
@@ -264,10 +272,16 @@ def train_delta_edge_masked(args,
         if epoch >= 3:
             dur.append(time.time() - t0)
 
+        # # Update embedding
+        # model.embedding = torch.nn.Parameter(logits)
+
         # acc = evaluate_delta_edge_masked(model, val_mask, device, ngh_high_deg, ngh_low_deg)
         # print("Epoch {:05d} | Time(s) {:.4f} | Loss {:.4f} | Accuracy {:.4f} | "
         #       "ETputs(KTEPS) {:.2f}".format(epoch, np.mean(dur), loss.item(), acc,
         #                                     n_edges / np.mean(dur) / 1000))
+
+        loss_log.append(round(loss.item(), 2))
+    np.savetxt('./results/loss/' + args.dataset + '_evo_delta_loss' + '.txt', loss_log, fmt='%.2f')
 
     # Update embedding
     model.embedding = torch.nn.Parameter(logits)
@@ -283,12 +297,16 @@ def evaluate_delta_edge_masked(model, mask, device, nodes_high_deg=None, nodes_l
     features = g.ndata['feat'].to(device)
     labels = g.ndata['label'].to(device)
     mask = mask.bool().to(device)  # Convert int8 to bool
+    edge_mask = g.edata['edge_mask']
 
     model.eval()
     with torch.no_grad():
-        logits = model(features, nodes_high_deg, nodes_low_deg)
+        logits = model(features, nodes_high_deg, nodes_low_deg, edge_mask)
+        # logits = model.embedding
         logits = logits[mask]
         labels = labels[mask]
         _, indices = torch.max(logits, dim=1)
         correct = torch.sum(indices == labels)
+        # Update embedding
+        model.embedding = torch.nn.Parameter(logits)
         return correct.item() * 1.0 / len(labels)
