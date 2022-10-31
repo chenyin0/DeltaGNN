@@ -369,13 +369,11 @@ def main(args):
                     acc = graphsage.evaluate_delta_edge_masked(device, model_delta_all_ngh,
                                                                test_mask, batch_size,
                                                                nodes_high_deg, nodes_low_deg)
-                # elif model_name == 'gat':
-                #     gat.train_delta_edge_masked(args, model_delta_all_ngh, device, lr,
-                #                                 weight_decay, list(train_nodes_high_deg.keys()),
-                #                                 nodes_low_deg))
-                #     acc = gat.evaluate_delta_edge_masked(model_delta_all_ngh, test_mask, device,
-                #                                          list(test_nodes_high_deg.keys()),
-                #                                          nodes_low_deg)
+                elif model_name == 'gat':
+                    gat.train_delta_edge_masked(args, model_delta_all_ngh, device, lr, weight_decay,
+                                                nodes_high_deg, nodes_low_deg)
+                    acc = gat.evaluate_delta_edge_masked(model_delta_all_ngh, test_mask, device,
+                                                         nodes_high_deg, nodes_low_deg)
             else:
                 if model_name == 'gcn':
                     # gcn.train_delta_edge_masked(args, model_delta_all_ngh, device, lr, weight_decay)
@@ -387,22 +385,23 @@ def main(args):
                     # acc = gcn.evaluate_delta_edge_masked(model_delta_all_ngh, test_mask, device)
 
                 elif model_name == 'graphsage':
-                    # graphsage.train_delta_edge_masked(args, model_delta_all_ngh, device, fan_out,
-                    #                                   batch_size, lr, weight_decay, nodes_high_deg,
-                    #                                   nodes_low_deg)
+                    if (i + 1) % retrain_epoch == 0 or i == 0:
+                        graphsage.train_delta_edge_masked(args, model_delta_all_ngh, device,
+                                                          fan_out, batch_size, lr, weight_decay,
+                                                          nodes_high_deg, nodes_low_deg)
                     acc = graphsage.evaluate_delta_edge_masked(device, model_delta_all_ngh,
                                                                test_mask, batch_size,
                                                                nodes_high_deg, nodes_low_deg)
-                # elif model_name == 'gat':
-                #     gat.train_delta_edge_masked(args, model_delta_all_ngh, device, lr,
-                #                                 weight_decay, list(train_nodes_high_deg.keys()),
-                #                                 list(train_nodes_low_deg.keys()))
-                #     acc = gat.evaluate_delta_edge_masked(model_delta_all_ngh, test_mask, device,
-                #                                          list(test_nodes_high_deg.keys()),
-                #                                          list(test_nodes_low_deg.keys()))
+                elif model_name == 'gat':
+                    if (i + 1) % retrain_epoch == 0 or i == 0:
+                        gat.train_delta_edge_masked(args, model_delta_all_ngh, device, lr,
+                                                    weight_decay, nodes_high_deg, nodes_low_deg)
+                    acc = gat.evaluate_delta_edge_masked(model_delta_all_ngh, test_mask, device,
+                                                         nodes_high_deg, nodes_low_deg)
 
             time_full_retrain = time.perf_counter() - time_start
-            print('>> Epoch training time with full nodes: {:.4}s'.format(time_full_retrain))
+            print('>> Epoch training time with full nodes: {}'.format(
+                util.time_format(time_full_retrain)))
             print("Test accuracy of delta_ngh @ {:d} nodes {:.2%}".format(
                 model_delta_all_ngh.g.number_of_nodes(), acc))
             acc_retrain_delta_ngh = acc * 100
@@ -427,8 +426,8 @@ def main(args):
     # plot.plt_edge_epoch()
     # plot.plt_edge_epoch(edge_epoch, result)
 
-    print('\n>> Task {:s} execution time: {:.4}s'.format(args.dataset,
-                                                         time.perf_counter() - Task_time_start))
+    print('\n>> Task {:s} execution time: {}'.format(
+        args.dataset, util.time_format(time.perf_counter() - Task_time_start)))
 
     for i in range(len(accuracy)):
         print(i, round(accuracy[i][2], 2))
@@ -469,13 +468,13 @@ if __name__ == '__main__':
     # parser.set_defaults(self_loop=False)
     args = parser.parse_args()
 
-    args.model = 'gcn'
+    # args.model = 'gcn'
     # args.model = 'graphsage'
-    # args.model = 'gat'
+    args.model = 'gat'
 
-    # args.dataset = 'cora'
+    args.dataset = 'cora'
     # args.dataset = 'citeseer'
-    args.dataset = 'ogbn-arxiv'
+    # args.dataset = 'ogbn-arxiv'
     # args.dataset = 'ogbn-mag'
 
     args.n_epochs = 200

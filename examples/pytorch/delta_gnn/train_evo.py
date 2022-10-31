@@ -387,9 +387,9 @@ def main(args):
 
         ##
         """
-        # No retraining
+        # Periodic retraining
         """
-        print('\n>> No retraining')
+        print('\n>> Periodic retraining')
         model.g = g_update.graph_evolve(inserted_nodes, g_csr, g, node_map_orig2evo,
                                         node_map_evo2orig, n_layers, model.g)
 
@@ -403,11 +403,11 @@ def main(args):
                 gcn.train(args, model, device, lr, weight_decay)
             acc = gcn.evaluate(model, test_mask, device)
         elif model_name == 'graphsage':
-            if (i + 2) % retrain_epoch == 0 or i == 0:
+            if (i + 1) % retrain_epoch == 0 or i == 0:
                 graphsage.train(args, model, device, fan_out, batch_size, lr, weight_decay)
             acc = graphsage.evaluate(device, model, test_mask, batch_size)
         elif model_name == 'gat':
-            if (i + 2) % retrain_epoch == 0 or i == 0:
+            if (i + 1) % retrain_epoch == 0 or i == 0:
                 gat.train(args, model, device, lr, weight_decay)
             acc = gat.evaluate(model, test_mask, device)
 
@@ -492,7 +492,8 @@ def main(args):
                 acc = gat.evaluate(model_retrain, test_mask, device)
 
             time_full_retrain = time.perf_counter() - time_start
-            print('>> Epoch training time with full nodes: {:.4}s'.format(time_full_retrain))
+            print('>> Epoch training time with full nodes: {}'.format(
+                util.time_format(time_full_retrain)))
             print("Test accuracy of retrain @ {:d} nodes {:.2%}".format(
                 model_retrain.g.number_of_nodes(), acc))
             acc_retrain = acc * 100
@@ -528,7 +529,8 @@ def main(args):
                 acc = gat.evaluate(model_delta, test_mask, device)
 
             time_delta_retrain = time.perf_counter() - time_start
-            print('>> Epoch training time in delta: {:.4}s'.format(time_delta_retrain))
+            print('>> Epoch training time in delta: {}'.format(
+                util.time_format(time_delta_retrain)))
             print("Test accuracy of delta @ {:d} nodes {:.2%}".format(
                 model_delta.g.number_of_nodes(), acc))
             acc_retrain_delta = acc * 100
@@ -553,8 +555,8 @@ def main(args):
     # plot.plt_edge_epoch()
     # plot.plt_edge_epoch(edge_epoch, result)
 
-    print('\n>> Task {:s} execution time: {:.4}s'.format(args.dataset,
-                                                         time.perf_counter() - Task_time_start))
+    print('\n>> Task {:s} execution time: {}'.format(
+        args.dataset, util.time_format(time.perf_counter() - Task_time_start)))
 
     for i in range(len(accuracy)):
         print(i, round(accuracy[i][3], 2), round(accuracy[i][2], 2))
@@ -595,17 +597,17 @@ if __name__ == '__main__':
     # parser.set_defaults(self_loop=True)
     args = parser.parse_args()
 
-    args.model = 'gcn'
+    # args.model = 'gcn'
     # args.model = 'graphsage'
-    # args.model = 'gat'
+    args.model = 'gat'
 
-    # args.dataset = 'cora'
+    args.dataset = 'cora'
     # args.dataset = 'citeseer'
     # args.dataset = 'ogbn-arxiv'
-    args.dataset = 'ogbn-mag'
+    # args.dataset = 'ogbn-mag'
 
     args.n_epochs = 200
-    args.gpu = 1
+    args.gpu = 0
     # args.mode = 'mixed'
 
     dump_accuracy_flag = 1
