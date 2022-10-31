@@ -184,7 +184,7 @@ class GAT_delta(nn.Module):
         self.embedding = th.Tensor([[0 for i in range(n_classes)]
                                     for j in range(g.number_of_nodes())]).requires_grad_(True)
 
-    def forward(self, g, inputs, ngh_high_deg=None, ngh_low_deg=None):
+    def forward(self, g, inputs, ngh_high_deg=None, ngh_low_deg=None, edge_mask=None):
         h = inputs
 
         # GAT need add_self_loop
@@ -192,7 +192,7 @@ class GAT_delta(nn.Module):
         g = dgl.add_self_loop(g)
 
         for i, layer in enumerate(self.layers):
-            h = layer(g, h, ngh_high_deg, ngh_low_deg)
+            h = layer(g, h, edge_mask)
             if i == 1:  # last layer
                 h = h.mean(1)
             else:  # other layer(s)
@@ -267,10 +267,11 @@ def train_delta_edge_masked(args,
                             ngh_low_deg=None):
     # define train/val samples, loss function and optimizer
     g = model.g
-    features = g.ndata['feat'].to(device)
-    train_mask = g.ndata['train_mask'].bool().to(device)
-    val_mask = g.ndata['val_mask'].to(device)
-    labels = g.ndata['label'].to(device)
+    features = g.ndata['feat']
+    train_mask = g.ndata['train_mask'].bool()
+    val_mask = g.ndata['val_mask']
+    labels = g.ndata['label']
+    edge_mask = g.edata['edge_mask']
 
     loss_fcn = nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
@@ -278,7 +279,7 @@ def train_delta_edge_masked(args,
     # training loop
     for epoch in range(args.n_epochs):
         model.train()
-        logits = model(g, features, ngh_high_deg, ngh_low_deg)
+        logits = model(g, features, ngh_high_deg, ngh_low_deg, edge_mask)
         loss = loss_fcn(logits[train_mask], labels[train_mask])
         optimizer.zero_grad()
         loss.backward()
@@ -292,15 +293,18 @@ def train_delta_edge_masked(args,
 
 def evaluate_delta_edge_masked(model, mask, device, nodes_high_deg=None, nodes_low_deg=None):
     g = model.g
-    features = g.ndata['feat'].to(device)
-    labels = g.ndata['label'].to(device)
-    mask = mask.bool().to(device)  # Convert int8 to bool
+    features = g.ndata['feat']
+    labels = g.ndata['label']
+    mask = mask.bool()  # Convert int8 to bool
+    edge_mask = g.edata['edge_mask']
 
     model.eval()
     with torch.no_grad():
-        logits = model(g, features, nodes_high_deg, nodes_low_deg)
+        logits = model(g, features, nodes_high_deg, nodes_low_deg, edge_mask)
         logits = logits[mask]
         labels = labels[mask]
         _, indices = torch.max(logits, dim=1)
         correct = torch.sum(indices == labels)
+        # Update embedding
+        model.embedding = torch.nn.Parameter(logits)
         return correct.item() * 1.0 / len(labels)

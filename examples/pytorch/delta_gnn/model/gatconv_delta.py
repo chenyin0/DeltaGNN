@@ -22,7 +22,7 @@ class GATConv_delta(GATConv):
               self).__init__(in_feats, out_feats, num_heads, feat_drop, attn_drop, negative_slope,
                              residual, activation, allow_zero_in_degree, bias)
 
-    def forward(self, graph, feat, ngh_high_deg=None, ngh_low_deg=None, get_attention=False):
+    def forward(self, graph, feat, edge_mask=None, get_attention=False):
         r"""
         Description
         -----------
@@ -54,7 +54,7 @@ class GATConv_delta(GATConv):
             The error can be ignored by setting ``allow_zero_in_degree`` parameter to ``True``.
         """
 
-        if (ngh_high_deg is not None) or (ngh_low_deg is not None):
+        if edge_mask is not None:
             with graph.local_scope():
                 if not self._allow_zero_in_degree:
                     if (graph.in_degrees() == 0).any():
@@ -115,7 +115,7 @@ class GATConv_delta(GATConv):
                 # graph.edata['a'] = self.attn_drop(edge_softmax(graph, e))
                 edge_after_softmax = self.attn_drop(edge_softmax(graph, e))
                 # Align the shape of edge_mask with edge_after_softmax
-                edge_mask = graph.edata['edge_mask']
+                # edge_mask = graph.edata['edge_mask']
                 edge_mask = edge_mask[:, None, None]
                 edge_mask = edge_mask.repeat(1, edge_after_softmax.shape[1],
                                              edge_after_softmax.shape[2])
