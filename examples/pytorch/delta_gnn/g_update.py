@@ -6,6 +6,7 @@ from dgl.data.utils import generate_mask_tensor
 from dgl.data.citation_graph import _sample_mask
 import util
 import time
+import pathlib
 
 
 def gen_node_reindex(node_map, node_id_prev):
@@ -49,22 +50,107 @@ def get_nodes_reindex(node_map, nodes_id_prev):
     return nodes_id_new
 
 
-def update_g_struct(new_nodes, g_orig, node_map_orig2evo, node_map_evo2orig, g_evo=None):
-    print('>> Start update graph structure')
+def update_g_struct_init(args, init_ratio, init_nodes, g_orig, node_map_orig2evo,
+                         node_map_evo2orig):
+    """
+    Load the init g_struct_update (src_nodes & dst_nodes) from files to save time
+    """
+
+    print('>> Start to initialize graph struct')
     time_start = time.perf_counter()
 
+    # Read edge_nodes
+    file_edge_nodes = pathlib.Path('./dataset/edge_src_dst_nodes/' + args.dataset +
+                                   '_g_struct_init_' + str(init_ratio) + '.txt')
+    file_map_orig2evo = pathlib.Path('./dataset/edge_src_dst_nodes/' + args.dataset +
+                                     '_map_orig2evo_' + str(init_ratio) + '.txt')
+    file_map_evo2orig = pathlib.Path('./dataset/edge_src_dst_nodes/' + args.dataset +
+                                     '_map_evo2orig_' + str(init_ratio) + '.txt')
+
+    if file_edge_nodes.exists() and file_map_orig2evo.exists() and file_map_evo2orig.exists():
+        # Read edge nodes
+        edge_src_nodes = []
+        edge_dst_nodes = []
+        f = open(file_edge_nodes, "r")
+        lines = f.readlines()
+        for line in lines:
+            line = line.strip('\n')  # Delete '\n'
+            tmp = line.split(' ')
+            edge_src_nodes.append(int(tmp[0]))
+            edge_dst_nodes.append(int(tmp[1]))
+
+        # Read node_map_orig2evo
+        dict_orig2evo_tmp = {}
+        f = open(file_map_orig2evo, "r")
+        lines = f.readlines()
+        for line in lines:
+            line = line.strip('\n')  # Delete '\n'
+            tmp = line.split(' ')
+            k = int(tmp[0])
+            v = int(tmp[1])
+            dict_orig2evo_tmp[k] = v
+        node_map_orig2evo.update(dict_orig2evo_tmp)
+
+        # Read node_map_evo2orig
+        dict_evo2orig_tmp = {}
+        f = open(file_map_evo2orig, "r")
+        lines = f.readlines()
+        for line in lines:
+            line = line.strip('\n')  # Delete '\n'
+            tmp = line.split(' ')
+            k = int(tmp[0])
+            v = int(tmp[1])
+            dict_evo2orig_tmp[k] = v
+        node_map_evo2orig.update(dict_evo2orig_tmp)
+
+    else:
+        edge_src_nodes, edge_dst_nodes = gen_edge_src_edge_nodes(init_nodes, g_orig,
+                                                                 node_map_orig2evo,
+                                                                 node_map_evo2orig)
+        # Write edge
+        with open(file_edge_nodes, 'w') as f:
+            for i in range(len(edge_src_nodes)):
+                edge_src_n = edge_src_nodes[i]
+                edge_dst_n = edge_dst_nodes[i]
+                f.write(str(edge_src_n) + ' ' + str(edge_dst_n) + '\n')
+
+        # Write node_map_orig2evo
+        with open(file_map_orig2evo, 'w') as f:
+            for k, v in node_map_orig2evo.items():
+                f.write(str(k) + ' ' + str(v) + '\n')
+
+        # Write node_map_evo2orig
+        with open(file_map_evo2orig, 'w') as f:
+            for k, v in node_map_evo2orig.items():
+                f.write(str(k) + ' ' + str(v) + '\n')
+
+    edge_src_nodes = th.tensor(edge_src_nodes, dtype=th.int64)
+    edge_dst_nodes = th.tensor(edge_dst_nodes, dtype=th.int64)
+    g_evo = dgl.graph((edge_src_nodes, edge_dst_nodes))
+
+    # Remove parallel edges
+    device = g_evo.device
+    g_evo = dgl.to_simple(g_evo.cpu(), return_counts='cnt', copy_ndata=True, copy_edata=True)
+    g_evo = g_evo.to(device)
+
+    print('>> Finish initialize graph structure ({:.2f}s)'.format(time.perf_counter() - time_start))
+
+    return g_evo
+
+
+def gen_edge_src_edge_nodes(nodes, g_orig, node_map_orig2evo, node_map_evo2orig):
     edge_src_nodes = []
     edge_dst_nodes = []
-    for node in new_nodes:
+    for node in nodes:
         pred_nghs = g_orig.predecessors(node).cpu().numpy().tolist()
         for pred_v in pred_nghs:
-            if pred_v in new_nodes or pred_v in node_map_orig2evo:
+            if pred_v in nodes or pred_v in node_map_orig2evo:
                 edge_src_nodes.append(pred_v)
                 edge_dst_nodes.append(node)
 
         succ_nghs = g_orig.successors(node).cpu().numpy().tolist()
         for succ_v in succ_nghs:
-            if succ_v in new_nodes or succ_v in node_map_orig2evo:
+            if succ_v in nodes or succ_v in node_map_orig2evo:
                 edge_src_nodes.append(node)
                 edge_dst_nodes.append(succ_v)
 
@@ -83,17 +169,31 @@ def update_g_struct(new_nodes, g_orig, node_map_orig2evo, node_map_evo2orig, g_e
         if node_id_evo not in node_map_evo2orig:
             node_map_evo2orig[node_id_evo] = node
 
-    edge_src_nodes_reindex = th.tensor(edge_src_nodes_reindex, dtype=th.int64)
-    edge_dst_nodes_reindex = th.tensor(edge_dst_nodes_reindex, dtype=th.int64)
+    return edge_src_nodes_reindex, edge_dst_nodes_reindex
 
-    if g_evo is None:
-        # Construct a new graph
-        g_evo = dgl.graph((edge_src_nodes_reindex, edge_dst_nodes_reindex))
-    else:
-        # device = th.device("cuda:0" if th.cuda.is_available() else "cpu")
-        edge_src_nodes_reindex = edge_src_nodes_reindex.to(g_evo.device)
-        edge_dst_nodes_reindex = edge_dst_nodes_reindex.to(g_evo.device)
-        g_evo.add_edges(edge_src_nodes_reindex, edge_dst_nodes_reindex)
+
+def update_g_struct_evo(new_nodes, g_orig, node_map_orig2evo, node_map_evo2orig, g_evo):
+    print('>> Start update graph structure')
+    time_start = time.perf_counter()
+
+    edge_src_nodes, edge_dst_nodes = gen_edge_src_edge_nodes(new_nodes, g_orig, node_map_orig2evo,
+                                                             node_map_evo2orig)
+
+    edge_src_nodes = th.tensor(edge_src_nodes, dtype=th.int64)
+    edge_dst_nodes = th.tensor(edge_dst_nodes, dtype=th.int64)
+
+    # if g_evo is None:
+    #     # Construct a new graph
+    #     g_evo = dgl.graph((edge_src_nodes, edge_dst_nodes))
+    # else:
+    #     # device = th.device("cuda:0" if th.cuda.is_available() else "cpu")
+    #     edge_src_nodes = edge_src_nodes.to(g_evo.device)
+    #     edge_dst_nodes = edge_dst_nodes.to(g_evo.device)
+    #     g_evo.add_edges(edge_src_nodes, edge_dst_nodes)
+
+    edge_src_nodes = edge_src_nodes.to(g_evo.device)
+    edge_dst_nodes = edge_dst_nodes.to(g_evo.device)
+    g_evo.add_edges(edge_src_nodes, edge_dst_nodes)
 
     # Remove parallel edges
     device = g_evo.device
@@ -101,6 +201,73 @@ def update_g_struct(new_nodes, g_orig, node_map_orig2evo, node_map_evo2orig, g_e
     g_evo = g_evo.to(device)
 
     print('>> Finish update graph structure ({:.2f}s)'.format(time.perf_counter() - time_start))
+
+    return g_evo
+
+
+# def update_g_struct(new_nodes, g_orig, node_map_orig2evo, node_map_evo2orig, g_evo=None):
+#     print('>> Start update graph structure')
+#     time_start = time.perf_counter()
+
+#     edge_src_nodes = []
+#     edge_dst_nodes = []
+#     for node in new_nodes:
+#         pred_nghs = g_orig.predecessors(node).cpu().numpy().tolist()
+#         for pred_v in pred_nghs:
+#             if pred_v in new_nodes or pred_v in node_map_orig2evo:
+#                 edge_src_nodes.append(pred_v)
+#                 edge_dst_nodes.append(node)
+
+#         succ_nghs = g_orig.successors(node).cpu().numpy().tolist()
+#         for succ_v in succ_nghs:
+#             if succ_v in new_nodes or succ_v in node_map_orig2evo:
+#                 edge_src_nodes.append(node)
+#                 edge_dst_nodes.append(succ_v)
+
+#     # Remapping node_id from g_orig -> g_evo, and record mapping from g_evo -> g_orig
+#     edge_src_nodes_reindex = []
+#     edge_dst_nodes_reindex = []
+#     for node in edge_src_nodes:
+#         node_id_evo = gen_node_reindex(node_map_orig2evo, node)
+#         edge_src_nodes_reindex.append(node_id_evo)
+#         if node_id_evo not in node_map_evo2orig:
+#             node_map_evo2orig[node_id_evo] = node
+
+#     for node in edge_dst_nodes:
+#         node_id_evo = gen_node_reindex(node_map_orig2evo, node)
+#         edge_dst_nodes_reindex.append(node_id_evo)
+#         if node_id_evo not in node_map_evo2orig:
+#             node_map_evo2orig[node_id_evo] = node
+
+#     edge_src_nodes_reindex = th.tensor(edge_src_nodes_reindex, dtype=th.int64)
+#     edge_dst_nodes_reindex = th.tensor(edge_dst_nodes_reindex, dtype=th.int64)
+
+#     if g_evo is None:
+#         # Construct a new graph
+#         g_evo = dgl.graph((edge_src_nodes_reindex, edge_dst_nodes_reindex))
+#     else:
+#         # device = th.device("cuda:0" if th.cuda.is_available() else "cpu")
+#         edge_src_nodes_reindex = edge_src_nodes_reindex.to(g_evo.device)
+#         edge_dst_nodes_reindex = edge_dst_nodes_reindex.to(g_evo.device)
+#         g_evo.add_edges(edge_src_nodes_reindex, edge_dst_nodes_reindex)
+
+#     # Remove parallel edges
+#     device = g_evo.device
+#     g_evo = dgl.to_simple(g_evo.cpu(), return_counts='cnt', copy_ndata=True, copy_edata=True)
+#     g_evo = g_evo.to(device)
+
+#     print('>> Finish update graph structure ({:.2f}s)'.format(time.perf_counter() - time_start))
+
+#     return g_evo, edge_src_nodes_reindex, edge_dst_nodes_reindex
+
+
+def graph_struct_init(args, init_ratio, new_nodes, g_orig, node_map_orig2evo, node_map_evo2orig):
+    """
+    Initialize graph
+    """
+    g_evo = update_g_struct_init(args, init_ratio, new_nodes, g_orig, node_map_orig2evo,
+                                 node_map_evo2orig)
+    update_g_attr_init(g_evo, g_orig, node_map_evo2orig)
 
     return g_evo
 
@@ -117,10 +284,10 @@ def graph_evolve(new_nodes,
     """
     if g_evo is None:
         # Construct a new graph
-        g_evo = update_g_struct(new_nodes, g_orig, node_map_orig2evo, node_map_evo2orig)
+        g_evo = update_g_struct_evo(new_nodes, g_orig, node_map_orig2evo, node_map_evo2orig)
         new_graph = True
     else:
-        g_evo = update_g_struct(new_nodes, g_orig, node_map_orig2evo, node_map_evo2orig, g_evo)
+        g_evo = update_g_struct_evo(new_nodes, g_orig, node_map_orig2evo, node_map_evo2orig, g_evo)
         new_graph = False
 
     if new_graph:
@@ -143,10 +310,10 @@ def graph_evolve_delta(new_nodes,
 
     if g_evo is None:
         # Construct a new graph
-        g_evo = update_g_struct(new_nodes, g_orig, node_map_orig2evo, node_map_evo2orig)
+        g_evo = update_g_struct_evo(new_nodes, g_orig, node_map_orig2evo, node_map_evo2orig)
         new_graph = True
     else:
-        g_evo = update_g_struct(new_nodes, g_orig, node_map_orig2evo, node_map_evo2orig, g_evo)
+        g_evo = update_g_struct_evo(new_nodes, g_orig, node_map_orig2evo, node_map_evo2orig, g_evo)
         new_graph = False
 
     if new_graph:
@@ -170,10 +337,10 @@ def graph_evolve_delta_all_ngh(new_nodes,
 
     if g_evo is None:
         # Construct a new graph
-        g_evo = update_g_struct(new_nodes, g_orig, node_map_orig2evo, node_map_evo2orig)
+        g_evo = update_g_struct_evo(new_nodes, g_orig, node_map_orig2evo, node_map_evo2orig)
         new_graph = True
     else:
-        g_evo = update_g_struct(new_nodes, g_orig, node_map_orig2evo, node_map_evo2orig, g_evo)
+        g_evo = update_g_struct_evo(new_nodes, g_orig, node_map_orig2evo, node_map_evo2orig, g_evo)
         new_graph = False
 
     if new_graph:

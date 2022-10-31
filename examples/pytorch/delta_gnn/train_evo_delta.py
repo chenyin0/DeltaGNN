@@ -10,6 +10,7 @@ from dgl.data import CoraGraphDataset, CiteseerGraphDataset, PubmedGraphDataset,
 from dgl.data import AsNodePredDataset
 from dgl import AddSelfLoop
 from ogb.nodeproppred import DglNodePropPredDataset
+import preprocess
 
 import util
 import g_update
@@ -83,8 +84,9 @@ def main(args):
     elif args.dataset == 'reddit':
         dataset = RedditDataset(raw_dir='./dataset', transform=transform)
     elif args.dataset == 'ogbn-arxiv':
-        dataset_raw = DglNodePropPredDataset('ogbn-arxiv', root='./dataset')
-        dataset = AsNodePredDataset(dataset_raw)
+        dataset = AsNodePredDataset(DglNodePropPredDataset('ogbn-arxiv', root='./dataset'))
+    elif args.dataset == 'ogbn-mag':
+        dataset = DglNodePropPredDataset('ogbn-mag', root='./dataset')
     # elif args.dataset == 'ogbn-mag':
     #     dataset = AsNodePredDataset(DglNodePropPredDataset('ogbn-mag', root='./dataset'))
     elif args.dataset == 'amazon_comp':
@@ -92,7 +94,10 @@ def main(args):
     else:
         raise ValueError('Unknown dataset: {}'.format(args.dataset))
 
-    g = dataset[0]
+    if args.dataset == 'ogbn-mag':
+        g = preprocess.ogbn_mag_preprocess(dataset)
+    else:
+        g = dataset[0]
 
     if args.gpu < 0:
         cuda = False
@@ -142,7 +147,7 @@ def main(args):
             # root_node_q = util.gen_root_node_queue(g)
             # node_q = util.bfs_traverse(g_csr, root_node_q)
             node_q = g.nodes().numpy().tolist()
-        elif args.dataset == 'ogbn-arxiv':
+        elif args.dataset == 'ogbn-arxiv' or args.dataset == 'ogbn-mag':
             node_q = util.sort_node_by_timestamp('./dataset/' + args.dataset + '_node_year.csv')
 
         with open(file_, 'w') as f:
@@ -150,7 +155,8 @@ def main(args):
                 f.write(str(i) + '\n')
 
     # Gen node_seq
-    node_seq = util.gen_snapshot(0.5, 10, g.number_of_nodes())
+    g_struct_init_ratio = 0.5
+    node_seq = util.gen_snapshot(g_struct_init_ratio, 10, g.number_of_nodes())
 
     # # Graph evolved size
     # cora_seq = [540, 691, 892, 1168, 1530, 2036, 2708]
@@ -179,8 +185,10 @@ def main(args):
     node_map_evo2orig = dict()
 
     init_nodes = node_q[:node_seq[0]]
-    g_evo = g_update.graph_evolve(init_nodes, g_csr, g, node_map_orig2evo, node_map_evo2orig,
-                                  n_layers)
+    # g_evo = g_update.graph_evolve(init_nodes, g_csr, g, node_map_orig2evo, node_map_evo2orig,
+    #                               n_layers)
+    g_evo = g_update.graph_struct_init(args, g_struct_init_ratio, init_nodes, g, node_map_orig2evo,
+                                       node_map_evo2orig)
     ##
 
     # features = g_evo.ndata['feat'].to(device)
@@ -468,9 +476,10 @@ if __name__ == '__main__':
     # args.dataset = 'cora'
     # args.dataset = 'citeseer'
     args.dataset = 'ogbn-arxiv'
+    # args.dataset = 'ogbn-mag'
 
     args.n_epochs = 200
-    args.deg_threshold = [0, 2]
+    args.deg_threshold = [5, 5]
     args.gpu = 0
 
     dump_accuracy_flag = 1
