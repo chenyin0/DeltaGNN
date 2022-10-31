@@ -189,10 +189,10 @@ class SAGE_delta(nn.Module):
         self.embedding = th.Tensor([[0 for i in range(n_classes)]
                                     for j in range(g.number_of_nodes())]).requires_grad_(True)
 
-    def forward(self, blocks, features, ngh_high_deg=None, ngh_low_deg=None):
+    def forward(self, blocks, features, ngh_high_deg=None, ngh_low_deg=None, edge_mask=None):
         h = features
         for l, (layer, block) in enumerate(zip(self.layers, blocks)):
-            h = layer(block, h, ngh_high_deg, ngh_low_deg)
+            h = layer(block, h, edge_mask)
             if l != len(self.layers) - 1:
                 h = self.activation(h)
                 h = self.dropout(h)
@@ -230,8 +230,9 @@ class SAGE_delta(nn.Module):
         # embedding_prev = embedding_prev.to('cpu')  ## Debug_yin_annotation
 
         # Combine delta rst with feat_prev
-        feat_prev_keep_ind = list(
-            set(feat_nodes_sampled) - set(ngh_high_deg_sampled) - set(ngh_low_deg_sampled))
+        # feat_prev_keep_ind = list(
+        #     set(feat_nodes_sampled) - set(ngh_high_deg_sampled) - set(ngh_low_deg_sampled))
+        feat_prev_keep_ind = list(set(feat_nodes_sampled) - set(ngh_high_deg_sampled))
 
         feat_prev_keep_ind = th.tensor(feat_prev_keep_ind, dtype=th.long)
         # ngh_high_deg_ind = th.tensor(ngh_high_deg, dtype=th.long)
@@ -275,7 +276,8 @@ class SAGE_delta(nn.Module):
 
         # Combine delta rst with feat_prev
         feat_prev_ind = list(i for i in range(embedding_prev.shape[0]))
-        feat_prev_keep_ind = list(set(feat_prev_ind) - set(ngh_high_deg) - set(ngh_low_deg))
+        # feat_prev_keep_ind = list(set(feat_prev_ind) - set(ngh_high_deg) - set(ngh_low_deg))
+        feat_prev_keep_ind = list(set(feat_prev_ind) - set(ngh_high_deg))
 
         feat_prev_keep_ind = th.tensor(feat_prev_keep_ind, dtype=th.long)
         # ngh_high_deg_ind = th.tensor(ngh_high_deg, dtype=th.long)
@@ -307,7 +309,7 @@ class SAGE_delta(nn.Module):
 
         return feat
 
-    def inference(self, g, device, batch_size, ngh_high_deg=None, ngh_low_deg=None):
+    def inference(self, g, device, batch_size, ngh_high_deg=None, ngh_low_deg=None, edge_mask=None):
         """Conduct layer-wise inference to get all the node embeddings."""
         feat = g.ndata['feat']
         sampler = MultiLayerFullNeighborSampler(1, prefetch_node_feats=['feat'])
@@ -331,7 +333,7 @@ class SAGE_delta(nn.Module):
             # for input_nodes, output_nodes, blocks in tqdm.tqdm(dataloader):
             for input_nodes, output_nodes, blocks in dataloader:
                 x = feat[input_nodes]
-                h = layer(blocks[0], x)  # len(blocks) = 1
+                h = layer(blocks[0], x, edge_mask)  # len(blocks) = 1
                 if l != len(self.layers) - 1:
                     h = th.nn.functional.relu(h)
                     h = self.dropout(h)
@@ -362,6 +364,7 @@ def train_delta_edge_masked(args,
     train_idx = th.Tensor(np.nonzero(train_mask.numpy())[0]).long().to(device)
     val_mask = g.ndata['val_mask'].to('cpu')
     val_idx = th.Tensor(np.nonzero(val_mask.numpy())[0]).long().to(device)
+    edge_mask = g.edata['edge_mask']
 
     sampler = NeighborSampler([int(fanout_) for fanout_ in fanout.split(',')],
                               prefetch_node_feats=['feat'],
@@ -395,7 +398,7 @@ def train_delta_edge_masked(args,
         for it, (input_nodes, output_nodes, blocks) in enumerate(train_dataloader):
             x = blocks[0].srcdata['feat']
             y = blocks[-1].dstdata['label']
-            y_hat = model(blocks, x, nodes_high_deg, nodes_low_deg)
+            y_hat = model(blocks, x, nodes_high_deg, nodes_low_deg, edge_mask)
             loss = th.nn.functional.cross_entropy(y_hat, y)
             optimizer.zero_grad()
             loss.backward()
@@ -431,10 +434,14 @@ def evaluate_delta_edge_masked(device,
 
     mask = mask.bool().to(device)  # Convert int8 to bool
     g = model.g
+    edge_mask = g.edata['edge_mask']
+
     model.eval()
     with th.no_grad():
-        pred = model.inference(g, device, batch_size, nodes_high_deg,
-                               nodes_low_deg)  # pred in buffer_device
+        pred = model.inference(g, device, batch_size, nodes_high_deg, nodes_low_deg,
+                               edge_mask)  # pred in buffer_device
         pred = pred[mask]
         label = g.ndata['label'][mask].to(pred.device)
+        # Update embedding
+        model.embedding = th.nn.Parameter(pred)
         return MF.accuracy(pred, label).item()
