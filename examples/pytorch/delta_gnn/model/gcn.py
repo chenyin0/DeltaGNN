@@ -50,10 +50,10 @@ class GCN(nn.Module):
 
 def train(args, model, device, lr, weight_decay):
     g = model.g
-    features = g.ndata['feat'].to(device)
-    train_mask = g.ndata['train_mask'].bool().to(device)
-    val_mask = g.ndata['val_mask'].to(device)
-    labels = g.ndata['label'].to(device)
+    features = g.ndata['feat']
+    train_mask = g.ndata['train_mask'].bool()
+    val_mask = g.ndata['val_mask']
+    labels = g.ndata['label']
     n_edges = g.number_of_edges()
 
     # print(train_mask, val_mask)
@@ -246,10 +246,10 @@ def train_delta_edge_masked(args,
                             ngh_high_deg=None,
                             ngh_low_deg=None):
     g = model.g
-    features = g.ndata['feat'].to(device)
-    train_mask = g.ndata['train_mask'].bool().to(device)
-    val_mask = g.ndata['val_mask'].to(device)
-    labels = g.ndata['label'].to(device)
+    features = g.ndata['feat']
+    train_mask = g.ndata['train_mask'].bool()
+    val_mask = g.ndata['val_mask']
+    labels = g.ndata['label']
     n_edges = g.number_of_edges()
     edge_mask = g.edata['edge_mask']
 
@@ -294,9 +294,9 @@ def evaluate_delta_edge_masked(model, mask, device, nodes_high_deg=None, nodes_l
     """
 
     g = model.g
-    features = g.ndata['feat'].to(device)
-    labels = g.ndata['label'].to(device)
-    mask = mask.bool().to(device)  # Convert int8 to bool
+    features = g.ndata['feat']
+    labels = g.ndata['label']
+    mask = mask.bool()  # Convert int8 to bool
     edge_mask = g.edata['edge_mask']
 
     model.eval()

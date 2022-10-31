@@ -22,12 +22,11 @@ class GraphConv_delta(GraphConv):
         # feat_prev size is variable with graph evolving (size = g_nodes_number * out_feats)
         # self.feat = nn.Parameter(th.Tensor(1, out_feats))
 
-    def forward(self, graph, feat, ngh_high_deg=None, ngh_low_deg=None):
+    def forward(self, graph, feat, edge_mask=None):
         r"""    
         The data type of "ngh_high_deg" and "ngh_low_deg" is List
         """
-        if (ngh_high_deg is not None) or (ngh_low_deg is not None):
-            edge_mask = graph.edata['edge_mask']
+        if edge_mask is not None:
             rst_delta = super().forward(graph, feat, edge_weight=edge_mask)
             return rst_delta
         else:
