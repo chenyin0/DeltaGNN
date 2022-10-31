@@ -10,6 +10,7 @@ import math
 import random
 import numpy as np
 import copy as cp
+import time
 
 
 def gen_root_node_queue(g):
@@ -89,18 +90,23 @@ def get_nghs_multi_layers(g_csr, root_nodes, layer_num):
 
 
 def get_dst_nghs_multi_layers(g, root_nodes, layer_num):
-    nodes_q = cp.deepcopy(root_nodes)
-    ngh = []
+    nodes_q = list(cp.deepcopy(root_nodes))
+    nghs_total = []
+    ngh_per_layer = []
     for i in range(layer_num):
-        ngh_per_layer = []
         for node in nodes_q:
-            ngh_per_layer.extend(g.successors(node).cpu().numpy().tolist())
-            ngh.extend(ngh_per_layer)
-        nodes_q = cp.deepcopy(ngh_per_layer)
+            nghs = g.successors(node).cpu().numpy().tolist()
+            ngh_per_layer.extend(nghs)
+            nghs_total.extend(nghs)
+        # print('>> ngh_per_layer_size: ', len(ngh_per_layer))
+        # print('>> ngh_size: ', len(nghs_total))
+        nodes_q.clear()
+        nodes_q.extend(ngh_per_layer)
+        ngh_per_layer.clear()
 
-    ngh = list(set(ngh))
+    nghs_total = list(set(nghs_total))
 
-    return ngh
+    return nghs_total
 
 
 def get_ngh_with_deg_th(g, root_nodes, deg_th):
@@ -558,6 +564,12 @@ def gen_edge_mask(g, inserted_nodes, deg_th, layer_num):
     """
     Edge_mask: select out processing nodes with high (all-ngh) and low (delta-update) degree 
     """
+    print('>> Start to gen edge mask')
+    time_start = time.perf_counter()
+
+    device = g.device
+    g = g.cpu()
+
     # g = dgl.remove_self_loop(g)
     nodes_low_deg = []
     nodes_high_deg = []
@@ -603,12 +615,12 @@ def gen_edge_mask(g, inserted_nodes, deg_th, layer_num):
         nodes_q = cp.deepcopy(ngh_per_layer)
         ngh_per_layer.clear()
 
-    src_nodes = th.tensor(src_nodes, dtype=th.long).to(g.device)
-    dst_nodes = th.tensor(dst_nodes, dtype=th.long).to(g.device)
+    src_nodes = th.tensor(src_nodes, dtype=th.long)
+    dst_nodes = th.tensor(dst_nodes, dtype=th.long)
     edge_ids = g.edge_ids(src_nodes, dst_nodes)
 
-    src_nodes_shield = th.tensor(src_nodes_shield, dtype=th.long).to(g.device)
-    dst_nodes_shield = th.tensor(dst_nodes_shield, dtype=th.long).to(g.device)
+    src_nodes_shield = th.tensor(src_nodes_shield, dtype=th.long)
+    dst_nodes_shield = th.tensor(dst_nodes_shield, dtype=th.long)
     edge_ids_shield = g.edge_ids(src_nodes_shield, dst_nodes_shield)
 
     edge_ids = edge_ids.tolist()
@@ -617,8 +629,8 @@ def gen_edge_mask(g, inserted_nodes, deg_th, layer_num):
     # print(list(set(edge_ids_shield)))
     edge_masked_num = len(list(set(edge_ids))) - len(list(set(edge_ids_shield)))
     edge_num_total = g.number_of_edges()
-    print(edge_num_total, edge_masked_num, 'percentage:', round(edge_masked_num / edge_num_total,
-                                                                2))
+    print('Edge_total: {:d}, Edge_mask_num: {:d}, ratio: {:2%}'.format(
+        edge_num_total, edge_masked_num, edge_masked_num / edge_num_total))
 
     edge_mask = [1 for i in range(g.number_of_edges())]
     for id in edge_ids:
@@ -629,7 +641,13 @@ def gen_edge_mask(g, inserted_nodes, deg_th, layer_num):
     nodes_high_deg = list(set(nodes_high_deg))
     nodes_low_deg = list(set(nodes_low_deg))
     print()
-    print('N_high_deg: {:d}, N_low_deg: {:d}, low_deg_ratio: {:2f}'.format(len(nodes_high_deg), len(nodes_low_deg), len(nodes_low_deg)/len(nodes_high_deg)))
+    print('N_high_deg: {:d}, N_low_deg: {:d}, low_deg_ratio: {:2f}'.format(
+        len(nodes_high_deg), len(nodes_low_deg), round(len(nodes_low_deg) / len(nodes_high_deg),
+                                                       2)))
+
+    g = g.to(device)
+
+    print('>> Finish gen edge mask ({})'.format(time_format(time.perf_counter() - time_start)))
 
     return th.Tensor(edge_mask).to(g.device), nodes_high_deg, nodes_low_deg
 
@@ -987,3 +1005,18 @@ def gen_snapshot(init_ratio, snapshot_num, total_node_num):
     node_seq[-1] = node_num
 
     return node_seq
+
+
+def time_format(sec):
+    if sec > 3600:
+        hour, tmp = divmod(sec, 3600)
+        min, s = divmod(tmp, 60)
+        time = str(int(hour)) + 'h' + str(int(min)) + 'm' + str(int(s)) + 's'
+    elif sec > 60:
+        min, s = divmod(sec, 60)
+        time = str(int(min)) + 'm' + str(int(s)) + 's'
+    else:
+        s = round(sec, 2)
+        time = str(s) + 's'
+
+    return time

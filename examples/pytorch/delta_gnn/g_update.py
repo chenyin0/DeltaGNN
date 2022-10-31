@@ -133,7 +133,7 @@ def update_g_struct_init(args, init_ratio, init_nodes, g_orig, node_map_orig2evo
     g_evo = dgl.to_simple(g_evo.cpu(), return_counts='cnt', copy_ndata=True, copy_edata=True)
     g_evo = g_evo.to(device)
 
-    print('>> Finish initialize graph structure ({:.2f}s)'.format(time.perf_counter() - time_start))
+    print('>> Finish initialize graph structure ({})'.format(util.time_format(time.perf_counter() - time_start)))
 
     return g_evo
 
@@ -200,7 +200,8 @@ def update_g_struct_evo(new_nodes, g_orig, node_map_orig2evo, node_map_evo2orig,
     g_evo = dgl.to_simple(g_evo.cpu(), return_counts='cnt', copy_ndata=True, copy_edata=True)
     g_evo = g_evo.to(device)
 
-    print('>> Finish update graph structure ({:.2f}s)'.format(time.perf_counter() - time_start))
+    print('>> Finish update graph structure ({})'.format(
+        util.time_format(time.perf_counter() - time_start)))
 
     return g_evo
 
