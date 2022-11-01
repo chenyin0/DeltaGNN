@@ -629,7 +629,7 @@ def gen_edge_mask(g, inserted_nodes, deg_th, layer_num):
     # print(list(set(edge_ids_shield)))
     edge_masked_num = len(list(set(edge_ids))) - len(list(set(edge_ids_shield)))
     edge_num_total = g.number_of_edges()
-    print('Edge_total: {:d}, Edge_mask_num: {:d}, ratio: {:2%}'.format(
+    print('Edge_total: {:d}, Edge_mask_num: {:d}, ratio: {:.2%}'.format(
         edge_num_total, edge_masked_num, edge_masked_num / edge_num_total))
 
     edge_mask = [1 for i in range(g.number_of_edges())]
@@ -641,9 +641,9 @@ def gen_edge_mask(g, inserted_nodes, deg_th, layer_num):
     nodes_high_deg = list(set(nodes_high_deg))
     nodes_low_deg = list(set(nodes_low_deg))
     print()
-    print('N_high_deg: {:d}, N_low_deg: {:d}, low_deg_ratio: {:2f}'.format(
-        len(nodes_high_deg), len(nodes_low_deg), round(len(nodes_low_deg) / len(nodes_high_deg),
-                                                       2)))
+    print('N_high_deg: {:d}, N_low_deg: {:d}, low_deg_ratio: {:.2%}'.format(
+        len(nodes_high_deg), len(nodes_low_deg),
+        len(nodes_low_deg) / len(nodes_high_deg)))
 
     g = g.to(device)
 
