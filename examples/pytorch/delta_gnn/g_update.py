@@ -128,6 +128,11 @@ def update_g_struct_init(args, init_ratio, init_nodes, g_orig, node_map_orig2evo
     edge_dst_nodes = th.tensor(edge_dst_nodes, dtype=th.int64)
     g_evo = dgl.graph((edge_src_nodes, edge_dst_nodes))
 
+
+    # Add_self_loop
+    g_evo = dgl.remove_self_loop(g_evo)
+    g_evo = dgl.add_self_loop(g_evo)
+
     # Remove parallel edges
     device = g_evo.device
     g_evo = dgl.to_simple(g_evo.cpu(), return_counts='cnt', copy_ndata=True, copy_edata=True)
@@ -194,6 +199,10 @@ def update_g_struct_evo(new_nodes, g_orig, node_map_orig2evo, node_map_evo2orig,
     edge_src_nodes = edge_src_nodes.to(g_evo.device)
     edge_dst_nodes = edge_dst_nodes.to(g_evo.device)
     g_evo.add_edges(edge_src_nodes, edge_dst_nodes)
+
+    # Add_self_loop
+    g_evo = dgl.remove_self_loop(g_evo)
+    g_evo = dgl.add_self_loop(g_evo)
 
     # Remove parallel edges
     device = g_evo.device

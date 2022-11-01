@@ -187,9 +187,9 @@ class GAT_delta(nn.Module):
     def forward(self, g, inputs, ngh_high_deg=None, ngh_low_deg=None, edge_mask=None):
         h = inputs
 
-        # GAT need add_self_loop
-        g = dgl.remove_self_loop(g)
-        g = dgl.add_self_loop(g)
+        # # GAT need add_self_loop
+        # g = dgl.remove_self_loop(g)
+        # g = dgl.add_self_loop(g)
 
         for i, layer in enumerate(self.layers):
             h = layer(g, h, edge_mask)
