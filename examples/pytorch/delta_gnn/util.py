@@ -104,9 +104,32 @@ def get_dst_nghs_multi_layers(g, root_nodes, layer_num):
         nodes_q.extend(ngh_per_layer)
         ngh_per_layer.clear()
 
-    nghs_total = list(set(nghs_total))
+    # nghs_total = list(set(nghs_total))
 
     return nghs_total
+
+
+def get_dst_nghs_multi_layers_with_mapping(g, root_nodes, layer_num):
+    """
+    Return the nghs and a mapping dict (Dict format, k: ngh_v, v: root_v)
+    """
+    nodes_q = list(cp.deepcopy(root_nodes))
+    nghs_total = []
+    ngh_per_layer = []
+    dict_v = dict()
+    for i in range(layer_num):
+        for node in nodes_q:
+            nghs = g.successors(node).cpu().numpy().tolist()
+            ngh_per_layer.extend(nghs)
+            for ngh in nghs:
+                nghs_total.append(ngh)
+                if ngh not in dict_v:
+                    dict_v[ngh] = node
+        nodes_q.clear()
+        nodes_q.extend(ngh_per_layer)
+        ngh_per_layer.clear()
+
+    return nghs_total, dict_v
 
 
 def get_ngh_with_deg_th(g, root_nodes, deg_th):

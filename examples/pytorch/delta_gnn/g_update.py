@@ -425,6 +425,7 @@ def update_g_attr_evo(new_nodes, g_evo, g_orig, node_map_orig2evo, node_map_evo2
     new_nodes_evo = get_nodes_reindex(node_map_orig2evo, new_nodes)
     nodes_index_evo.extend(new_nodes_evo)
     new_nodes_evo_nghs = util.get_dst_nghs_multi_layers(g_evo, new_nodes_evo, layer_num)
+    new_nodes_evo_nghs = list(set(new_nodes_evo_nghs))
     nodes_index_evo.extend(new_nodes_evo_nghs)
     random.shuffle(nodes_index_evo)
 
