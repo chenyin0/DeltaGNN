@@ -147,15 +147,16 @@ def main(args):
                         if g_evo.in_degrees(v_id) > deg_th:
                             nghs = g_evo.predecessors(v_id).numpy().tolist()
                             ngh_num = len(nghs)
-                            for ngh in nghs and visited[i] != 1:
-                                nodes_q_pair.insert(0, [i, v_layer + 1])  # Insert stack front
-                                trace_item = [
-                                    v_id, ngh_num, ngh,
-                                    g_evo.in_degrees(ngh),
-                                    g_evo.out_degrees(ngh)
-                                ]
-                                mem_trace.append(trace_item)
-                                visited[i] = 1
+                            for ngh in nghs:
+                                if visited[i] != 1:
+                                    nodes_q_pair.insert(0, [i, v_layer + 1])  # Insert stack front
+                                    trace_item = [
+                                        v_id, ngh_num, ngh,
+                                        g_evo.in_degrees(ngh),
+                                        g_evo.out_degrees(ngh)
+                                    ]
+                                    mem_trace.append(trace_item)
+                                    visited[i] = 1
                         else:
                             root_v = dict_map[v_id]
                             trace_item = [
@@ -176,14 +177,15 @@ def main(args):
                             nghs = g_evo.predecessors(v).numpy().tolist()
                             ngh_per_layer.extend(nghs)
                             ngh_num = len(nghs)
-                            for ngh in nghs and visited[ngh] != 1:
-                                trace_item = [
-                                    v, ngh_num, ngh,
-                                    g_evo.in_degrees(ngh),
-                                    g_evo.out_degrees(ngh)
-                                ]
-                                mem_trace.append(trace_item)
-                                visited[ngh] = 1
+                            for ngh in nghs:
+                                if visited[ngh] != 1:
+                                    trace_item = [
+                                        v, ngh_num, ngh,
+                                        g_evo.in_degrees(ngh),
+                                        g_evo.out_degrees(ngh)
+                                    ]
+                                    mem_trace.append(trace_item)
+                                    visited[ngh] = 1
                         else:
                             root_v = dict_map[v]
                             trace_item = [
@@ -208,14 +210,15 @@ def main(args):
                         ngh_per_layer.extend(nghs)
                         # nghs_total.extend(nghs)
                         ngh_num = len(nghs)
-                        for ngh in nghs and visited[ngh] != 1:
-                            trace_item = [
-                                v, ngh_num, ngh,
-                                g_evo.in_degrees(ngh),
-                                g_evo.out_degrees(ngh)
-                            ]
-                            mem_trace.append(trace_item)
-                            visited[ngh] = 1
+                        for ngh in nghs:
+                            if visited[ngh] != 1:
+                                trace_item = [
+                                    v, ngh_num, ngh,
+                                    g_evo.in_degrees(ngh),
+                                    g_evo.out_degrees(ngh)
+                                ]
+                                mem_trace.append(trace_item)
+                                visited[ngh] = 1
                     vertex_q.clear()
                     vertex_q.extend(ngh_per_layer)
                     ngh_per_layer.clear()
