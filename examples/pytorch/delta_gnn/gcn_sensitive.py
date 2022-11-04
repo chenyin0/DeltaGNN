@@ -11,7 +11,7 @@ from gcn import GCN
 #from gcn_mp import GCN
 #from gcn_spmv import GCN
 
-import plt_graph
+# import plt_graph
 import random
 import math
 import copy
