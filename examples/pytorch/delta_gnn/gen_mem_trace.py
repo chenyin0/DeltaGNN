@@ -75,7 +75,8 @@ def main(args):
             # node_q = util.bfs_traverse(g_csr, root_node_q)
             nodes_q = g.nodes().numpy().tolist()
         elif args.dataset == 'ogbn-arxiv' or args.dataset == 'ogbn-mag':
-            nodes_q = util.sort_node_by_timestamp('../../../dataset/' + args.dataset + '_node_year.csv')
+            nodes_q = util.sort_node_by_timestamp('../../../dataset/' + args.dataset +
+                                                  '_node_year.csv')
 
         with open(file_, 'w') as f:
             for i in nodes_q:
@@ -106,7 +107,8 @@ def main(args):
     theTime = datetime.datetime.now().strftime(ISOTIMEFORMAT)
     theTime = str(theTime)
     if arch == 'delta-gnn' or arch == 'delta-gnn-opt':
-        file_path = '../../../results/mem_trace/' + args.dataset + '_' + arch + '_' + str(deg_th) + '.txt'
+        file_path = '../../../results/mem_trace/' + args.dataset + '_' + arch + '_' + str(
+            deg_th) + '.txt'
     else:
         file_path = '../../../results/mem_trace/' + args.dataset + '_' + arch + '.txt'
     os.system('rm ' + file_path)  # Reset mem trace
@@ -128,9 +130,10 @@ def main(args):
 
         # Get node index of added_nodes in evolve graph
         inserted_nodes_evo = g_update.get_nodes_reindex(node_map_orig2evo, inserted_nodes)
-        visited = [0 for i in range(g_evo.number_of_nodes())]
+        inserted_nodes_evo = inserted_nodes_evo[:50]  # Sampling
+        # visited = [0 for i in range(g_evo.number_of_nodes())]
         # affected_nghs = util.get_dst_nghs_multi_layers(g_evo, inserted_nodes_evo, n_layer)
-
+        visited_layerwise = [[0 for i in range(g_evo.number_of_nodes())] for i in range(n_layer)]
         # Only record the last time graph evolving, for saving sim time
         if i == len(node_seq[1:]) - 1:
             if arch == 'delta-gnn-opt':
@@ -148,30 +151,35 @@ def main(args):
                             nghs = g_evo.predecessors(v_id).numpy().tolist()
                             ngh_num = len(nghs)
                             for ngh in nghs:
-                                if visited[i] != 1:
-                                    nodes_q_pair.insert(0, [i, v_layer + 1])  # Insert stack front
+                                if visited_layerwise[v_layer][ngh] != 1:
+                                    nodes_q_pair.insert(0, [ngh, v_layer + 1])  # Insert stack front
                                     trace_item = [
                                         v_id, ngh_num, ngh,
                                         g_evo.in_degrees(ngh),
                                         g_evo.out_degrees(ngh)
                                     ]
                                     mem_trace.append(trace_item)
-                                    visited[i] = 1
+                                    visited_layerwise[v_layer][ngh] = 1
+                                    if ngh not in dict_map:
+                                        dict_map[ngh] = v_id
                         else:
-                            root_v = dict_map[v_id]
-                            trace_item = [
-                                root_v,
-                                g_evo.out_degrees(root_v), v_id,
-                                g_evo.in_degrees(v_id),
-                                g_evo.out_degrees(v_id)
-                            ]
-                            mem_trace.append(trace_item)
+                            if visited_layerwise[v_layer][v_id] != 1:
+                                root_v = dict_map[v_id]
+                                trace_item = [
+                                    root_v,
+                                    g_evo.out_degrees(root_v), v_id,
+                                    g_evo.in_degrees(v_id),
+                                    g_evo.out_degrees(v_id)
+                                ]
+                                mem_trace.append(trace_item)
+                                visited_layerwise[v_layer][v_id] = 1
             elif arch == 'delta-gnn':
                 affected_nodes, dict_map = util.get_dst_nghs_multi_layers_with_mapping(
                     g_evo, inserted_nodes_evo, n_layer)
                 vertex_q = affected_nodes
                 ngh_per_layer = []
                 for i in range(n_layer):
+                    visited = [0 for i in range(g_evo.number_of_nodes())]
                     for v in vertex_q:
                         if g_evo.out_degree(v) > deg_th:
                             nghs = g_evo.predecessors(v).numpy().tolist()
@@ -186,15 +194,19 @@ def main(args):
                                     ]
                                     mem_trace.append(trace_item)
                                     visited[ngh] = 1
+                                    if ngh not in dict_map:
+                                        dict_map[ngh] = v
                         else:
-                            root_v = dict_map[v]
-                            trace_item = [
-                                root_v,
-                                g_evo.out_degrees(root_v), v,
-                                g_evo.in_degrees(v),
-                                g_evo.out_degrees(v)
-                            ]
-                            mem_trace.append(trace_item)
+                            if visited[v] != 1:
+                                root_v = dict_map[v]
+                                trace_item = [
+                                    root_v,
+                                    g_evo.out_degrees(root_v), v,
+                                    g_evo.in_degrees(v),
+                                    g_evo.out_degrees(v)
+                                ]
+                                mem_trace.append(trace_item)
+                                visited[v] = 1
                     vertex_q.clear()
                     vertex_q.extend(ngh_per_layer)
                     ngh_per_layer.clear()
@@ -205,6 +217,7 @@ def main(args):
                 ngh_per_layer = []
                 # nghs_total = []
                 for i in range(n_layer):
+                    visited = [0 for i in range(g_evo.number_of_nodes())]
                     for v in vertex_q:
                         nghs = g_evo.predecessors(v).numpy().tolist()
                         ngh_per_layer.extend(nghs)
@@ -242,6 +255,7 @@ def main(args):
                     vertex_q.extend(ngh_per_layer)
                     ngh_per_layer.clear()
 
+            # Dump trace
             with open(file_path, mode='a+') as f:
                 for line in mem_trace:
                     for item in line:
@@ -312,7 +326,7 @@ if __name__ == '__main__':
     # args.dataset = 'ogbn-mag'
 
     # args.n_epochs = 200
-    # args.deg_threshold = 0
+    # args.deg_threshold = 30
     # args.gpu = 0
 
     print('\n************ {:s} ************'.format(args.dataset))

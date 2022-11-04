@@ -8,6 +8,7 @@ deg_th_list_large_dataset = [10, 20, 50, 100, 300, 500]
 # epoch = 200
 # task_num = len(deg_th_list)
 arch_list = ['hygcn', 'awb-gcn', 'i-gcn', 'regnn', 'delta-gnn', 'delta-gnn-opt']
+# arch_list = ['delta-gnn', 'delta-gnn-opt']
 dataset_list = ['cora', 'citeseer', 'ogbn-arxiv', 'ogbn-mag']
 
 ISOTIMEFORMAT = '%m%d_%H%M'
@@ -53,15 +54,16 @@ for dataset in dataset_list:
                 deg_th_list = deg_th_list_large_dataset
             for deg_th in deg_th_list:
                 time_subtask_start = time.perf_counter()
-                os.system('/usr/bin/python3.8 ./gen_mem_trace.py --dataset=' + dataset + ' --arch=' + arch +
-                          ' --deg-threshold=' + str(deg_th) + ' | tee -a ' + log_path)
+                os.system('/usr/bin/python3.8 ./gen_mem_trace.py --dataset=' + dataset +
+                          ' --arch=' + arch + ' --deg-threshold=' + str(deg_th) + ' | tee -a ' +
+                          log_path)
                 print('\n>> SubTask {:s} @ {:s} deg_th={:s} exe time: {:s}'.format(
                     arch, dataset, str(deg_th),
                     util.time_format(time.perf_counter() - time_subtask_start)))
         else:
             time_subtask_start = time.perf_counter()
-            os.system('/usr/bin/python3.8 ./gen_mem_trace.py --dataset=' + dataset + ' --arch=' + arch +
-                      ' | tee -a ' + log_path)
+            os.system('/usr/bin/python3.8 ./gen_mem_trace.py --dataset=' + dataset + ' --arch=' +
+                      arch + ' | tee -a ' + log_path)
             print('\n>> SubTask {:s} @ {:s} exe time: {:s}'.format(
                 arch, dataset, util.time_format(time.perf_counter() - time_subtask_start)))
 
