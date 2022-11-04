@@ -1,6 +1,4 @@
-import os, sys
-os.chdir(sys.path[0])
-print(sys.path)
+import os
 import argparse
 import time
 
@@ -298,14 +296,14 @@ if __name__ == '__main__':
     # parser.set_defaults(self_loop=False)
     args = parser.parse_args()
 
-    args.arch = 'hygcn'
+    # args.arch = 'hygcn'
     # args.arch = 'awb-gcn'
     # args.arch = 'i-gcn'
     # args.arch = 'regnn'
     # args.arch = 'delta-gnn'
     # args.arch = 'delta-gnn-opt'
 
-    args.dataset = 'cora'
+    # args.dataset = 'cora'
     # args.dataset = 'citeseer'
     # args.dataset = 'ogbn-arxiv'
     # args.dataset = 'ogbn-mag'
