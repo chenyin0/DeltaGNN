@@ -46,7 +46,7 @@ os.system('rm ' + log_path)
 
 for dataset in dataset_list:
     for arch in arch_list:
-        if arch == 'delta-gnn' or arch == 'delta-gnn-opy':
+        if arch == 'delta-gnn' or arch == 'delta-gnn-opt':
             if dataset == 'cora' or dataset == 'citeseer':
                 deg_th_list = deg_th_list_small_dataset
             elif dataset == 'ogbn-arxiv' or dataset == 'ogbn-mag':
