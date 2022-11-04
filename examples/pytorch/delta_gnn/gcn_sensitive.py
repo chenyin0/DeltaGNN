@@ -135,11 +135,11 @@ def add_noise_in_deg(g, degree_list, degree_begin, degree_end, intensity, node_r
 def main(args):
     # load and preprocess dataset
     if args.dataset == 'cora':
-        data = CoraGraphDataset(raw_dir='./dataset', reverse_edge=False)
+        data = CoraGraphDataset(raw_dir='../../../dataset', reverse_edge=False)
     elif args.dataset == 'citeseer':
-        data = CiteseerGraphDataset(raw_dir='./dataset', reverse_edge=False)
+        data = CiteseerGraphDataset(raw_dir='../../../dataset', reverse_edge=False)
     elif args.dataset == 'pubmed':
-        data = PubmedGraphDataset(raw_dir='./dataset', reverse_edge=False)
+        data = PubmedGraphDataset(raw_dir='../../../dataset', reverse_edge=False)
     else:
         raise ValueError('Unknown dataset: {}'.format(args.dataset))
 

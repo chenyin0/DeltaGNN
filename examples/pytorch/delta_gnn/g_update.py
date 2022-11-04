@@ -60,11 +60,18 @@ def update_g_struct_init(args, init_ratio, init_nodes, g_orig, node_map_orig2evo
     time_start = time.perf_counter()
 
     # Read edge_nodes
-    file_edge_nodes = pathlib.Path('./dataset/edge_src_dst_nodes/' + args.dataset +
+    # file_edge_nodes = pathlib.Path('./dataset/edge_src_dst_nodes/' + args.dataset +
+    #                                '_g_struct_init_' + str(init_ratio) + '.txt')
+    # file_map_orig2evo = pathlib.Path('./dataset/edge_src_dst_nodes/' + args.dataset +
+    #                                  '_map_orig2evo_' + str(init_ratio) + '.txt')
+    # file_map_evo2orig = pathlib.Path('./dataset/edge_src_dst_nodes/' + args.dataset +
+    #                                  '_map_evo2orig_' + str(init_ratio) + '.txt')
+
+    file_edge_nodes = pathlib.Path('../../../dataset/edge_src_dst_nodes/' + args.dataset +
                                    '_g_struct_init_' + str(init_ratio) + '.txt')
-    file_map_orig2evo = pathlib.Path('./dataset/edge_src_dst_nodes/' + args.dataset +
+    file_map_orig2evo = pathlib.Path('../../../dataset/edge_src_dst_nodes/' + args.dataset +
                                      '_map_orig2evo_' + str(init_ratio) + '.txt')
-    file_map_evo2orig = pathlib.Path('./dataset/edge_src_dst_nodes/' + args.dataset +
+    file_map_evo2orig = pathlib.Path('../../../dataset/edge_src_dst_nodes/' + args.dataset +
                                      '_map_evo2orig_' + str(init_ratio) + '.txt')
 
     if file_edge_nodes.exists() and file_map_orig2evo.exists() and file_map_evo2orig.exists():

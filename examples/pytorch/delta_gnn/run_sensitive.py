@@ -18,7 +18,7 @@ theTime = str(theTime)
 Task_time_start = time.perf_counter()
 
 # Predefined
-log_path = './results/' + theTime + '_log.txt'
+log_path = '../../../results/' + theTime + '_log.txt'
 
 # Remove previous log
 os.system('rm ' + log_path)

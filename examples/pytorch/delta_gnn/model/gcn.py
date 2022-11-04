@@ -79,7 +79,7 @@ def train(args, model, device, lr, weight_decay):
 
         loss_log.append(round(loss.item(), 2))
 
-    np.savetxt('./results/loss/' + args.dataset + '_evo_loss' + '.txt', loss_log, fmt='%.2f')
+    np.savetxt('../../../results/loss/' + args.dataset + '_evo_loss' + '.txt', loss_log, fmt='%.2f')
 
     # acc = evaluate(model, val_mask, device)
     # print("Epoch {:05d} | Time(s) {:.4f} | Loss {:.4f} | Accuracy {:.4f} | "
@@ -281,7 +281,7 @@ def train_delta_edge_masked(args,
         #                                     n_edges / np.mean(dur) / 1000))
 
         loss_log.append(round(loss.item(), 2))
-    np.savetxt('./results/loss/' + args.dataset + '_evo_delta_loss' + '.txt', loss_log, fmt='%.2f')
+    np.savetxt('../../../results/loss/' + args.dataset + '_evo_delta_loss' + '.txt', loss_log, fmt='%.2f')
 
     # Update embedding
     model.embedding = torch.nn.Parameter(logits)

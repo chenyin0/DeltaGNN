@@ -41,7 +41,7 @@ def main(args):
     if model_name == 'gcn':
         path = os.getcwd()
         print(path)
-        with open("./examples/pytorch/delta_gnn/gcn_para.json", 'r') as f:
+        with open('./gcn_para.json', 'r') as f:
             para = json.load(f)
             n_hidden = para['--n-hidden']
             n_layers = para['--n-layers']
@@ -49,7 +49,7 @@ def main(args):
             weight_decay = para['--weight-decay']
             dropout = para['--dropout']
     elif model_name == 'graphsage':
-        with open('./examples/pytorch/delta_gnn/graphsage_para.json', 'r') as f:
+        with open('./graphsage_para.json', 'r') as f:
             para = json.load(f)
             n_hidden = para['--n-hidden']
             n_layers = para['--n-layers']
@@ -62,7 +62,7 @@ def main(args):
             weight_decay = para['--weight-decay']
             dropout = para['--dropout']
     elif model_name == 'gat':
-        with open('./examples/pytorch/delta_gnn/gat_para.json', 'r') as f:
+        with open('./gat_para.json', 'r') as f:
             para = json.load(f)
             n_hidden = para['--n-hidden']
             n_layers = para['--n-layers']
@@ -79,19 +79,19 @@ def main(args):
     transform = (AddSelfLoop()
                  )  # by default, it will first remove self-loops to prevent duplication
     if args.dataset == 'cora':
-        dataset = CoraGraphDataset(raw_dir='./dataset', transform=transform)
+        dataset = CoraGraphDataset(raw_dir='../../../dataset', transform=transform)
     elif args.dataset == 'citeseer':
-        dataset = CiteseerGraphDataset(raw_dir='./dataset', transform=transform)
+        dataset = CiteseerGraphDataset(raw_dir='../../../dataset', transform=transform)
     elif args.dataset == 'pubmed':
-        dataset = PubmedGraphDataset(raw_dir='./dataset', transform=transform)
+        dataset = PubmedGraphDataset(raw_dir='../../../dataset', transform=transform)
     elif args.dataset == 'reddit':
-        dataset = RedditDataset(raw_dir='./dataset', transform=transform)
+        dataset = RedditDataset(raw_dir='../../../dataset', transform=transform)
     elif args.dataset == 'ogbn-arxiv':
-        dataset = AsNodePredDataset(DglNodePropPredDataset('ogbn-arxiv', root='./dataset'))
+        dataset = AsNodePredDataset(DglNodePropPredDataset('ogbn-arxiv', root='../../../dataset'))
     elif args.dataset == 'ogbn-mag':
-        dataset = DglNodePropPredDataset('ogbn-mag', root='./dataset')
+        dataset = DglNodePropPredDataset('ogbn-mag', root='../../../dataset')
     elif args.dataset == 'amazon_comp':
-        dataset = AmazonCoBuyComputerDataset(raw_dir='./dataset')
+        dataset = AmazonCoBuyComputerDataset(raw_dir='../../../dataset')
     else:
         raise ValueError('Unknown dataset: {}'.format(args.dataset))
 
@@ -132,7 +132,7 @@ def main(args):
     g_csr = g.adj_sparse('csr')
     """ Traverse to get graph evolving snapshot """
     node_q = []
-    file_ = pathlib.Path('./dataset/' + args.dataset + '_evo_seq.txt')
+    file_ = pathlib.Path('../../../dataset/' + args.dataset + '_evo_seq.txt')
     if file_.exists():
         f = open(file_, "r")
         lines = f.readlines()
@@ -145,7 +145,8 @@ def main(args):
             # node_q = util.bfs_traverse(g_csr, root_node_q)
             node_q = g.nodes().numpy().tolist()
         elif args.dataset == 'ogbn-arxiv' or args.dataset == 'ogbn-mag':
-            node_q = util.sort_node_by_timestamp('./dataset/' + args.dataset + '_node_year.csv')
+            node_q = util.sort_node_by_timestamp('../../../dataset/' + args.dataset +
+                                                 '_node_year.csv')
 
         with open(file_, 'w') as f:
             for i in node_q:
@@ -359,8 +360,8 @@ def main(args):
     mem_access_q_full_retrain = []  # For gen mem trace
     mem_access_q_all_ngh = []  # For gen mem trace
     if dump_mem_trace_flag:
-        trace_path_full_retrain = './results/mem_trace/' + args.dataset + '_full_retrain.txt'
-        trace_path_all_ngh = './results/mem_trace/' + args.dataset + '_all_ngh.txt'
+        trace_path_full_retrain = '../../../results/mem_trace/' + args.dataset + '_full_retrain.txt'
+        trace_path_all_ngh = '../../../results/mem_trace/' + args.dataset + '_all_ngh.txt'
 
         os.system('rm ' + trace_path_full_retrain)  # Reset mem trace
         os.system('rm ' + trace_path_all_ngh)  # Reset mem trace
@@ -544,11 +545,11 @@ def main(args):
 
     # Dump log
     if dump_accuracy_flag:
-        np.savetxt('./results/accuracy/' + args.dataset + '_evo' + '.txt',
+        np.savetxt('../../../results/accuracy/' + args.dataset + '_evo' + '.txt',
                    accuracy,
                    fmt='%d, %d, %.2f, %.2f, %.2f')
     if dump_node_access_flag:
-        np.savetxt('./results/node_access/' + args.dataset + '_evo.txt',
+        np.savetxt('../../../results/node_access/' + args.dataset + '_evo.txt',
                    delta_neighbor,
                    fmt='%d, %d, %d, %d')
 

@@ -100,7 +100,7 @@ def count_affected_node_ratio():
     """
     Count the affected nodes ratio with graph evolving
     """
-    cites = load_data('./dataset/cora_src/cora_cites.txt')
+    cites = load_data('../../../dataset/cora_src/cora_cites.txt')
 
     node_set = set()
     child_csr = dict()  # Record the children of each node

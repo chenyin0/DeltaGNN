@@ -803,8 +803,8 @@ def save_graph_csr(g, dataset):
     indptr = g_csr[0].numpy().tolist()
     indices = g_csr[1].numpy().tolist()
 
-    np.savetxt('./dataset/csr/' + dataset + '_indptr.txt', indptr, fmt='%d')
-    np.savetxt('./dataset/csr/' + dataset + '_indices.txt', indices, fmt='%d')
+    np.savetxt('../../../dataset/csr/' + dataset + '_indptr.txt', indptr, fmt='%d')
+    np.savetxt('../../../dataset/csr/' + dataset + '_indices.txt', indices, fmt='%d')
 
 
 def dump_mem_trace(queue, file_path):
@@ -1009,7 +1009,7 @@ def sort_node_by_timestamp(file_path):
         total += len(i)
         accumulation.append(total)
 
-    np.savetxt('./results/graph_struct_evo/graph_structure_evo.txt', accumulation, fmt='%d')
+    np.savetxt('../../../results/graph_struct_evo/graph_structure_evo.txt', accumulation, fmt='%d')
 
     return node_q_sort_by_time
 
