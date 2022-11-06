@@ -22,7 +22,7 @@ import pathlib
 def main(args):
     # Overall task execution time
     Task_time_start = time.perf_counter()
-
+    print('>> Task start time: ', time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()))
     # # Load GNN model parameter
     model_name = args.model
 
@@ -103,9 +103,9 @@ def main(args):
     """
     mem_trace = []
     deg_th = args.deg_threshold
-    ISOTIMEFORMAT = '%m%d_%H%M'
-    theTime = datetime.datetime.now().strftime(ISOTIMEFORMAT)
-    theTime = str(theTime)
+    # ISOTIMEFORMAT = '%m%d_%H%M'
+    # theTime = datetime.datetime.now().strftime(ISOTIMEFORMAT)
+    # theTime = str(theTime)
     if arch == 'delta-gnn' or arch == 'delta-gnn-opt':
         file_path = '../../../results/mem_trace/' + args.dataset + '_' + arch + '_' + str(
             deg_th) + '.txt'
@@ -116,6 +116,7 @@ def main(args):
     #     print('New file!')
 
     n_layer = 2
+    sample_num = args.sample_node_num
     # Add new nodes
     for i in range(len(node_seq[1:])):
         print('\n>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
@@ -125,12 +126,15 @@ def main(args):
                                                           g_evo.number_of_nodes()))
         iter_time_start = time.perf_counter()
 
-        g_evo = g_update.graph_evolve(inserted_nodes, g_csr, g, node_map_orig2evo,
-                                      node_map_evo2orig, n_layer, g_evo)
+        # g_evo = g_update.graph_evolve(inserted_nodes, g_csr, g, node_map_orig2evo,
+        #                               node_map_evo2orig, n_layer, g_evo)
+        g_evo = g_update.graph_evolve_by_trace(args, g_struct_init_ratio, i, inserted_nodes, g,
+                                               node_map_orig2evo, node_map_evo2orig, n_layer, g_evo)
 
         # Get node index of added_nodes in evolve graph
         inserted_nodes_evo = g_update.get_nodes_reindex(node_map_orig2evo, inserted_nodes)
-        inserted_nodes_evo = inserted_nodes_evo[:50]  # Sampling
+        # inserted_nodes_evo = inserted_nodes_evo[:50]  # Sampling for small graph
+        inserted_nodes_evo = inserted_nodes_evo[:sample_num]  # Sampling for large graph
         # visited = [0 for i in range(g_evo.number_of_nodes())]
         # affected_nghs = util.get_dst_nghs_multi_layers(g_evo, inserted_nodes_evo, n_layer)
         visited_layerwise = [[0 for i in range(g_evo.number_of_nodes())] for i in range(n_layer)]
@@ -271,6 +275,7 @@ def main(args):
 
     print('\n>> Task {:s} on Arch {:s} execution time: {}'.format(
         args.dataset, args.arch, util.time_format(time.perf_counter() - Task_time_start)))
+    print('>> Task finish time: ', time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()))
 
 
 if __name__ == '__main__':
@@ -310,6 +315,10 @@ if __name__ == '__main__':
                         type=int,
                         default=0,
                         help="degree threshold of neighbors nodes")
+    parser.add_argument("--sample-node-num",
+                        type=int,
+                        default=50,
+                        help="the number of sampled nodes in new inserted nodes")
     # parser.set_defaults(self_loop=False)
     args = parser.parse_args()
 

@@ -135,7 +135,6 @@ def update_g_struct_init(args, init_ratio, init_nodes, g_orig, node_map_orig2evo
     edge_dst_nodes = th.tensor(edge_dst_nodes, dtype=th.int64)
     g_evo = dgl.graph((edge_src_nodes, edge_dst_nodes))
 
-
     # Add_self_loop
     g_evo = dgl.remove_self_loop(g_evo)
     g_evo = dgl.add_self_loop(g_evo)
@@ -145,7 +144,8 @@ def update_g_struct_init(args, init_ratio, init_nodes, g_orig, node_map_orig2evo
     g_evo = dgl.to_simple(g_evo.cpu(), return_counts='cnt', copy_ndata=True, copy_edata=True)
     g_evo = g_evo.to(device)
 
-    print('>> Finish initialize graph structure ({})'.format(util.time_format(time.perf_counter() - time_start)))
+    print('>> Finish initialize graph structure ({})'.format(
+        util.time_format(time.perf_counter() - time_start)))
 
     return g_evo
 
@@ -190,6 +190,115 @@ def update_g_struct_evo(new_nodes, g_orig, node_map_orig2evo, node_map_evo2orig,
 
     edge_src_nodes, edge_dst_nodes = gen_edge_src_edge_nodes(new_nodes, g_orig, node_map_orig2evo,
                                                              node_map_evo2orig)
+
+    edge_src_nodes = th.tensor(edge_src_nodes, dtype=th.int64)
+    edge_dst_nodes = th.tensor(edge_dst_nodes, dtype=th.int64)
+
+    # if g_evo is None:
+    #     # Construct a new graph
+    #     g_evo = dgl.graph((edge_src_nodes, edge_dst_nodes))
+    # else:
+    #     # device = th.device("cuda:0" if th.cuda.is_available() else "cpu")
+    #     edge_src_nodes = edge_src_nodes.to(g_evo.device)
+    #     edge_dst_nodes = edge_dst_nodes.to(g_evo.device)
+    #     g_evo.add_edges(edge_src_nodes, edge_dst_nodes)
+
+    edge_src_nodes = edge_src_nodes.to(g_evo.device)
+    edge_dst_nodes = edge_dst_nodes.to(g_evo.device)
+    g_evo.add_edges(edge_src_nodes, edge_dst_nodes)
+
+    # Add_self_loop
+    g_evo = dgl.remove_self_loop(g_evo)
+    g_evo = dgl.add_self_loop(g_evo)
+
+    # Remove parallel edges
+    device = g_evo.device
+    g_evo = dgl.to_simple(g_evo.cpu(), return_counts='cnt', copy_ndata=True, copy_edata=True)
+    g_evo = g_evo.to(device)
+
+    print('>> Finish update graph structure ({})'.format(
+        util.time_format(time.perf_counter() - time_start)))
+
+    return g_evo
+
+
+def update_g_struct_evo_by_trace(args, init_ratio, evo_iter, new_nodes, g_orig, node_map_orig2evo,
+                                 node_map_evo2orig, g_evo):
+    """
+    Dump and read nodes from file, to save time for large graph
+    
+    evo_iter: the times of evo iter
+    """
+
+    print('>> Start update graph structure')
+    time_start = time.perf_counter()
+
+    file_edge_nodes = pathlib.Path('../../../dataset/edge_src_dst_nodes/' + args.dataset +
+                                   '_g_struct_evo_' + str(init_ratio) + '_evo_iter_' +
+                                   str(evo_iter) + '.txt')
+    file_map_orig2evo = pathlib.Path('../../../dataset/edge_src_dst_nodes/' + args.dataset +
+                                     '_map_orig2evo_' + str(init_ratio) + '_evo_iter_' +
+                                     str(evo_iter) + '.txt')
+    file_map_evo2orig = pathlib.Path('../../../dataset/edge_src_dst_nodes/' + args.dataset +
+                                     '_map_evo2orig_' + str(init_ratio) + '_evo_iter_' +
+                                     str(evo_iter) + '.txt')
+
+    if file_edge_nodes.exists() and file_map_orig2evo.exists() and file_map_evo2orig.exists():
+        # Read edge nodes
+        edge_src_nodes = []
+        edge_dst_nodes = []
+        f = open(file_edge_nodes, "r")
+        lines = f.readlines()
+        for line in lines:
+            line = line.strip('\n')  # Delete '\n'
+            tmp = line.split(' ')
+            edge_src_nodes.append(int(tmp[0]))
+            edge_dst_nodes.append(int(tmp[1]))
+
+        # Read node_map_orig2evo
+        dict_orig2evo_tmp = {}
+        f = open(file_map_orig2evo, "r")
+        lines = f.readlines()
+        for line in lines:
+            line = line.strip('\n')  # Delete '\n'
+            tmp = line.split(' ')
+            k = int(tmp[0])
+            v = int(tmp[1])
+            dict_orig2evo_tmp[k] = v
+        node_map_orig2evo.update(dict_orig2evo_tmp)
+
+        # Read node_map_evo2orig
+        dict_evo2orig_tmp = {}
+        f = open(file_map_evo2orig, "r")
+        lines = f.readlines()
+        for line in lines:
+            line = line.strip('\n')  # Delete '\n'
+            tmp = line.split(' ')
+            k = int(tmp[0])
+            v = int(tmp[1])
+            dict_evo2orig_tmp[k] = v
+        node_map_evo2orig.update(dict_evo2orig_tmp)
+
+    else:
+        edge_src_nodes, edge_dst_nodes = gen_edge_src_edge_nodes(new_nodes, g_orig, node_map_orig2evo,
+                                                             node_map_evo2orig)
+
+        # Write edge
+        with open(file_edge_nodes, 'w') as f:
+            for i in range(len(edge_src_nodes)):
+                edge_src_n = edge_src_nodes[i]
+                edge_dst_n = edge_dst_nodes[i]
+                f.write(str(edge_src_n) + ' ' + str(edge_dst_n) + '\n')
+
+        # Write node_map_orig2evo
+        with open(file_map_orig2evo, 'w') as f:
+            for k, v in node_map_orig2evo.items():
+                f.write(str(k) + ' ' + str(v) + '\n')
+
+        # Write node_map_evo2orig
+        with open(file_map_evo2orig, 'w') as f:
+            for k, v in node_map_evo2orig.items():
+                f.write(str(k) + ' ' + str(v) + '\n')
 
     edge_src_nodes = th.tensor(edge_src_nodes, dtype=th.int64)
     edge_dst_nodes = th.tensor(edge_dst_nodes, dtype=th.int64)
@@ -285,6 +394,19 @@ def graph_struct_init(args, init_ratio, new_nodes, g_orig, node_map_orig2evo, no
     g_evo = update_g_struct_init(args, init_ratio, new_nodes, g_orig, node_map_orig2evo,
                                  node_map_evo2orig)
     update_g_attr_init(g_evo, g_orig, node_map_evo2orig)
+
+    return g_evo
+
+
+def graph_evolve_by_trace(args, init_ratio, evo_iter, new_nodes, g_orig, node_map_orig2evo,
+                          node_map_evo2orig, layer_num, g_evo):
+    """
+    Construct evolve graph from trace for saving time
+    """
+
+    g_evo = update_g_struct_evo_by_trace(args, init_ratio, evo_iter, new_nodes, g_orig,
+                                         node_map_orig2evo, node_map_evo2orig, g_evo)
+    update_g_attr_evo(new_nodes, g_evo, g_orig, node_map_orig2evo, node_map_evo2orig, layer_num)
 
     return g_evo
 
