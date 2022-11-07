@@ -406,7 +406,7 @@ def graph_evolve_by_trace(args, init_ratio, evo_iter, new_nodes, g_orig, node_ma
 
     g_evo = update_g_struct_evo_by_trace(args, init_ratio, evo_iter, new_nodes, g_orig,
                                          node_map_orig2evo, node_map_evo2orig, g_evo)
-    update_g_attr_evo(new_nodes, g_evo, g_orig, node_map_orig2evo, node_map_evo2orig, layer_num)
+    # update_g_attr_evo(new_nodes, g_evo, g_orig, node_map_orig2evo, node_map_evo2orig, layer_num)
 
     return g_evo
 
