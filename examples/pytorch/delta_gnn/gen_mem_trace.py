@@ -134,7 +134,8 @@ def main(args):
         # Get node index of added_nodes in evolve graph
         inserted_nodes_evo = g_update.get_nodes_reindex(node_map_orig2evo, inserted_nodes)
         # inserted_nodes_evo = inserted_nodes_evo[:50]  # Sampling for small graph
-        inserted_nodes_evo = inserted_nodes_evo[:sample_num]  # Sampling for large graph
+        if sample_num < len(inserted_nodes_evo):
+            inserted_nodes_evo = inserted_nodes_evo[:sample_num]  # Sampling for large graph
         # visited = [0 for i in range(g_evo.number_of_nodes())]
         # affected_nghs = util.get_dst_nghs_multi_layers(g_evo, inserted_nodes_evo, n_layer)
         visited_layerwise = [[0 for i in range(g_evo.number_of_nodes())] for i in range(n_layer)]
@@ -190,16 +191,16 @@ def main(args):
                             ngh_per_layer.extend(nghs)
                             ngh_num = len(nghs)
                             for ngh in nghs:
-                                if visited[ngh] != 1:
-                                    trace_item = [
-                                        v, ngh_num, ngh,
-                                        g_evo.in_degrees(ngh),
-                                        g_evo.out_degrees(ngh)
-                                    ]
-                                    mem_trace.append(trace_item)
-                                    visited[ngh] = 1
-                                    if ngh not in dict_map:
-                                        dict_map[ngh] = v
+                                # if visited[ngh] != 1:
+                                trace_item = [
+                                    v, ngh_num, ngh,
+                                    g_evo.in_degrees(ngh),
+                                    g_evo.out_degrees(ngh)
+                                ]
+                                mem_trace.append(trace_item)
+                                visited[ngh] = 1
+                                if ngh not in dict_map:
+                                    dict_map[ngh] = v
                         else:
                             if visited[v] != 1:
                                 root_v = dict_map[v]

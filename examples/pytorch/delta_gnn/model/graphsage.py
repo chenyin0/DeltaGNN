@@ -148,7 +148,7 @@ def evaluate(device, model, mask, batch_size):
     Evaluate with all neighbor aggregation (Used in test)
     """
 
-    mask = mask.bool().to(device)  # Convert int8 to bool
+    mask = mask.bool()  # Convert int8 to bool
     g = model.g
     model.eval()
     with th.no_grad():
