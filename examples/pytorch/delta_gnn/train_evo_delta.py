@@ -32,6 +32,7 @@ import pathlib
 def main(args):
     # Overall task execution time
     Task_time_start = time.perf_counter()
+    print('>> Task start time: ', time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()))
 
     # Load GNN model parameter
     model_name = args.model
@@ -148,7 +149,8 @@ def main(args):
             # node_q = util.bfs_traverse(g_csr, root_node_q)
             node_q = g.nodes().numpy().tolist()
         elif args.dataset == 'ogbn-arxiv' or args.dataset == 'ogbn-mag':
-            node_q = util.sort_node_by_timestamp('../../../dataset/' + args.dataset + '_node_year.csv')
+            node_q = util.sort_node_by_timestamp('../../../dataset/' + args.dataset +
+                                                 '_node_year.csv')
 
         with open(file_, 'w') as f:
             for i in node_q:
@@ -377,25 +379,25 @@ def main(args):
             else:
                 if model_name == 'gcn':
                     # gcn.train_delta_edge_masked(args, model_delta_all_ngh, device, lr, weight_decay)
-                    if (i + 1) % retrain_epoch == 0 or i == 0:
-                        gcn.train_delta_edge_masked(args, model_delta_all_ngh, device, lr,
-                                                    weight_decay, nodes_high_deg, nodes_low_deg)
+                    # if (i + 1) % retrain_epoch == 0 or i == 0:
+                    gcn.train_delta_edge_masked(args, model_delta_all_ngh, device, lr, weight_decay,
+                                                nodes_high_deg, nodes_low_deg)
                     acc = gcn.evaluate_delta_edge_masked(model_delta_all_ngh, test_mask, device,
                                                          nodes_high_deg, nodes_low_deg)
                     # acc = gcn.evaluate_delta_edge_masked(model_delta_all_ngh, test_mask, device)
 
                 elif model_name == 'graphsage':
-                    if (i + 1) % retrain_epoch == 0 or i == 0:
-                        graphsage.train_delta_edge_masked(args, model_delta_all_ngh, device,
-                                                          fan_out, batch_size, lr, weight_decay,
-                                                          nodes_high_deg, nodes_low_deg)
+                    # if (i + 1) % retrain_epoch == 0 or i == 0:
+                    graphsage.train_delta_edge_masked(args, model_delta_all_ngh, device, fan_out,
+                                                      batch_size, lr, weight_decay, nodes_high_deg,
+                                                      nodes_low_deg)
                     acc = graphsage.evaluate_delta_edge_masked(device, model_delta_all_ngh,
                                                                test_mask, batch_size,
                                                                nodes_high_deg, nodes_low_deg)
                 elif model_name == 'gat':
-                    if (i + 1) % retrain_epoch == 0 or i == 0:
-                        gat.train_delta_edge_masked(args, model_delta_all_ngh, device, lr,
-                                                    weight_decay, nodes_high_deg, nodes_low_deg)
+                    # if (i + 1) % retrain_epoch == 0 or i == 0:
+                    gat.train_delta_edge_masked(args, model_delta_all_ngh, device, lr, weight_decay,
+                                                nodes_high_deg, nodes_low_deg)
                     acc = gat.evaluate_delta_edge_masked(model_delta_all_ngh, test_mask, device,
                                                          nodes_high_deg, nodes_low_deg)
 
@@ -412,16 +414,18 @@ def main(args):
 
         i += 1
 
-    deg_th = str(args.deg_threshold)
-    # Dump log
-    if dump_accuracy_flag:
-        np.savetxt('../../../results/accuracy/' + args.dataset + '_evo_delta_' + deg_th + '.txt',
-                   accuracy,
-                   fmt='%d, %d, %.2f')
-    if dump_node_access_flag:
-        np.savetxt('../../../results/node_access/' + args.dataset + '_evo_delta_deg_' + deg_th + '.txt',
-                   delta_neighbor,
-                   fmt='%d, %d')
+        deg_th = str(args.deg_threshold)
+        # Dump log
+        if dump_accuracy_flag:
+            np.savetxt('../../../results/accuracy/' + args.dataset + '_' + args.model + '_' +
+                       '_evo_delta_' + deg_th + '.txt',
+                       accuracy,
+                       fmt='%d, %d, %.2f')
+        if dump_node_access_flag:
+            np.savetxt('../../../results/node_access/' + args.dataset + '_' + args.model + '_' +
+                       '_evo_delta_deg_' + deg_th + '.txt',
+                       delta_neighbor,
+                       fmt='%d, %d')
 
     # plot.plt_edge_epoch()
     # plot.plt_edge_epoch(edge_epoch, result)
@@ -470,15 +474,15 @@ if __name__ == '__main__':
 
     # args.model = 'gcn'
     # args.model = 'graphsage'
-    args.model = 'gat'
+    # args.model = 'gat'
 
     # args.dataset = 'cora'
     # args.dataset = 'citeseer'
-    args.dataset = 'ogbn-arxiv'
+    # args.dataset = 'ogbn-arxiv'
     # args.dataset = 'ogbn-mag'
 
     args.n_epochs = 200
-    args.deg_threshold = [5, 5]
+    # args.deg_threshold = [100, 0]
     args.gpu = 0
 
     dump_accuracy_flag = 1

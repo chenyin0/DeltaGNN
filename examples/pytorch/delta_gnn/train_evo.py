@@ -35,6 +35,7 @@ import pathlib
 def main(args):
     # Overall task execution time
     Task_time_start = time.perf_counter()
+    print('>> Task start time: ', time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()))
 
     # Load GNN model parameter
     model_name = args.model
@@ -543,15 +544,17 @@ def main(args):
 
         i += 1
 
-    # Dump log
-    if dump_accuracy_flag:
-        np.savetxt('../../../results/accuracy/' + args.dataset + '_evo' + '.txt',
-                   accuracy,
-                   fmt='%d, %d, %.2f, %.2f, %.2f')
-    if dump_node_access_flag:
-        np.savetxt('../../../results/node_access/' + args.dataset + '_evo.txt',
-                   delta_neighbor,
-                   fmt='%d, %d, %d, %d')
+        # Dump log
+        if dump_accuracy_flag:
+            np.savetxt('../../../results/accuracy/' + args.dataset + '_' + args.model + '_' +
+                       '_evo' + '.txt',
+                       accuracy,
+                       fmt='%d, %d, %.2f, %.2f, %.2f')
+        if dump_node_access_flag:
+            np.savetxt('../../../results/node_access/' + args.dataset + '_' + args.model + '_' +
+                       '_evo.txt',
+                       delta_neighbor,
+                       fmt='%d, %d, %d, %d')
 
     # plot.plt_edge_epoch()
     # plot.plt_edge_epoch(edge_epoch, result)
@@ -600,9 +603,9 @@ if __name__ == '__main__':
 
     # args.model = 'gcn'
     # args.model = 'graphsage'
-    args.model = 'gat'
+    # args.model = 'gat'
 
-    args.dataset = 'cora'
+    # args.dataset = 'cora'
     # args.dataset = 'citeseer'
     # args.dataset = 'ogbn-arxiv'
     # args.dataset = 'ogbn-mag'
