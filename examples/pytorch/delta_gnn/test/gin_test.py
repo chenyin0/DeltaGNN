@@ -244,9 +244,9 @@ if __name__ == "__main__":
     transform = (AddSelfLoop()
                  )  # by default, it will first remove self-loops to prevent duplication
     if args.dataset == 'cora':
-        dataset = CoraGraphDataset(raw_dir='./dataset', transform=transform)
+        dataset = CoraGraphDataset(raw_dir='../../../../dataset', transform=transform)
     elif args.dataset == 'citeseer':
-        dataset = CiteseerGraphDataset(raw_dir='./dataset', transform=transform)
+        dataset = CiteseerGraphDataset(raw_dir='../../../../dataset', transform=transform)
 
     g = dataset[0]
 

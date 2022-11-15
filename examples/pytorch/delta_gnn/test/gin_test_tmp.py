@@ -161,7 +161,7 @@ if __name__ == "__main__":
     # create GIN model
     in_size = dataset.dim_nfeats
     out_size = dataset.gclasses
-    model = GIN(in_size, 16, out_size).to(device)
+    model = GIN(in_size, 128, out_size).to(device)
 
     # model training/validating
     print("Training...")

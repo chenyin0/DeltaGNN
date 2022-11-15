@@ -10,6 +10,7 @@ from dgl import AddSelfLoop
 from dgl.data import CiteseerGraphDataset, CoraGraphDataset, PubmedGraphDataset
 from ogb.nodeproppred import DglNodePropPredDataset
 from dgl.data import AsNodePredDataset
+import time
 
 
 class GCN(nn.Module):
@@ -51,7 +52,7 @@ def train(g, features, labels, masks, model):
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-2, weight_decay=5e-4)
 
     # training loop
-    for epoch in range(500):
+    for epoch in range(200):
         model.train()
         logits = model(g, features)
         loss = loss_fcn(logits[train_mask], labels[train_mask])
@@ -59,7 +60,7 @@ def train(g, features, labels, masks, model):
         loss.backward()
         optimizer.step()
         acc = evaluate(g, features, labels, val_mask, model)
-        print("Epoch {:05d} | Loss {:.4f} | Accuracy {:.4f} ".format(epoch, loss.item(), acc))
+        # print("Epoch {:05d} | Loss {:.4f} | Accuracy {:.4f} ".format(epoch, loss.item(), acc))
 
 
 if __name__ == "__main__":
@@ -77,17 +78,18 @@ if __name__ == "__main__":
     transform = (AddSelfLoop()
                  )  # by default, it will first remove self-loops to prevent duplication
     if args.dataset == "cora":
-        data = CoraGraphDataset()
+        data = CoraGraphDataset(raw_dir='../../../../dataset', transform=transform)
     elif args.dataset == "citeseer":
-        data = CiteseerGraphDataset()
+        data = CiteseerGraphDataset(raw_dir='../../../../dataset', transform=transform)
     elif args.dataset == "pubmed":
-        data = PubmedGraphDataset()
+        data = PubmedGraphDataset(raw_dir='../../../../dataset', transform=transform)
     elif args.dataset == "ogbn-arxiv":
-        data = AsNodePredDataset(DglNodePropPredDataset('ogbn-arxiv', root='./dataset'))
+        data = AsNodePredDataset(DglNodePropPredDataset('ogbn-arxiv', root='../../../../dataset'))
     else:
         raise ValueError("Unknown dataset: {}".format(args.dataset))
     g = data[0]
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    # device = 'cpu'
     g = g.int().to(device)
     g = dgl.add_self_loop(g)
     features = g.ndata["feat"]
@@ -113,7 +115,7 @@ if __name__ == "__main__":
     # create GCN model
     in_size = features.shape[1]
     out_size = data.num_classes
-    model = GCN(in_size, 256, out_size).to(device)
+    model = GCN(in_size, 128, out_size).to(device)
 
     # device = g.device
     # g = dgl.to_simple(g.cpu(), return_counts='cnt')
@@ -126,5 +128,7 @@ if __name__ == "__main__":
 
     # test the model
     print("Testing...")
+    time_start = time.perf_counter()
     acc = evaluate(g, features, labels, masks[2], model)
     print("Test accuracy {:.4f}".format(acc))
+    print('Task time: ', time.perf_counter() - time_start)

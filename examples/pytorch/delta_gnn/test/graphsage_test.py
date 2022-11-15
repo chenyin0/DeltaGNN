@@ -11,7 +11,7 @@ from dgl.data import CoraGraphDataset, CiteseerGraphDataset
 import tqdm
 import argparse
 import numpy as np
-
+import time
 
 class SAGE(nn.Module):
 
@@ -93,10 +93,10 @@ def train(args, device, g, dataset, model):
     # create sampler & dataloader
     # train_idx = dataset.train_idx.to(device)
     train_mask = g.ndata['train_mask']
-    train_idx = torch.Tensor(np.nonzero(train_mask.numpy())[0]).long()
+    train_idx = torch.Tensor(np.nonzero(train_mask.cpu().numpy())[0]).long()
     # val_idx = dataset.val_idx.to(device)
     val_mask = g.ndata['val_mask']
-    val_idx = torch.Tensor(np.nonzero(val_mask.numpy())[0]).long()
+    val_idx = torch.Tensor(np.nonzero(val_mask.cpu().numpy())[0]).long()
     sampler = NeighborSampler(
         [10, 10, 10],  # fanout for [layer-0, layer-1, layer-2]
         prefetch_node_feats=['feat'],
@@ -124,7 +124,7 @@ def train(args, device, g, dataset, model):
 
     opt = torch.optim.Adam(model.parameters(), lr=1e-3, weight_decay=5e-4)
 
-    for epoch in range(20):
+    for epoch in range(1):
         model.train()
         total_loss = 0
         for it, (input_nodes, output_nodes, blocks) in enumerate(train_dataloader):
@@ -145,7 +145,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--mode",
-        default='mixed',
+        default='cpu',
         choices=['cpu', 'mixed', 'puregpu'],
         help="Training mode. 'cpu' for CPU training, 'mixed' for CPU-GPU mixed training, "
         "'puregpu' for pure-GPU training.")
@@ -156,20 +156,21 @@ if __name__ == '__main__':
 
     # load and preprocess dataset
     print('Loading data')
-    dataset = AsNodePredDataset(DglNodePropPredDataset('ogbn-arxiv', root='./dataset'))
-    # dataset = CiteseerGraphDataset(raw_dir='./dataset')
+    # dataset = AsNodePredDataset(DglNodePropPredDataset('ogbn-arxiv', root='../../../../dataset'))
+    dataset = CiteseerGraphDataset(raw_dir='../../../../dataset')
+    # dataset = CoraGraphDataset(raw_dir='../../../../dataset', transform=transform)
     g = dataset[0]
-    g = g.to('cuda' if args.mode == 'puregpu' else 'cpu')
     device = torch.device('cpu' if args.mode == 'cpu' else 'cuda')
+    g = g.int().to(device)
 
     # create GraphSAGE model
     in_size = g.ndata['feat'].shape[1]
     out_size = dataset.num_classes
-    model = SAGE(in_size, 256, out_size).to(device)
+    model = SAGE(in_size, 128, out_size).to(device)
 
-    # train_mask = g.ndata['train_mask']
-    # val_mask = g.ndata['val_mask']
-    # test_mask = g.ndata['test_mask']
+    train_mask = g.ndata['train_mask']
+    val_mask = g.ndata['val_mask']
+    test_mask = g.ndata['test_mask']
     # print(train_mask, torch.count_nonzero(train_mask).item())
     # print(val_mask, torch.count_nonzero(val_mask).item())
     # print(test_mask, torch.count_nonzero(test_mask).item())
@@ -183,5 +184,7 @@ if __name__ == '__main__':
     print('Testing...')
     test_mask = g.ndata['test_mask']
     test_idx = torch.Tensor(np.nonzero(test_mask.numpy())[0]).long()
+    time_start = time.perf_counter()
     acc = layerwise_infer(device, g, test_idx, model, batch_size=4096)
     print("Test Accuracy {:.4f}".format(acc.item()))
+    print('Task time: ', time.perf_counter() - time_start)
