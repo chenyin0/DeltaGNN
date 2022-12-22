@@ -16,12 +16,18 @@ def plt_workload_imbalance(g_csr, deg_th):
         else:
             workload_delta.append(1)
 
-    items = ['Full-ngh updating', 'Delta updating']
+    items = ['Full updating', 'Delta updating']
 
     # workload = [0, 1, 5, 6, 9, 78]
     # workload_delta = [5, 8, 9, 63, 1, 2]
 
     data = [workload, workload_delta]
+
+    tmp = []
+    for i in range(len(workload)):
+        tmp.append([min(40, workload[i]), min(40, workload_delta[i])])
+
+    np.savetxt('./results/' + 'cora_work_balance.txt', tmp, fmt='%d, %d')
 
     # Group size in each label
     group_size = len(items)
@@ -86,7 +92,7 @@ def plt_workload_imbalance(g_csr, deg_th):
     # plt.yticks(size=10)
     # plt.xticks(size = 10)
 
-    ax1.set_ylim([0, 40])
+    ax1.set_ylim([0, 30])
     # ax1.set_yscale('log')
 
     # my_y_ticks = np.arange(0, 120, 20)

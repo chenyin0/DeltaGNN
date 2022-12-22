@@ -6,11 +6,11 @@ import subprocess
 
 deg_th_list_small_dataset = [1, 2, 5, 10, 20, 30]
 # deg_th_list_large_dataset = [50, 100, 300, 500, 1000, 2000]
-# deg_th_list_large_dataset = [10, 20, 30, 50, 100]
-deg_th_list_large_dataset = [10, 20]
+deg_th_list_large_dataset = [10, 20, 30, 50, 100]
+# deg_th_list_large_dataset = [10, 20]
 arch_list = ['gcn', 'graphsage', 'gat']
-# dataset_list = ['cora', 'citeseer', 'ogbn-arxiv', 'ogbn-mag']
-dataset_list = ['ogbn-arxiv', 'ogbn-mag']
+dataset_list = ['cora', 'citeseer', 'ogbn-arxiv', 'ogbn-mag']
+# dataset_list = ['ogbn-arxiv', 'ogbn-mag']
 epoch = 200
 # task_num = len(deg_th_list)
 
@@ -26,28 +26,28 @@ log_path = '../../../results/' + theTime + '_log.txt'
 # Remove previous log
 os.system('rm ' + log_path)
 
-epoch_str = str(epoch)
-
 # os.system('cd ./examples/pytorch/delta_gnn/')
 
 for dataset in dataset_list:
     for arch in arch_list:
         # os.system('pwd')
         if dataset == 'cora' or dataset == 'citeseer':
+            epoch = 200
             os.system('/usr/bin/python3.8 ./train_evo.py' + ' --dataset=' + dataset + ' --model=' +
-                      arch + ' --n-epochs=' + epoch_str)
+                      arch + ' --n-epochs=' + str(epoch))
 
             for deg_th in deg_th_list_small_dataset:
                 os.system('/usr/bin/python3.8 ./train_evo_delta.py' + ' --dataset=' + dataset +
                           ' --model=' + arch + ' --deg-threshold=' + str(deg_th) + ' --n-epochs=' +
-                          epoch_str)
+                          str(epoch))
         elif dataset == 'ogbn-arxiv' or dataset == 'ogbn-mag':
+            epoch = 100
             os.system('/usr/bin/python3.8 ./train_evo.py' + ' --dataset=' + dataset + ' --model=' +
-                      arch + ' --n-epochs=' + epoch_str)
+                      arch + ' --n-epochs=' + str(epoch))
             for deg_th in deg_th_list_large_dataset:
                 os.system('/usr/bin/python3.8 ./train_evo_delta.py' + ' --dataset=' + dataset +
                           ' --model=' + arch + ' --deg-threshold=' + str(deg_th) + ' --n-epochs=' +
-                          epoch_str)
+                          str(epoch))
 
 # # Cora
 # # os.system('/usr/bin/python3.8 ./train_evo.py --dataset=cora --n-epochs=' + epoch_str +

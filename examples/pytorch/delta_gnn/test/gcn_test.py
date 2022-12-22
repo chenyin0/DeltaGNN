@@ -124,11 +124,13 @@ if __name__ == "__main__":
 
     # model training
     print("Training...")
+    time_start = time.perf_counter()
     train(g, features, labels, masks, model)
+    print('Training time: ', time.perf_counter() - time_start)
 
     # test the model
     print("Testing...")
     time_start = time.perf_counter()
     acc = evaluate(g, features, labels, masks[2], model)
     print("Test accuracy {:.4f}".format(acc))
-    print('Task time: ', time.perf_counter() - time_start)
+    print('Inference time: ', time.perf_counter() - time_start)

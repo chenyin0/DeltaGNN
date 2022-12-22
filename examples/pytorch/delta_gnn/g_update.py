@@ -280,8 +280,9 @@ def update_g_struct_evo_by_trace(args, init_ratio, evo_iter, new_nodes, g_orig, 
         node_map_evo2orig.update(dict_evo2orig_tmp)
 
     else:
-        edge_src_nodes, edge_dst_nodes = gen_edge_src_edge_nodes(new_nodes, g_orig, node_map_orig2evo,
-                                                             node_map_evo2orig)
+        edge_src_nodes, edge_dst_nodes = gen_edge_src_edge_nodes(new_nodes, g_orig,
+                                                                 node_map_orig2evo,
+                                                                 node_map_evo2orig)
 
         # Write edge
         with open(file_edge_nodes, 'w') as f:

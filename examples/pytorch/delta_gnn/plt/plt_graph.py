@@ -51,24 +51,24 @@ def plot_degree_distribution(degree_list):
         node_totol_num += i
 
     x = [i for i in range(len(degree_list))]
-    y = [degree_list[i] / node_totol_num for i in range(len(degree_list))]
+    y = [round(degree_list[i]* 100 / node_totol_num) for i in range(len(degree_list))]
     # y = [degree_list[i] for i in range(len(degree_list))]
 
-    fig = plt.figure(figsize=(3, 4))
+    fig = plt.figure(figsize=(3, 3.3))
     bax = brokenaxes(xlims=((0, 22), (165, 170)), hspace=1, despine=False)
     bax.bar(x, y)
 
     for ax in bax.axs:
-        ax.yaxis.set_major_formatter(ticker.PercentFormatter(xmax=1, decimals=0))
+        # ax.yaxis.set_major_formatter(ticker.PercentFormatter(xmax=1, decimals=0))
         ax.xaxis.set_tick_params(labelsize=13)
         ax.yaxis.set_tick_params(labelsize=13)
 
         ax.xaxis.set_major_locator(MultipleLocator(5))
 
-    bax.set_xlabel('Node degree', labelpad=20, fontsize=16)
-    bax.set_ylabel('Proportion distribution', labelpad=35, fontsize=16)
+    bax.set_xlabel('Vertex degree', labelpad=20, fontsize=16)
+    bax.set_ylabel('Vertex Distribution (%)', labelpad=35, fontsize=16)
 
-    plt.savefig('./figure/degree_distribution.pdf', dpi=600, bbox_inches="tight", pad_inches=0)
+    plt.savefig('../../../figure/degree_distribution.pdf', dpi=600, bbox_inches="tight", pad_inches=0)
 
 
 def plot_node_degree(degree_list, dataset_name):

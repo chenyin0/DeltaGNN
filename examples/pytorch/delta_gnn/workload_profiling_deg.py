@@ -164,12 +164,14 @@ def main(args):
     workload_accumulated_dist_norm = gen_workload_accumulate_by_deg(deg_dist, 10)
     deg_accumulated_dist = gen_deg_accumulated_dist(deg_dist)
     if args.dataset == 'cora' or args.dataset == 'citeseer':
-        deg_list = [1, 2, 5, 10, 15, 20, 30, 50, 99]
+        # deg_list = [1, 2, 5, 10, 15, 20, 30, 50, 99]
+        deg_list = [i for i in range(20)]
     elif args.dataset == 'ogbn-arxiv' or args.dataset == 'ogbn-mag':
-        deg_list = [1, 2, 5, 10, 15, 20, 30, 50, 100, 200, 300, 500, 800, 1000, 2000]
+        deg_list = [50, 60, 70, 80, 90, 100, 110, 120, 130, 140, 150, 200, 300, 500, 800, 1000, 2000]
+        # deg_list = [i for i in range(20)]
 
     for deg in deg_list:
-        print(deg, workload_accumulated_dist_norm[deg + 1], deg_accumulated_dist[deg + 1])
+        print(deg, workload_accumulated_dist_norm[deg + 1], '   ', deg_accumulated_dist[deg + 1])
 
     # plot(workload_accumulated_dist_norm, args.dataset)
 
@@ -221,8 +223,8 @@ if __name__ == '__main__':
 
     # args.dataset = 'cora'
     # args.dataset = 'citeseer'
-    args.dataset = 'ogbn-arxiv'
-    # args.dataset = 'ogbn-mag'
+    # args.dataset = 'ogbn-arxiv'
+    args.dataset = 'ogbn-mag'
 
     # args.n_epochs = 200
     # args.gpu = 0

@@ -621,7 +621,7 @@ def gen_edge_mask(g, inserted_nodes, deg_th, layer_num):
                 deg = g.out_degrees(ngh)
                 # For high deg nodes
                 # if deg >= deg_th[i]:
-                if deg >= deg_th:
+                if deg >= int(deg_th):
                     nodes_high_deg.append(ngh)
                     # # Traverse L-hop predecessor nghs of high deg nodes
                     # src_nodes_tmp, dst_nodes_tmp = get_predecessor_nghs(g, [ngh], layer_num)
