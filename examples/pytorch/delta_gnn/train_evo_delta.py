@@ -23,6 +23,8 @@ from model.graphsage import SAGE, SAGE_delta
 import model.graphsage as graphsage
 from model.gat import GAT, GAT_delta
 import model.gat as gat
+from model.gin import GIN, GIN_delta
+import model.gin as gin
 
 import os
 import json
@@ -37,8 +39,8 @@ def main(args):
     # Load GNN model parameter
     model_name = args.model
     if model_name == 'gcn':
-        path = os.getcwd()
-        print(path)
+        # path = os.getcwd()
+        # print(path)
         with open('./gcn_para.json', 'r') as f:
             para = json.load(f)
             n_hidden = para['--n-hidden']
@@ -70,6 +72,14 @@ def main(args):
             attn_dropout = para['--attn-drop']
             heads_str = str(para['--heads'])
             heads = [int(i) for i in heads_str.split(',')]
+    elif model_name == 'gin':
+        with open('./gin_para.json', 'r') as f:
+            para = json.load(f)
+            n_hidden = para['--n-hidden']
+            n_layers = para['--n-layers']
+            lr = para['--lr']
+            weight_decay = para['--weight-decay']
+            dropout = para['--dropout']
     else:
         assert ('Not define GNN model')
 
@@ -244,6 +254,10 @@ def main(args):
                     attn_dropout, heads).to(device)
         model_delta_all_ngh = GAT_delta(g_evo, in_feats, n_hidden, n_classes, n_layers, F.relu,
                                         feat_dropout, attn_dropout, heads).to(device)
+    elif model_name == 'gin':
+        model = GIN(g_evo, in_feats, n_hidden, n_classes, n_layers, dropout).to(device)
+        model_delta_all_ngh = GIN_delta(g_evo, in_feats, n_hidden, n_classes, n_layers,
+                                        dropout).to(device)
 
     # Train the initial graph (timestamp = 0)
     print("\n>>> Accuracy on initial graph (timestamp=0):")
@@ -257,6 +271,9 @@ def main(args):
     elif model_name == 'gat':
         gat.train(args, model, device, lr, weight_decay)
         acc = gat.evaluate(model, test_mask, device)
+    elif model_name == 'gin':
+        gin.train(args, model, device, lr, weight_decay)
+        acc = gin.evaluate(model, test_mask, device)
 
     acc_init = acc * 100
     accuracy = []
@@ -285,7 +302,7 @@ def main(args):
     #         inserted_nodes = node_q
     #         node_q.clear()
 
-    deg_th = args.deg_threshold
+    deg_th = int(args.deg_threshold)
     delta_neighbor = []
 
     # Add new nodes
@@ -376,6 +393,9 @@ def main(args):
                                                 nodes_high_deg, nodes_low_deg)
                     acc = gat.evaluate_delta_edge_masked(model_delta_all_ngh, test_mask, device,
                                                          nodes_high_deg, nodes_low_deg)
+                elif model_name == 'gin':
+                    gin.train_delta_edge_masked(args, model_delta_all_ngh, device, lr, weight_decay)
+                    acc = gin.evaluate_delta_edge_masked(model_delta_all_ngh, test_mask, device)
             else:
                 if model_name == 'gcn':
                     # gcn.train_delta_edge_masked(args, model_delta_all_ngh, device, lr, weight_decay)
@@ -400,6 +420,12 @@ def main(args):
                                                 nodes_high_deg, nodes_low_deg)
                     acc = gat.evaluate_delta_edge_masked(model_delta_all_ngh, test_mask, device,
                                                          nodes_high_deg, nodes_low_deg)
+                elif model_name == 'gin':
+                    # if (i + 1) % retrain_epoch == 0 or i == 0:
+                    gin.train_delta_edge_masked(args, model_delta_all_ngh, device, lr, weight_decay,
+                                                nodes_high_deg, nodes_low_deg)
+                    acc = gin.evaluate_delta_edge_masked(model_delta_all_ngh, test_mask, device,
+                                                         nodes_high_deg, nodes_low_deg)
 
             time_full_retrain = time.perf_counter() - time_start
             print('>> Epoch training time with full nodes: {}'.format(
@@ -417,12 +443,12 @@ def main(args):
         deg_th = str(args.deg_threshold)
         # Dump log
         if dump_accuracy_flag:
-            np.savetxt('../../../results/accuracy/' + args.dataset + '_' + args.model + '_' +
+            np.savetxt('../../../results/accuracy/' + args.dataset + '_' + args.model +
                        '_evo_delta_' + deg_th + '.txt',
                        accuracy,
                        fmt='%d, %d, %.2f')
         if dump_node_access_flag:
-            np.savetxt('../../../results/node_access/' + args.dataset + '_' + args.model + '_' +
+            np.savetxt('../../../results/node_access/' + args.dataset + '_' + args.model +
                        '_evo_delta_deg_' + deg_th + '.txt',
                        delta_neighbor,
                        fmt='%d, %d')
@@ -475,8 +501,9 @@ if __name__ == '__main__':
     # args.model = 'gcn'
     # args.model = 'graphsage'
     # args.model = 'gat'
+    args.model = 'gin'
 
-    # args.dataset = 'cora'
+    args.dataset = 'cora'
     # args.dataset = 'citeseer'
     # args.dataset = 'ogbn-arxiv'
     # args.dataset = 'ogbn-mag'

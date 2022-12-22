@@ -23,6 +23,8 @@ from model.graphsage import SAGE
 import model.graphsage as graphsage
 from model.gat import GAT
 import model.gat as gat
+from model.gin import GIN
+import model.gin as gin
 
 import os
 import plt.plt_workload
@@ -42,6 +44,7 @@ def main(args):
     if model_name == 'gcn':
         path = os.getcwd()
         print(path)
+        # with open('./examples/pytorch/delta_gnn/gcn_para.json', 'r') as f:
         with open('./gcn_para.json', 'r') as f:
             para = json.load(f)
             n_hidden = para['--n-hidden']
@@ -50,6 +53,7 @@ def main(args):
             weight_decay = para['--weight-decay']
             dropout = para['--dropout']
     elif model_name == 'graphsage':
+        # with open('./examples/pytorch/delta_gnn/graphsage_para.json', 'r') as f:
         with open('./graphsage_para.json', 'r') as f:
             para = json.load(f)
             n_hidden = para['--n-hidden']
@@ -63,6 +67,7 @@ def main(args):
             weight_decay = para['--weight-decay']
             dropout = para['--dropout']
     elif model_name == 'gat':
+        # with open('./examples/pytorch/delta_gnn/gat_para.json', 'r') as f:
         with open('./gat_para.json', 'r') as f:
             para = json.load(f)
             n_hidden = para['--n-hidden']
@@ -73,6 +78,17 @@ def main(args):
             attn_dropout = para['--attn-drop']
             heads_str = str(para['--heads'])
             heads = [int(i) for i in heads_str.split(',')]
+    elif model_name == 'gin':
+        path = os.getcwd()
+        print(path)
+        # with open('./examples/pytorch/delta_gnn/gin_para.json', 'r') as f:
+        with open('./gin_para.json', 'r') as f:
+            para = json.load(f)
+            n_hidden = para['--n-hidden']
+            n_layers = para['--n-layers']
+            lr = para['--lr']
+            weight_decay = para['--weight-decay']
+            dropout = para['--dropout']
     else:
         assert ('Not define GNN model')
 
@@ -80,7 +96,7 @@ def main(args):
     transform = (AddSelfLoop()
                  )  # by default, it will first remove self-loops to prevent duplication
     if args.dataset == 'cora':
-        dataset = CoraGraphDataset(raw_dir='../../../dataset', transform=transform)
+        dataset = CoraGraphDataset(raw_dir='./dataset', transform=transform)
     elif args.dataset == 'citeseer':
         dataset = CiteseerGraphDataset(raw_dir='../../../dataset', transform=transform)
     elif args.dataset == 'pubmed':
@@ -110,6 +126,15 @@ def main(args):
     device = th.device("cuda:" + str(gpu_id) if cuda else "cpu")
     mode = args.mode
 
+    # """ Profiling workloads imbalance """
+    # deg_th = 6
+    # plt.plt_workload.plt_workload_imbalance(g.adj_sparse('csr'), deg_th)
+
+    # ##
+    """ Plot degree distribution """
+    deg_dist = util.gen_degree_distribution(g.adj_sparse('csr'))
+    plt.plt_graph.plot_degree_distribution(deg_dist)
+
     # features = g.ndata['feat']
     # # print(features)
     # labels = g.ndata['label']
@@ -133,7 +158,7 @@ def main(args):
     g_csr = g.adj_sparse('csr')
     """ Traverse to get graph evolving snapshot """
     node_q = []
-    file_ = pathlib.Path('../../../dataset/' + args.dataset + '_evo_seq.txt')
+    file_ = pathlib.Path('./dataset/' + args.dataset + '_evo_seq.txt')
     if file_.exists():
         f = open(file_, "r")
         lines = f.readlines()
@@ -201,7 +226,7 @@ def main(args):
     #     percentage = round(cnt / total * 100, 2)
     #     print(i, percentage)
 
-    # ##
+    ##
     # """ Profiling workloads imbalance """
     # deg_th = 6
     # plt.plt_workload.plt_workload_imbalance(g_csr, deg_th)
@@ -302,6 +327,11 @@ def main(args):
                             attn_dropout, heads).to(device)
         model_delta = GAT(g_evo, in_feats, n_hidden, n_classes, n_layers, F.relu, feat_dropout,
                           attn_dropout, heads).to(device)
+    elif model_name == 'gin':
+        model_golden = GIN(g, in_feats, n_hidden, n_classes, n_layers, dropout).to(device)
+        model = GIN(g_evo, in_feats, n_hidden, n_classes, n_layers, dropout).to(device)
+        model_retrain = GIN(g_evo, in_feats, n_hidden, n_classes, n_layers, dropout).to(device)
+        model_delta = GIN(g_evo, in_feats, n_hidden, n_classes, n_layers, dropout).to(device)
 
     # for param in model.parameters():
     #     print(param)
@@ -322,6 +352,9 @@ def main(args):
     elif model_name == 'gat':
         gat.train(args, model_golden, device, lr, weight_decay)
         acc = gat.evaluate(model_golden, test_mask, device)
+    elif model_name == 'gin':
+        gin.train(args, model_golden, device, lr, weight_decay)
+        acc = gin.evaluate(model_golden, test_mask, device)
 
     print("Test accuracy {:.2%}".format(acc))
 
@@ -337,6 +370,9 @@ def main(args):
     elif model_name == 'gat':
         gat.train(args, model, device, lr, weight_decay)
         acc = gat.evaluate(model, test_mask, device)
+    elif model_name == 'gin':
+        gin.train(args, model, device, lr, weight_decay)
+        acc = gin.evaluate(model, test_mask, device)
 
     accuracy = []
     acc_no_retrain = acc_retrain = acc_retrain_delta = acc * 100
@@ -412,6 +448,10 @@ def main(args):
             if (i + 1) % retrain_epoch == 0 or i == 0:
                 gat.train(args, model, device, lr, weight_decay)
             acc = gat.evaluate(model, test_mask, device)
+        elif model_name == 'gin':
+            if (i + 1) % retrain_epoch == 0 or i == 0:
+                gin.train(args, model, device, lr, weight_decay)
+            acc = gin.evaluate(model, test_mask, device)
 
         print("Test accuracy of non-retrain @ {:d} nodes {:.2%}".format(
             model.g.number_of_nodes(), acc))
@@ -492,6 +532,9 @@ def main(args):
             elif model_name == 'gat':
                 gat.train(args, model_retrain, device, lr, weight_decay)
                 acc = gat.evaluate(model_retrain, test_mask, device)
+            elif model_name == 'gin':
+                gin.train(args, model_retrain, device, lr, weight_decay)
+                acc = gin.evaluate(model_retrain, test_mask, device)
 
             time_full_retrain = time.perf_counter() - time_start
             print('>> Epoch training time with full nodes: {}'.format(
@@ -529,6 +572,9 @@ def main(args):
             elif model_name == 'gat':
                 gat.train(args, model_delta, device, lr, weight_decay)
                 acc = gat.evaluate(model_delta, test_mask, device)
+            elif model_name == 'gin':
+                gin.train(args, model_delta, device, lr, weight_decay)
+                acc = gin.evaluate(model_delta, test_mask, device)
 
             time_delta_retrain = time.perf_counter() - time_start
             print('>> Epoch training time in delta: {}'.format(
@@ -546,15 +592,21 @@ def main(args):
 
         # Dump log
         if dump_accuracy_flag:
-            np.savetxt('../../../results/accuracy/' + args.dataset + '_' + args.model + '_' +
-                       '_evo' + '.txt',
+            np.savetxt('../../../results/accuracy/' + args.dataset + '_' + args.model + '_evo' +
+                       '.txt',
                        accuracy,
                        fmt='%d, %d, %.2f, %.2f, %.2f')
+            # np.savetxt('./results/accuracy/' + args.dataset + '_' + args.model + '_evo' + '.txt',
+            #            accuracy,
+            #            fmt='%d, %d, %.2f, %.2f, %.2f')
         if dump_node_access_flag:
-            np.savetxt('../../../results/node_access/' + args.dataset + '_' + args.model + '_' +
+            np.savetxt('../../../results/node_access/' + args.dataset + '_' + args.model +
                        '_evo.txt',
                        delta_neighbor,
                        fmt='%d, %d, %d, %d')
+            # np.savetxt('./results/node_access/' + args.dataset + '_' + args.model + '_evo.txt',
+            #            delta_neighbor,
+            #            fmt='%d, %d, %d, %d')
 
     # plot.plt_edge_epoch()
     # plot.plt_edge_epoch(edge_epoch, result)
@@ -604,8 +656,9 @@ if __name__ == '__main__':
     # args.model = 'gcn'
     # args.model = 'graphsage'
     # args.model = 'gat'
+    args.model = 'gin'
 
-    # args.dataset = 'cora'
+    args.dataset = 'cora'
     # args.dataset = 'citeseer'
     # args.dataset = 'ogbn-arxiv'
     # args.dataset = 'ogbn-mag'
