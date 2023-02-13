@@ -255,8 +255,8 @@ def main(args):
         model_delta_all_ngh = GAT_delta(g_evo, in_feats, n_hidden, n_classes, n_layers, F.relu,
                                         feat_dropout, attn_dropout, heads).to(device)
     elif model_name == 'gin':
-        model = GIN(g_evo, in_feats, n_hidden, n_classes, n_layers, dropout).to(device)
-        model_delta_all_ngh = GIN_delta(g_evo, in_feats, n_hidden, n_classes, n_layers,
+        model = GIN(g_evo, in_feats, n_hidden, n_classes, n_layers, F.relu, dropout).to(device)
+        model_delta_all_ngh = GIN_delta(g_evo, in_feats, n_hidden, n_classes, n_layers, F.relu,
                                         dropout).to(device)
 
     # Train the initial graph (timestamp = 0)

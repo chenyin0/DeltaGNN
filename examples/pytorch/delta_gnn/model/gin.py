@@ -2,6 +2,7 @@ import numpy as np
 import torch
 import torch as th
 import torch.nn as nn
+from torch.nn import Linear, Sequential, ReLU, BatchNorm1d as BN
 import torch.nn.functional as F
 from torch.optim import Adam, lr_scheduler
 from sklearn.model_selection import StratifiedKFold
@@ -34,30 +35,23 @@ class MLP(nn.Module):
 
 class GIN(nn.Module):
 
-    def __init__(self, g, input_dim, hidden_dim, output_dim, n_layers, dropout):
+    def __init__(self, g, input_dim, hidden_dim, output_dim, n_layers, activation, dropout):
         super().__init__()
         self.g = g
         self.ginlayers = nn.ModuleList()
-        self.batch_norms = nn.ModuleList()
-        num_layers = n_layers
-        # five-layer GCN with two-layer MLP aggregator and sum-neighbor-pooling scheme
-        for layer in range(num_layers - 1):  # excluding the input layer
-            if layer == 0:
-                mlp = MLP(input_dim, hidden_dim, hidden_dim)
-            else:
-                mlp = MLP(hidden_dim, hidden_dim, hidden_dim)
-            self.ginlayers.append(GINConv(mlp, learn_eps=False))  # set to True if learning epsilon
-            self.batch_norms.append(nn.BatchNorm1d(hidden_dim))
-        # linear functions for graph sum poolings of output of each layer
-        self.linear_prediction = nn.ModuleList()
-        for layer in range(num_layers):
-            if layer == 0:
-                self.linear_prediction.append(nn.Linear(input_dim, output_dim))
-            else:
-                self.linear_prediction.append(nn.Linear(hidden_dim, output_dim))
-        self.drop = nn.Dropout(dropout)
-        # self.pool = (SumPooling())  # change to mean readout (AvgPooling) on social network datasets
-        self.pool = (AvgPooling())
+        # self.batch_norms = nn.ModuleList()
+        if n_layers > 1:
+            self.ginlayers.append(GINConv(Linear(input_dim, hidden_dim), activation=activation))
+            # self.batch_norms.append(nn.BatchNorm1d(hidden_dim))
+            for i in range(1, n_layers - 1):
+                self.ginlayers.append(GINConv(Linear(hidden_dim, hidden_dim),
+                                              activation=activation))
+                # self.batch_norms.append(nn.BatchNorm1d(hidden_dim))
+            self.ginlayers.append(GINConv(Linear(hidden_dim, output_dim), activation=activation))
+            # self.batch_norms.append(nn.BatchNorm1d(output_dim))
+        else:
+            self.ginlayers.append(GINConv(Linear(input_dim, output_dim), activation=activation))
+            # self.batch_norms.append(nn.BatchNorm1d(output_dim))
 
     def forward(self, h):
         # list of hidden representation at each layer (including the input layer)
@@ -65,8 +59,8 @@ class GIN(nn.Module):
         g = self.g
         for i, layer in enumerate(self.ginlayers):
             h = layer(g, h)
-            h = self.batch_norms[i](h)
-            h = F.relu(h)
+            # h = self.batch_norms[i](h)
+            # h = F.relu(h)
         #     hidden_rep.append(h)
         # score_over_layer = 0
         # # perform graph sum pooling over all nodes in each layer
@@ -74,7 +68,7 @@ class GIN(nn.Module):
         #     pooled_h = self.pool(g, h)
         #     score_over_layer += self.drop(self.linear_prediction[i](pooled_h))
         # return score_over_layer
-
+        h = F.log_softmax(h, dim=-1)
         return h
 
 
@@ -86,6 +80,7 @@ def train(args, model, device, lr, weight_decay):
     labels = g.ndata['label']
     n_edges = g.number_of_edges()
 
+    loss_fcn = nn.CrossEntropyLoss()
     optimizer = Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
     # initialize graph
     loss_log = []
@@ -96,7 +91,7 @@ def train(args, model, device, lr, weight_decay):
             t0 = time.time()
         # forward
         logits = model(features)
-        loss = F.cross_entropy(logits[train_mask], labels[train_mask])
+        loss = loss_fcn(logits[train_mask], labels[train_mask])
 
         optimizer.zero_grad()
         loss.backward()
@@ -162,31 +157,23 @@ class GIN_delta(nn.Module):
         g: subgraph of original graph
     """
 
-    def __init__(self, g, input_dim, hidden_dim, output_dim, n_layers, dropout):
+    def __init__(self, g, input_dim, hidden_dim, output_dim, n_layers, activation, dropout):
         super(GIN_delta, self).__init__()
         self.g = g
         self.ginlayers = nn.ModuleList()
-        self.batch_norms = nn.ModuleList()
-        num_layers = n_layers
-        # five-layer GCN with two-layer MLP aggregator and sum-neighbor-pooling scheme
-        for layer in range(num_layers - 1):  # excluding the input layer
-            if layer == 0:
-                mlp = MLP(input_dim, hidden_dim, hidden_dim)
-            else:
-                mlp = MLP(hidden_dim, hidden_dim, hidden_dim)
-            self.ginlayers.append(GINConv_delta(mlp,
-                                                learn_eps=False))  # set to True if learning epsilon
-            self.batch_norms.append(nn.BatchNorm1d(hidden_dim))
-        # linear functions for graph sum poolings of output of each layer
-        self.linear_prediction = nn.ModuleList()
-        for layer in range(num_layers):
-            if layer == 0:
-                self.linear_prediction.append(nn.Linear(input_dim, output_dim))
-            else:
-                self.linear_prediction.append(nn.Linear(hidden_dim, output_dim))
-        self.drop = nn.Dropout(dropout)
-        # self.pool = (SumPooling())  # change to mean readout (AvgPooling) on social network datasets
-        self.pool = (AvgPooling())
+        # self.batch_norms = nn.ModuleList()
+        if n_layers > 1:
+            self.ginlayers.append(GINConv(Linear(input_dim, hidden_dim), activation=activation))
+            # self.batch_norms.append(nn.BatchNorm1d(hidden_dim))
+            for i in range(1, n_layers - 1):
+                self.ginlayers.append(GINConv(Linear(hidden_dim, hidden_dim),
+                                              activation=activation))
+                # self.batch_norms.append(nn.BatchNorm1d(hidden_dim))
+            self.ginlayers.append(GINConv(Linear(hidden_dim, output_dim), activation=activation))
+            # self.batch_norms.append(nn.BatchNorm1d(output_dim))
+        else:
+            self.ginlayers.append(GINConv(Linear(input_dim, output_dim), activation=activation))
+            # self.batch_norms.append(nn.BatchNorm1d(output_dim))
 
         # Record previous embedding
         self.embedding = th.Tensor([[0 for i in range(output_dim)]
@@ -199,8 +186,8 @@ class GIN_delta(nn.Module):
         h = features
         for i, layer in enumerate(self.ginlayers):
             h = layer(g, h, edge_mask)
-            h = self.batch_norms[i](h)
-            h = F.relu(h)
+            # h = self.batch_norms[i](h)
+            # h = F.relu(h)
 
             # Delta update features
             if ngh_high_deg is not None or ngh_low_deg is not None:
@@ -220,6 +207,7 @@ class GIN_delta(nn.Module):
         #     # Combine delta-inferenced embedding and previous embedding
         #     h = self.combine_embedding(self.embedding, h, ngh_high_deg, ngh_low_deg)
 
+        h = F.log_softmax(h, dim=-1)
         return h
 
     def combine_embedding(self, embedding_prev, feat, ngh_high_deg, ngh_low_deg):
@@ -291,6 +279,7 @@ def train_delta_edge_masked(args,
     n_edges = g.number_of_edges()
     edge_mask = g.edata['edge_mask']
 
+    loss_fcn = nn.CrossEntropyLoss()
     optimizer = Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
     # initialize graph
     loss_log = []
@@ -301,7 +290,7 @@ def train_delta_edge_masked(args,
             t0 = time.time()
         # forward
         logits = model(features, ngh_high_deg, ngh_low_deg, edge_mask)
-        loss = F.cross_entropy(logits[train_mask], labels[train_mask])
+        loss = loss_fcn(logits[train_mask], labels[train_mask])
 
         optimizer.zero_grad()
         loss.backward()

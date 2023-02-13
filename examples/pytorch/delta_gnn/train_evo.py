@@ -96,7 +96,7 @@ def main(args):
     transform = (AddSelfLoop()
                  )  # by default, it will first remove self-loops to prevent duplication
     if args.dataset == 'cora':
-        dataset = CoraGraphDataset(raw_dir='./dataset', transform=transform)
+        dataset = CoraGraphDataset(raw_dir='../../../dataset', transform=transform)
     elif args.dataset == 'citeseer':
         dataset = CiteseerGraphDataset(raw_dir='../../../dataset', transform=transform)
     elif args.dataset == 'pubmed':
@@ -328,10 +328,10 @@ def main(args):
         model_delta = GAT(g_evo, in_feats, n_hidden, n_classes, n_layers, F.relu, feat_dropout,
                           attn_dropout, heads).to(device)
     elif model_name == 'gin':
-        model_golden = GIN(g, in_feats, n_hidden, n_classes, n_layers, dropout).to(device)
-        model = GIN(g_evo, in_feats, n_hidden, n_classes, n_layers, dropout).to(device)
-        model_retrain = GIN(g_evo, in_feats, n_hidden, n_classes, n_layers, dropout).to(device)
-        model_delta = GIN(g_evo, in_feats, n_hidden, n_classes, n_layers, dropout).to(device)
+        model_golden = GIN(g, in_feats, n_hidden, n_classes, n_layers, F.relu, dropout).to(device)
+        model = GIN(g_evo, in_feats, n_hidden, n_classes, n_layers, F.relu, dropout).to(device)
+        model_retrain = GIN(g_evo, in_feats, n_hidden, n_classes, n_layers, F.relu, dropout).to(device)
+        model_delta = GIN(g_evo, in_feats, n_hidden, n_classes, n_layers, F.relu, dropout).to(device)
 
     # for param in model.parameters():
     #     print(param)
