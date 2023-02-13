@@ -293,7 +293,7 @@ if __name__ == "__main__":
                         help="degree threshold of neighbors nodes")
     args = parser.parse_args()
 
-    args.dataset = 'pubmed'
+    args.dataset = 'cora'
     args.gpu = -1
     args.n_epochs = 200
 
