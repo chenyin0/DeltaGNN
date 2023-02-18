@@ -9,11 +9,16 @@ import torch
 import torch as th
 import torch.nn as nn
 from dgl.nn.pytorch import GraphConv
+from torch_geometric.nn import GCNConv
 from .graphconv_delta import GraphConv_delta
 import torch.nn.functional as F
 from torch.optim import Adam
+# from ogb.nodeproppred import Evaluator, PygNodePropPredDataset
+# import torch_geometric.transforms as T
 import numpy as np
 import time
+import util
+from torch_sparse import SparseTensor
 
 
 class GCN(nn.Module):
@@ -21,42 +26,80 @@ class GCN(nn.Module):
     def __init__(self, g, in_feats, n_hidden, n_classes, n_layers, activation, dropout):
         super(GCN, self).__init__()
         self.g = g
+        adj = SparseTensor(row=self.g.all_edges()[0],
+                           col=self.g.all_edges()[1],
+                           sparse_sizes=(self.g.number_of_nodes(), self.g.number_of_nodes()))
+        self.adj_t = adj.to_symmetric()
         self.layers = nn.ModuleList()
+        self.bns = torch.nn.ModuleList()
+
+        # if n_layers > 1:
+        #     self.layers.append(
+        #         GraphConv(in_feats, n_hidden, activation=activation, allow_zero_in_degree=True))
+        #     for i in range(1, n_layers - 1):
+        #         self.layers.append(
+        #             GraphConv(n_hidden, n_hidden, activation=activation, allow_zero_in_degree=True))
+        #     self.layers.append(GraphConv(n_hidden, n_classes, allow_zero_in_degree=True))
+        # else:
+        #     self.layers.append(
+        #         GraphConv(in_feats, n_classes, activation=activation, allow_zero_in_degree=True))
+
+        # if n_layers > 1:
+        #     self.layers.append(GraphConv(in_feats, n_hidden, activation=None))
+        #     self.bns.append(torch.nn.BatchNorm1d(n_hidden))
+        #     for i in range(1, n_layers - 1):
+        #         self.layers.append(GraphConv(n_hidden, n_hidden, activation=None))
+        #         self.bns.append(torch.nn.BatchNorm1d(n_hidden))
+        #     self.layers.append(GraphConv(n_hidden, n_classes))
+        # else:
+        #     self.layers.append(GraphConv(in_feats, n_classes, activation=None))
 
         if n_layers > 1:
-            self.layers.append(
-                GraphConv(in_feats, n_hidden, activation=activation, allow_zero_in_degree=True))
+            self.layers.append(GCNConv(in_feats, n_hidden))
+            self.bns.append(torch.nn.BatchNorm1d(n_hidden))
             for i in range(1, n_layers - 1):
-                self.layers.append(
-                    GraphConv(n_hidden, n_hidden, activation=activation, allow_zero_in_degree=True))
-            self.layers.append(GraphConv(n_hidden, n_classes, allow_zero_in_degree=True))
+                self.layers.append(GCNConv(n_hidden, n_hidden))
+                self.bns.append(torch.nn.BatchNorm1d(n_hidden))
+            self.layers.append(GCNConv(n_hidden, n_classes))
         else:
-            self.layers.append(
-                GraphConv(in_feats, n_classes, activation=activation, allow_zero_in_degree=True))
+            self.layers.append(GCNConv(in_feats, n_classes))
 
-        self.dropout = nn.Dropout(p=dropout)
+        # self.dropout = nn.Dropout(p=dropout)
+        self.dropout = dropout
 
-        # Record previous logits
-        self.logits = torch.zeros(g.number_of_nodes(), n_classes)
+    # def forward(self, features):
+    #     h = features
+    #     for i, layer in enumerate(self.layers):
+    #         if i != 0:
+    #             h = self.dropout(h)
+    #         h = layer(self.g, h)
+    #     return h
 
-    def forward(self, features):
+    # def reset_parameters(self):
+    #     for layer in self.layers:
+    #         layer.reset_parameters()
+    #     for bn in self.bns:
+    #         bn.reset_parameters()
+
+    def forward(self, features, adj_t):
         h = features
-        for i, layer in enumerate(self.layers):
-            if i != 0:
-                h = self.dropout(h)
-            h = layer(self.g, h)
-        return h
+        for i, layer in enumerate(self.layers[:-1]):
+            h = layer(h, adj_t)
+            h = self.bns[i](h)
+            h = F.relu(h)
+            h = F.dropout(h, p=self.dropout, training=self.training)
+        h = self.layers[-1](h, adj_t)
+        return h.log_softmax(dim=-1)
 
 
 def train(args, model, device, lr, weight_decay):
     g = model.g
     features = g.ndata['feat']
     train_mask = g.ndata['train_mask'].bool()
-    val_mask = g.ndata['val_mask']
+    val_mask = g.ndata['val_mask'].bool()
     labels = g.ndata['label']
     n_edges = g.number_of_edges()
-
-    # print(train_mask, val_mask)
+    adj_t = model.adj_t.to(device)
 
     optimizer = Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
     # initialize graph
@@ -67,7 +110,8 @@ def train(args, model, device, lr, weight_decay):
         if epoch >= 3:
             t0 = time.time()
         # forward
-        logits = model(features)
+        logits = model(features, adj_t)
+        # logits = model(features)
         loss = F.cross_entropy(logits[train_mask], labels[train_mask])
 
         optimizer.zero_grad()
@@ -79,13 +123,18 @@ def train(args, model, device, lr, weight_decay):
 
         loss_log.append(round(loss.item(), 2))
 
-    np.savetxt('../../../results/loss/' + args.dataset + '_evo_loss' + '.txt', loss_log, fmt='%.2f')
+        # acc = evaluate(model, val_mask, device)
+        # print("Epoch {:05d} | Time(s) {:.4f} | Loss {:.4f} | Accuracy {:.4f} | "
+        #       "ETputs(KTEPS) {:.2f}".format(epoch, np.mean(dur), loss.item(), acc,
+        #                                     n_edges / np.mean(dur) / 1000))
+
+    # np.savetxt('../../../results/loss/' + args.dataset + '_evo_loss' + '.txt', loss_log, fmt='%.2f')
     # np.savetxt('./results/loss/' + args.dataset + '_evo_loss' + '.txt', loss_log, fmt='%.2f')
 
-    # acc = evaluate(model, val_mask, device)
-    # print("Epoch {:05d} | Time(s) {:.4f} | Loss {:.4f} | Accuracy {:.4f} | "
-    #       "ETputs(KTEPS) {:.2f}".format(epoch, np.mean(dur), loss.item(),
-    #                                     acc, n_edges / np.mean(dur) / 1000))
+    acc = evaluate(model, val_mask, device)
+    print("Epoch {:05d} | Time(s) {:.4f} | Loss {:.4f} | Accuracy {:.4f} | "
+          "ETputs(KTEPS) {:.2f}".format(epoch, np.mean(dur), loss.item(), acc,
+                                        n_edges / np.mean(dur) / 1000))
 
 
 def evaluate(model, mask, device):
@@ -93,15 +142,32 @@ def evaluate(model, mask, device):
     features = g.ndata['feat'].to(device)
     labels = g.ndata['label'].to(device)
     mask = mask.bool().to(device)  # Convert int8 to bool
+    adj_t = model.adj_t.to(device)
 
     model.eval()
     with torch.no_grad():
-        logits = model(features)
+        # logits = model(features)
+        logits = model(features, adj_t)
         logits = logits[mask]
         labels = labels[mask]
         _, indices = torch.max(logits, dim=1)
         correct = torch.sum(indices == labels)
         return correct.item() * 1.0 / len(labels)
+
+    # evaluator = Evaluator(name='ogbn-arxiv')
+    # with torch.no_grad():
+    #     # logits = model(features, adj_t)
+    #     logits = model(features, adj_t)
+    #     y_pred = logits.argmax(dim=-1, keepdim=True)
+    #     # labels = labels[mask]
+    #     labels = labels.reshape(labels.shape[0], 1)
+
+    #     acc = evaluator.eval({
+    #         'y_true': labels[mask],
+    #         'y_pred': y_pred[mask],
+    #     })['acc']
+
+    #     return acc
 
 
 def evaluate_delta(model, mask, device, updated_nodes):
@@ -188,8 +254,11 @@ class GCN_delta(nn.Module):
     def combine_embedding(self, embedding_prev, feat, ngh_high_deg, ngh_low_deg):
         # Compulsorily execute in CPU (GPU not suits for scalar execution)
         device = feat.device
+        time_start = time.perf_counter()
         feat = feat.to('cpu')
         embedding_prev = embedding_prev.to('cpu')
+        load_time = time.perf_counter() - time_start
+        print('>> Load feat: {}'.format(util.time_format(load_time)))
 
         ##
         r"""
@@ -212,9 +281,15 @@ class GCN_delta(nn.Module):
         # ngh_high_deg_ind = th.tensor(ngh_high_deg, dtype=th.long)
         ngh_low_deg_ind = th.tensor(ngh_low_deg, dtype=th.long)
 
+        time_prev_ind = time.perf_counter() - time_start - load_time
+        print('>> prev_ind: {}'.format(util.time_format(time_prev_ind)))
+
         feat_prev = th.index_select(embedding_prev, 0, feat_prev_keep_ind)
         # feat_high_deg = th.index_select(feat, 0, ngh_high_deg_ind)
         feat_low_deg = th.index_select(feat, 0, ngh_low_deg_ind)
+
+        time_prev_index_sel = time.perf_counter() - time_start - load_time - time_prev_ind
+        print('>> prev_index_sel: {}'.format(util.time_format(time_prev_index_sel)))
 
         # Gen index for scatter
         index_feat_prev = [[feat_prev_keep_ind[row].item() for col in range(feat_prev.shape[1])]
@@ -224,6 +299,10 @@ class GCN_delta(nn.Module):
         index_low_deg = [[ngh_low_deg_ind[row].item() for col in range(feat_low_deg.shape[1])]
                          for row in range(ngh_low_deg_ind.shape[0])]
 
+        time_feat_sel = time.perf_counter(
+        ) - time_start - load_time - time_prev_ind - time_prev_index_sel
+        print('>> feat_sel: {}'.format(util.time_format(time_feat_sel)))
+
         index_feat_prev = th.tensor(index_feat_prev)
         # index_high_deg = th.tensor(index_high_deg)
         index_low_deg = th.tensor(index_low_deg)
@@ -232,9 +311,16 @@ class GCN_delta(nn.Module):
         feat.scatter(0, index_feat_prev, feat_prev)
         # embedding_prev.scatter(0, index_high_deg, feat_high_deg)
         feat.scatter(0, index_low_deg, feat_low_deg, reduce='add')
+        # feat.scatter_reduce(0, index_low_deg, feat_low_deg, reduce='sum')
+
+        # time_scatter = time.perf_counter() - time_start - load_time - time_index_sel
+        # print('>> scatter: {}'.format(util.time_format(time_scatter)))
 
         # Transfer 'feat' to its previous device
         feat = feat.to(device)
+
+        # time_feat2gpu = time.perf_counter() - time_start - load_time - time_index_sel - time_scatter
+        # print('>> feat2gpu: {}'.format(util.time_format(time_feat2gpu)))
 
         return feat
 
