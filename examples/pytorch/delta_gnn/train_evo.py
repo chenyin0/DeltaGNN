@@ -10,8 +10,10 @@ import dgl
 from dgl.data import CoraGraphDataset, CiteseerGraphDataset, PubmedGraphDataset, RedditDataset, AmazonCoBuyComputerDataset
 from dgl.data import AsNodePredDataset
 from ogb.nodeproppred import DglNodePropPredDataset
-from dgl import AddSelfLoop
+# from ogb.nodeproppred import PygNodePropPredDataset
+from dgl import AddSelfLoop, GCNNorm
 import preprocess
+# import torch_geometric.transforms as T
 
 import util
 import g_update
@@ -41,42 +43,43 @@ def main(args):
 
     # Load GNN model parameter
     model_name = args.model
+    dataset = args.dataset
     if model_name == 'gcn':
         path = os.getcwd()
         print(path)
         # with open('./examples/pytorch/delta_gnn/gcn_para.json', 'r') as f:
         with open('./gcn_para.json', 'r') as f:
             para = json.load(f)
-            n_hidden = para['--n-hidden']
-            n_layers = para['--n-layers']
-            lr = para['--lr']
-            weight_decay = para['--weight-decay']
-            dropout = para['--dropout']
+            n_hidden = para[dataset]['--n-hidden']
+            n_layers = para[dataset]['--n-layers']
+            lr = para[dataset]['--lr']
+            weight_decay = para[dataset]['--weight-decay']
+            dropout = para[dataset]['--dropout']
     elif model_name == 'graphsage':
         # with open('./examples/pytorch/delta_gnn/graphsage_para.json', 'r') as f:
         with open('./graphsage_para.json', 'r') as f:
             para = json.load(f)
-            n_hidden = para['--n-hidden']
-            n_layers = para['--n-layers']
+            n_hidden = para[dataset]['--n-hidden']
+            n_layers = para[dataset]['--n-layers']
             # num_negs = para['--num-negs']
-            fan_out = str(para['--fan-out'])
-            batch_size = para['--batch-size']
+            fan_out = str(para[dataset]['--fan-out'])
+            batch_size = para[dataset]['--batch-size']
             # log_every = para['--log-every']
             # eval_every = para['--eval-every']
-            lr = para['--lr']
-            weight_decay = para['--weight-decay']
-            dropout = para['--dropout']
+            lr = para[dataset]['--lr']
+            weight_decay = para[dataset]['--weight-decay']
+            dropout = para[dataset]['--dropout']
     elif model_name == 'gat':
         # with open('./examples/pytorch/delta_gnn/gat_para.json', 'r') as f:
         with open('./gat_para.json', 'r') as f:
             para = json.load(f)
-            n_hidden = para['--n-hidden']
-            n_layers = para['--n-layers']
-            lr = para['--lr']
-            weight_decay = para['--weight-decay']
-            feat_dropout = para['--feat-drop']
-            attn_dropout = para['--attn-drop']
-            heads_str = str(para['--heads'])
+            n_hidden = para[dataset]['--n-hidden']
+            n_layers = para[dataset]['--n-layers']
+            lr = para[dataset]['--lr']
+            weight_decay = para[dataset]['--weight-decay']
+            feat_dropout = para[dataset]['--feat-drop']
+            attn_dropout = para[dataset]['--attn-drop']
+            heads_str = str(para[dataset]['--heads'])
             heads = [int(i) for i in heads_str.split(',')]
     elif model_name == 'gin':
         path = os.getcwd()
@@ -84,11 +87,11 @@ def main(args):
         # with open('./examples/pytorch/delta_gnn/gin_para.json', 'r') as f:
         with open('./gin_para.json', 'r') as f:
             para = json.load(f)
-            n_hidden = para['--n-hidden']
-            n_layers = para['--n-layers']
-            lr = para['--lr']
-            weight_decay = para['--weight-decay']
-            dropout = para['--dropout']
+            n_hidden = para[dataset]['--n-hidden']
+            n_layers = para[dataset]['--n-layers']
+            lr = para[dataset]['--lr']
+            weight_decay = para[dataset]['--weight-decay']
+            dropout = para[dataset]['--dropout']
     else:
         assert ('Not define GNN model')
 
@@ -131,9 +134,9 @@ def main(args):
     # plt.plt_workload.plt_workload_imbalance(g.adj_sparse('csr'), deg_th)
 
     # ##
-    """ Plot degree distribution """
-    deg_dist = util.gen_degree_distribution(g.adj_sparse('csr'))
-    plt.plt_graph.plot_degree_distribution(deg_dist)
+    # """ Plot degree distribution """
+    # deg_dist = util.gen_degree_distribution(g.adj_sparse('csr'))
+    # plt.plt_graph.plot_degree_distribution(deg_dist)
 
     # features = g.ndata['feat']
     # # print(features)
@@ -304,6 +307,7 @@ def main(args):
             g_evo = g_evo.to(gpu_id)
 
     # create GNN model
+    g = dgl.add_self_loop(g)
     if model_name == 'gcn':
         model_golden = GCN(g, in_feats, n_hidden, n_classes, n_layers, F.relu, dropout).to(device)
         model = GCN(g_evo, in_feats, n_hidden, n_classes, n_layers, F.relu, dropout).to(device)
@@ -330,8 +334,10 @@ def main(args):
     elif model_name == 'gin':
         model_golden = GIN(g, in_feats, n_hidden, n_classes, n_layers, F.relu, dropout).to(device)
         model = GIN(g_evo, in_feats, n_hidden, n_classes, n_layers, F.relu, dropout).to(device)
-        model_retrain = GIN(g_evo, in_feats, n_hidden, n_classes, n_layers, F.relu, dropout).to(device)
-        model_delta = GIN(g_evo, in_feats, n_hidden, n_classes, n_layers, F.relu, dropout).to(device)
+        model_retrain = GIN(g_evo, in_feats, n_hidden, n_classes, n_layers, F.relu,
+                            dropout).to(device)
+        model_delta = GIN(g_evo, in_feats, n_hidden, n_classes, n_layers, F.relu,
+                          dropout).to(device)
 
     # for param in model.parameters():
     #     print(param)
@@ -344,6 +350,7 @@ def main(args):
     print("\n>>> Accuracy on full graph with model_golden:")
     test_mask = model_golden.g.ndata['test_mask']
     if model_name == 'gcn':
+        # model_golden.reset_parameters()
         gcn.train(args, model_golden, device, lr, weight_decay)
         acc = gcn.evaluate(model_golden, test_mask, device)
     elif model_name == 'graphsage':
@@ -653,10 +660,10 @@ if __name__ == '__main__':
     # parser.set_defaults(self_loop=True)
     args = parser.parse_args()
 
-    # args.model = 'gcn'
+    args.model = 'gcn'
     # args.model = 'graphsage'
     # args.model = 'gat'
-    args.model = 'gin'
+    # args.model = 'gin'
 
     args.dataset = 'cora'
     # args.dataset = 'citeseer'
@@ -664,7 +671,7 @@ if __name__ == '__main__':
     # args.dataset = 'ogbn-mag'
 
     args.n_epochs = 200
-    args.gpu = 0
+    args.gpu = 1
     # args.mode = 'mixed'
 
     dump_accuracy_flag = 1
