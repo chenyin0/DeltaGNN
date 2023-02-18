@@ -288,6 +288,7 @@ def main(args):
     if args.self_loop:
         g_evo = dgl.remove_self_loop(g_evo)
         g_evo = dgl.add_self_loop(g_evo)
+        g = dgl.add_self_loop(g)
 
     # normalization
     degs = g_evo.in_degrees().float()
@@ -307,7 +308,6 @@ def main(args):
             g_evo = g_evo.to(gpu_id)
 
     # create GNN model
-    g = dgl.add_self_loop(g)
     if model_name == 'gcn':
         model_golden = GCN(g, in_feats, n_hidden, n_classes, n_layers, F.relu, dropout).to(device)
         model = GCN(g_evo, in_feats, n_hidden, n_classes, n_layers, F.relu, dropout).to(device)
@@ -645,7 +645,10 @@ if __name__ == '__main__':
     # parser.add_argument("--n-hidden", type=int, default=16, help="number of hidden gcn units")
     # parser.add_argument("--n-layers", type=int, default=2, help="number of gcn layers")
     # parser.add_argument("--weight-decay", type=float, default=5e-4, help="Weight for L2 loss")
-    parser.add_argument("--self-loop", action='store_true', help="graph self-loop (default=False)")
+    parser.add_argument("--self-loop",
+                        default=True,
+                        action='store_true',
+                        help="graph self-loop (default=False)")
     parser.add_argument(
         "--mode",
         default='mixed',
@@ -660,8 +663,8 @@ if __name__ == '__main__':
     # parser.set_defaults(self_loop=True)
     args = parser.parse_args()
 
-    args.model = 'gcn'
-    # args.model = 'graphsage'
+    # args.model = 'gcn'
+    args.model = 'graphsage'
     # args.model = 'gat'
     # args.model = 'gin'
 
@@ -671,7 +674,7 @@ if __name__ == '__main__':
     # args.dataset = 'ogbn-mag'
 
     args.n_epochs = 200
-    args.gpu = 1
+    args.gpu = 0
     # args.mode = 'mixed'
 
     dump_accuracy_flag = 1
