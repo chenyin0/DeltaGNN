@@ -1,7 +1,30 @@
 {
+  "cora": {
     "--n-hidden": 32,
     "--n-layers": 2,
-    "--weight-decay": 5e-2,
-    "--lr": 1e-2,
+    "--weight-decay": 0.05,
+    "--lr": 0.01,
     "--dropout": 0.5
+  },
+  "citeseer": {
+    "--n-hidden": 32,
+    "--n-layers": 2,
+    "--weight-decay": 0.05,
+    "--lr": 0.01,
+    "--dropout": 0.5
+  },
+  "ogbn-arxiv": {
+    "--n-hidden": 32,
+    "--n-layers": 2,
+    "--weight-decay": 0,
+    "--lr": 0.01,
+    "--dropout": 0.5
+  },
+  "ogbn-mag": {
+    "--n-hidden": 32,
+    "--n-layers": 2,
+    "--weight-decay": 0.05,
+    "--lr": 0.01,
+    "--dropout": 0.5
+  }
 }
