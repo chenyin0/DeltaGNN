@@ -26,10 +26,10 @@ class GCN(nn.Module):
     def __init__(self, g, in_feats, n_hidden, n_classes, n_layers, activation, dropout):
         super(GCN, self).__init__()
         self.g = g
-        adj = SparseTensor(row=self.g.all_edges()[0],
-                           col=self.g.all_edges()[1],
-                           sparse_sizes=(self.g.number_of_nodes(), self.g.number_of_nodes()))
-        self.adj_t = adj.to_symmetric()
+        # adj = SparseTensor(row=self.g.all_edges()[0],
+        #                    col=self.g.all_edges()[1],
+        #                    sparse_sizes=(self.g.number_of_nodes(), self.g.number_of_nodes()))
+        # self.adj_t = adj.to_symmetric()
         self.layers = nn.ModuleList()
         self.bns = torch.nn.ModuleList()
 
@@ -67,6 +67,9 @@ class GCN(nn.Module):
         # self.dropout = nn.Dropout(p=dropout)
         self.dropout = dropout
 
+        # Record previous logits
+        self.logits = torch.zeros(g.number_of_nodes(), n_classes)
+
     # def forward(self, features):
     #     h = features
     #     for i, layer in enumerate(self.layers):
@@ -99,7 +102,10 @@ def train(args, model, device, lr, weight_decay):
     val_mask = g.ndata['val_mask'].bool()
     labels = g.ndata['label']
     n_edges = g.number_of_edges()
-    adj_t = model.adj_t.to(device)
+    adj = SparseTensor(row=g.all_edges()[0],
+                       col=g.all_edges()[1],
+                       sparse_sizes=(g.number_of_nodes(), g.number_of_nodes()))
+    adj_t = adj.to_symmetric().to(device)
 
     optimizer = Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
     # initialize graph
@@ -142,7 +148,11 @@ def evaluate(model, mask, device):
     features = g.ndata['feat'].to(device)
     labels = g.ndata['label'].to(device)
     mask = mask.bool().to(device)  # Convert int8 to bool
-    adj_t = model.adj_t.to(device)
+    # adj_t = model.adj_t.to(device)
+    adj = SparseTensor(row=g.all_edges()[0],
+                       col=g.all_edges()[1],
+                       sparse_sizes=(g.number_of_nodes(), g.number_of_nodes()))
+    adj_t = adj.to_symmetric().to(device)
 
     model.eval()
     with torch.no_grad():
@@ -178,11 +188,16 @@ def evaluate_delta(model, mask, device, updated_nodes):
     features = g.ndata['feat'].to(device)
     labels = g.ndata['label'].to(device)
     mask = mask.bool().to(device)  # Convert int8 to bool
+    adj = SparseTensor(row=g.all_edges()[0],
+                       col=g.all_edges()[1],
+                       sparse_sizes=(g.number_of_nodes(), g.number_of_nodes()))
+    adj_t = adj.to_symmetric().to(device)
 
     model.eval()
     with torch.no_grad():
         logits_prev = model.logits
-        logits = model(features)
+        # logits = model(features)
+        logits = model(features, adj_t)
         # logits = logits[mask]
 
         logits_updated = logits
