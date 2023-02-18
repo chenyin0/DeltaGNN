@@ -38,48 +38,49 @@ def main(args):
 
     # Load GNN model parameter
     model_name = args.model
+    dataset = args.dataset
     if model_name == 'gcn':
         # path = os.getcwd()
         # print(path)
         with open('./gcn_para.json', 'r') as f:
             para = json.load(f)
-            n_hidden = para['--n-hidden']
-            n_layers = para['--n-layers']
-            lr = para['--lr']
-            weight_decay = para['--weight-decay']
-            dropout = para['--dropout']
+            n_hidden = para[dataset]['--n-hidden']
+            n_layers = para[dataset]['--n-layers']
+            lr = para[dataset]['--lr']
+            weight_decay = para[dataset]['--weight-decay']
+            dropout = para[dataset]['--dropout']
     elif model_name == 'graphsage':
         with open('./graphsage_para.json', 'r') as f:
             para = json.load(f)
-            n_hidden = para['--n-hidden']
-            n_layers = para['--n-layers']
+            n_hidden = para[dataset]['--n-hidden']
+            n_layers = para[dataset]['--n-layers']
             # num_negs = para['--num-negs']
-            fan_out = str(para['--fan-out'])
-            batch_size = para['--batch-size']
+            fan_out = str(para[dataset]['--fan-out'])
+            batch_size = para[dataset]['--batch-size']
             # log_every = para['--log-every']
             # eval_every = para['--eval-every']
-            lr = para['--lr']
-            weight_decay = para['--weight-decay']
-            dropout = para['--dropout']
+            lr = para[dataset]['--lr']
+            weight_decay = para[dataset]['--weight-decay']
+            dropout = para[dataset]['--dropout']
     elif model_name == 'gat':
         with open('./gat_para.json', 'r') as f:
             para = json.load(f)
-            n_hidden = para['--n-hidden']
-            n_layers = para['--n-layers']
-            lr = para['--lr']
-            weight_decay = para['--weight-decay']
-            feat_dropout = para['--feat-drop']
-            attn_dropout = para['--attn-drop']
-            heads_str = str(para['--heads'])
+            n_hidden = para[dataset]['--n-hidden']
+            n_layers = para[dataset]['--n-layers']
+            lr = para[dataset]['--lr']
+            weight_decay = para[dataset]['--weight-decay']
+            feat_dropout = para[dataset]['--feat-drop']
+            attn_dropout = para[dataset]['--attn-drop']
+            heads_str = str(para[dataset]['--heads'])
             heads = [int(i) for i in heads_str.split(',')]
     elif model_name == 'gin':
         with open('./gin_para.json', 'r') as f:
             para = json.load(f)
-            n_hidden = para['--n-hidden']
-            n_layers = para['--n-layers']
-            lr = para['--lr']
-            weight_decay = para['--weight-decay']
-            dropout = para['--dropout']
+            n_hidden = para[dataset]['--n-hidden']
+            n_layers = para[dataset]['--n-layers']
+            lr = para[dataset]['--lr']
+            weight_decay = para[dataset]['--weight-decay']
+            dropout = para[dataset]['--dropout']
     else:
         assert ('Not define GNN model')
 
@@ -483,7 +484,10 @@ if __name__ == '__main__':
     # parser.add_argument("--n-hidden", type=int, default=16, help="number of hidden gcn units")
     # parser.add_argument("--n-layers", type=int, default=2, help="number of gcn layers")
     # parser.add_argument("--weight-decay", type=float, default=5e-4, help="Weight for L2 loss")
-    parser.add_argument("--self-loop", action='store_true', help="graph self-loop (default=False)")
+    parser.add_argument("--self-loop",
+                        default=True,
+                        action='store_true',
+                        help="graph self-loop (default=False)")
     parser.add_argument(
         "--mode",
         default='mixed',
@@ -498,10 +502,10 @@ if __name__ == '__main__':
     # parser.set_defaults(self_loop=False)
     args = parser.parse_args()
 
-    # args.model = 'gcn'
+    args.model = 'gcn'
     # args.model = 'graphsage'
     # args.model = 'gat'
-    args.model = 'gin'
+    # args.model = 'gin'
 
     args.dataset = 'cora'
     # args.dataset = 'citeseer'
