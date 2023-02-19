@@ -7,6 +7,9 @@ from dgl.data.citation_graph import _sample_mask
 import util
 import time
 import pathlib
+import numpy as np
+# from train_evo import train_idx_orig, val_idx_orig, test_idx_orig
+# from train_evo_delta import train_idx_orig, val_idx_orig, test_idx_orig
 
 
 def gen_node_reindex(node_map, node_id_prev):
@@ -53,7 +56,7 @@ def get_nodes_reindex(node_map, nodes_id_prev):
 def update_g_struct_init(args, init_ratio, init_nodes, g_orig, node_map_orig2evo,
                          node_map_evo2orig):
     """
-    Load the init g_struct_update (src_nodes & dst_nodes) from files to save time
+    Load the init g_struct_update (src_nodes & dst_nodes) from files for time saving
     """
 
     print('>> Start to initialize graph struct')
@@ -394,7 +397,8 @@ def graph_struct_init(args, init_ratio, new_nodes, g_orig, node_map_orig2evo, no
     """
     g_evo = update_g_struct_init(args, init_ratio, new_nodes, g_orig, node_map_orig2evo,
                                  node_map_evo2orig)
-    update_g_attr_init(g_evo, g_orig, node_map_evo2orig)
+    # update_g_attr_init(g_evo, g_orig, node_map_evo2orig)
+    update_g_attr(args, g_evo, g_orig, node_map_evo2orig, node_map_orig2evo)
 
     return g_evo
 
@@ -412,33 +416,48 @@ def graph_evolve_by_trace(args, init_ratio, evo_iter, new_nodes, g_orig, node_ma
     return g_evo
 
 
-def graph_evolve(new_nodes,
-                 g_orig_csr,
-                 g_orig,
-                 node_map_orig2evo,
-                 node_map_evo2orig,
-                 layer_num,
-                 g_evo=None):
+# def graph_evolve(args, new_nodes,
+#                  g_orig_csr,
+#                  g_orig,
+#                  node_map_orig2evo,
+#                  node_map_evo2orig,
+#                  layer_num,
+#                  g_evo=None):
+#     """
+#     Construct evolving graph
+#     """
+#     if g_evo is None:
+#         # Construct a new graph
+#         g_evo = update_g_struct_evo(new_nodes, g_orig, node_map_orig2evo, node_map_evo2orig)
+#         new_graph = True
+#     else:
+#         g_evo = update_g_struct_evo(new_nodes, g_orig, node_map_orig2evo, node_map_evo2orig, g_evo)
+#         new_graph = False
+
+#     if new_graph:
+#         update_g_attr_init(args, g_evo, g_orig, node_map_evo2orig)
+#     else:
+#         update_g_attr_evo(args, new_nodes, g_evo, g_orig, node_map_orig2evo, node_map_evo2orig, layer_num)
+
+#     return g_evo
+
+
+def graph_evolve(args, new_nodes, g_orig, node_map_orig2evo, node_map_evo2orig, g_evo=None):
     """
-    Construct evolve graph from an orginal static graph
+    Construct evolving graph
     """
     if g_evo is None:
         # Construct a new graph
         g_evo = update_g_struct_evo(new_nodes, g_orig, node_map_orig2evo, node_map_evo2orig)
-        new_graph = True
     else:
         g_evo = update_g_struct_evo(new_nodes, g_orig, node_map_orig2evo, node_map_evo2orig, g_evo)
-        new_graph = False
 
-    if new_graph:
-        update_g_attr_init(g_evo, g_orig, node_map_evo2orig)
-    else:
-        update_g_attr_evo(new_nodes, g_evo, g_orig, node_map_orig2evo, node_map_evo2orig, layer_num)
-
+    update_g_attr(args, g_evo, g_orig, node_map_evo2orig, node_map_orig2evo)
     return g_evo
 
 
-def graph_evolve_delta(new_nodes,
+def graph_evolve_delta(args,
+                       new_nodes,
                        g_orig_csr,
                        g_orig,
                        node_map_orig2evo,
@@ -489,6 +508,68 @@ def graph_evolve_delta_all_ngh(new_nodes,
         update_g_attr_evo(new_nodes, g_evo, g_orig, node_map_orig2evo, node_map_evo2orig, layer_num)
 
     return g_evo
+
+
+def update_g_attr(args, g_evo, g_orig, node_map_evo2orig, node_map_orig2evo):
+    """
+    Update graph attribution:
+    Set train/val/test idx according to the original dataset
+    """
+    # Get orig_node_index of evo_node_index
+    nodes_orig_index = []
+    for node in g_evo.nodes().tolist():
+        nodes_orig_index.append(node_map_evo2orig[node])
+
+    features = g_orig.ndata['feat'][nodes_orig_index, :].to(g_evo.device)
+    g_evo.ndata['feat'] = features
+
+    labels = g_orig.ndata['label'][nodes_orig_index].to(g_evo.device)
+    g_evo.ndata['label'] = labels
+
+    if args.dataset == 'cora':
+        # train:val:test = 140:500:1000; total vertex = 2708
+        train_ratio = round(140 / 2708, 4)
+        val_ratio = round(500 / 2708, 4)
+        test_ratio = round(1000 / 2708, 4)
+
+        g_node_num = g_evo.number_of_nodes()
+        train_num = round(g_node_num * train_ratio)
+        val_num = round(g_node_num * val_ratio)
+        test_num = round(g_node_num * test_ratio)
+
+        train_idx_orig = range(train_num)
+        val_idx_orig = range(train_num, train_num + val_num)
+        test_idx_orig = range(g_node_num - test_num, g_node_num)
+
+    else:
+        train_idx_orig, val_idx_orig, test_idx_orig = util.load_dataset_index(
+            args.dataset, './data/')
+        train_idx_orig = list(set(nodes_orig_index).intersection(set(train_idx_orig.tolist())))
+        val_idx_orig = list(set(nodes_orig_index).intersection(set(val_idx_orig.tolist())))
+        test_idx_orig = list(set(nodes_orig_index).intersection(set(test_idx_orig.tolist())))
+
+    # Remap idx_orig to idx_evo
+    train_idx = []
+    val_idx = []
+    test_idx = []
+    for i in train_idx_orig:
+        if i in node_map_orig2evo:
+            train_idx.append(node_map_orig2evo[i])
+    for i in val_idx_orig:
+        if i in node_map_orig2evo:
+            val_idx.append(node_map_orig2evo[i])
+    for i in test_idx_orig:
+        if i in node_map_orig2evo:
+            test_idx.append(node_map_orig2evo[i])
+
+    train_mask = generate_mask_tensor(_sample_mask(train_idx, labels.shape[0])).to(g_evo.device)
+    g_evo.ndata['train_mask'] = train_mask
+
+    val_mask = generate_mask_tensor(_sample_mask(val_idx, labels.shape[0])).to(g_evo.device)
+    g_evo.ndata['val_mask'] = val_mask
+
+    test_mask = generate_mask_tensor(_sample_mask(test_idx, labels.shape[0])).to(g_evo.device)
+    g_evo.ndata['test_mask'] = test_mask
 
 
 def update_g_attr_init(g_evo, g_orig, node_map_evo2orig):
