@@ -78,11 +78,11 @@ class GCN(nn.Module):
     #         h = layer(self.g, h)
     #     return h
 
-    # def reset_parameters(self):
-    #     for layer in self.layers:
-    #         layer.reset_parameters()
-    #     for bn in self.bns:
-    #         bn.reset_parameters()
+    def reset_parameters(self):
+        for layer in self.layers:
+            layer.reset_parameters()
+        for bn in self.bns:
+            bn.reset_parameters()
 
     def forward(self, features, adj_t):
         h = features
@@ -272,8 +272,8 @@ class GCN_delta(nn.Module):
         time_start = time.perf_counter()
         feat = feat.to('cpu')
         embedding_prev = embedding_prev.to('cpu')
-        load_time = time.perf_counter() - time_start
-        print('>> Load feat: {}'.format(util.time_format(load_time)))
+        # load_time = time.perf_counter() - time_start
+        # print('>> Load feat: {}'.format(util.time_format(load_time)))
 
         ##
         r"""
@@ -296,15 +296,15 @@ class GCN_delta(nn.Module):
         # ngh_high_deg_ind = th.tensor(ngh_high_deg, dtype=th.long)
         ngh_low_deg_ind = th.tensor(ngh_low_deg, dtype=th.long)
 
-        time_prev_ind = time.perf_counter() - time_start - load_time
-        print('>> prev_ind: {}'.format(util.time_format(time_prev_ind)))
+        # time_prev_ind = time.perf_counter() - time_start - load_time
+        # print('>> prev_ind: {}'.format(util.time_format(time_prev_ind)))
 
         feat_prev = th.index_select(embedding_prev, 0, feat_prev_keep_ind)
         # feat_high_deg = th.index_select(feat, 0, ngh_high_deg_ind)
         feat_low_deg = th.index_select(feat, 0, ngh_low_deg_ind)
 
-        time_prev_index_sel = time.perf_counter() - time_start - load_time - time_prev_ind
-        print('>> prev_index_sel: {}'.format(util.time_format(time_prev_index_sel)))
+        # time_prev_index_sel = time.perf_counter() - time_start - load_time - time_prev_ind
+        # print('>> prev_index_sel: {}'.format(util.time_format(time_prev_index_sel)))
 
         # Gen index for scatter
         index_feat_prev = [[feat_prev_keep_ind[row].item() for col in range(feat_prev.shape[1])]
@@ -314,9 +314,9 @@ class GCN_delta(nn.Module):
         index_low_deg = [[ngh_low_deg_ind[row].item() for col in range(feat_low_deg.shape[1])]
                          for row in range(ngh_low_deg_ind.shape[0])]
 
-        time_feat_sel = time.perf_counter(
-        ) - time_start - load_time - time_prev_ind - time_prev_index_sel
-        print('>> feat_sel: {}'.format(util.time_format(time_feat_sel)))
+        # time_feat_sel = time.perf_counter(
+        # ) - time_start - load_time - time_prev_ind - time_prev_index_sel
+        # print('>> feat_sel: {}'.format(util.time_format(time_feat_sel)))
 
         index_feat_prev = th.tensor(index_feat_prev)
         # index_high_deg = th.tensor(index_high_deg)
