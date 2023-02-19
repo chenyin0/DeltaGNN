@@ -1080,8 +1080,8 @@ def load_dataset_index(dataset, path):
     if (not fp_train_idx.exists()) or (not fp_val_idx.exists()) or (not fp_test_idx.exists()):
         raise Exception('No existing file: train/val/test_idx.txt')
     else:
-        train_idx = np.loadtxt(fp_train_idx, delimiter='\n', dtype=np.uint32)
-        val_idx = np.loadtxt(fp_val_idx, delimiter='\n', dtype=np.uint32)
-        test_idx = np.loadtxt(fp_test_idx, delimiter='\n', dtype=np.int64)
+        train_idx = np.loadtxt(fp_train_idx, dtype=np.uint32)
+        val_idx = np.loadtxt(fp_val_idx, dtype=np.uint32)
+        test_idx = np.loadtxt(fp_test_idx, dtype=np.uint32)
 
     return train_idx, val_idx, test_idx
