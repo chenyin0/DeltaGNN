@@ -11,6 +11,7 @@ import random
 import numpy as np
 import copy as cp
 import time
+import pathlib
 
 
 def gen_root_node_queue(g):
@@ -1044,3 +1045,43 @@ def time_format(sec):
         time = str(s) + 's'
 
     return time
+
+
+def dump_dataset_index(g, dataset, path):
+    """
+    Dump the train/val/test vertice index
+    """
+
+    train_idx = g.ndata['train_mask'].nonzero().squeeze()
+    val_idx = g.ndata['val_mask'].nonzero().squeeze()
+    test_idx = g.ndata['test_mask'].nonzero().squeeze()
+
+    fp_train_idx = pathlib.Path(path + dataset + '_' + 'train_idx.txt')
+    fp_val_idx = pathlib.Path(path + dataset + '_' + 'val_idx.txt')
+    fp_test_idx = pathlib.Path(path + dataset + '_' + 'test_idx.txt')
+
+    if (not fp_train_idx.exists()) or (not fp_val_idx.exists()) or (not fp_test_idx.exists()):
+        np.savetxt(path + dataset + '_' + 'train_idx.txt', train_idx, fmt='%d')
+        np.savetxt(path + dataset + '_' + 'val_idx.txt', val_idx, fmt='%d')
+        np.savetxt(path + dataset + '_' + 'test_idx.txt', test_idx, fmt='%d')
+
+    return train_idx, val_idx, test_idx
+
+
+def load_dataset_index(dataset, path):
+    """
+    load the train/val/test vertice index
+    """
+
+    fp_train_idx = pathlib.Path(path + dataset + '_' + 'train_idx.txt')
+    fp_val_idx = pathlib.Path(path + dataset + '_' + 'val_idx.txt')
+    fp_test_idx = pathlib.Path(path + dataset + '_' + 'test_idx.txt')
+
+    if (not fp_train_idx.exists()) or (not fp_val_idx.exists()) or (not fp_test_idx.exists()):
+        raise Exception('No existing file: train/val/test_idx.txt')
+    else:
+        train_idx = np.loadtxt(fp_train_idx, delimiter='\n', dtype=np.uint32)
+        val_idx = np.loadtxt(fp_val_idx, delimiter='\n', dtype=np.uint32)
+        test_idx = np.loadtxt(fp_test_idx, delimiter='\n', dtype=np.int64)
+
+    return train_idx, val_idx, test_idx
