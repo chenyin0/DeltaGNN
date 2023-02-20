@@ -10,10 +10,8 @@ import dgl
 from dgl.data import CoraGraphDataset, CiteseerGraphDataset, PubmedGraphDataset, RedditDataset, AmazonCoBuyComputerDataset
 from dgl.data import AsNodePredDataset
 from ogb.nodeproppred import DglNodePropPredDataset
-# from ogb.nodeproppred import PygNodePropPredDataset
-from dgl import AddSelfLoop, GCNNorm
+from dgl import AddSelfLoop
 import preprocess
-# import torch_geometric.transforms as T
 
 import util
 import g_update
@@ -37,61 +35,64 @@ import pathlib
 
 
 def main(args):
+    import os
+    os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "max_split_size_mb:32"
+
     # Overall task execution time
     Task_time_start = time.perf_counter()
     print('>> Task start time: ', time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()))
 
     # Load GNN model parameter
     model_name = args.model
-    dataset = args.dataset
+    dataset_name = args.dataset
     if model_name == 'gcn':
-        path = os.getcwd()
-        print(path)
+        # path = os.getcwd()
+        # print(path)
         # with open('./examples/pytorch/delta_gnn/gcn_para.json', 'r') as f:
         with open('./gcn_para.json', 'r') as f:
             para = json.load(f)
-            n_hidden = para[dataset]['--n-hidden']
-            n_layers = para[dataset]['--n-layers']
-            lr = para[dataset]['--lr']
-            weight_decay = para[dataset]['--weight-decay']
-            dropout = para[dataset]['--dropout']
+            n_hidden = para[dataset_name]['--n-hidden']
+            n_layers = para[dataset_name]['--n-layers']
+            lr = para[dataset_name]['--lr']
+            weight_decay = para[dataset_name]['--weight-decay']
+            dropout = para[dataset_name]['--dropout']
     elif model_name == 'graphsage':
         # with open('./examples/pytorch/delta_gnn/graphsage_para.json', 'r') as f:
         with open('./graphsage_para.json', 'r') as f:
             para = json.load(f)
-            n_hidden = para[dataset]['--n-hidden']
-            n_layers = para[dataset]['--n-layers']
+            n_hidden = para[dataset_name]['--n-hidden']
+            n_layers = para[dataset_name]['--n-layers']
             # num_negs = para['--num-negs']
-            fan_out = str(para[dataset]['--fan-out'])
-            batch_size = para[dataset]['--batch-size']
+            fan_out = str(para[dataset_name]['--fan-out'])
+            batch_size = para[dataset_name]['--batch-size']
             # log_every = para['--log-every']
             # eval_every = para['--eval-every']
-            lr = para[dataset]['--lr']
-            weight_decay = para[dataset]['--weight-decay']
-            dropout = para[dataset]['--dropout']
+            lr = para[dataset_name]['--lr']
+            weight_decay = para[dataset_name]['--weight-decay']
+            dropout = para[dataset_name]['--dropout']
     elif model_name == 'gat':
         # with open('./examples/pytorch/delta_gnn/gat_para.json', 'r') as f:
         with open('./gat_para.json', 'r') as f:
             para = json.load(f)
-            n_hidden = para[dataset]['--n-hidden']
-            n_layers = para[dataset]['--n-layers']
-            lr = para[dataset]['--lr']
-            weight_decay = para[dataset]['--weight-decay']
-            feat_dropout = para[dataset]['--feat-drop']
-            attn_dropout = para[dataset]['--attn-drop']
-            heads_str = str(para[dataset]['--heads'])
+            n_hidden = para[dataset_name]['--n-hidden']
+            n_layers = para[dataset_name]['--n-layers']
+            lr = para[dataset_name]['--lr']
+            weight_decay = para[dataset_name]['--weight-decay']
+            feat_dropout = para[dataset_name]['--feat-drop']
+            attn_dropout = para[dataset_name]['--attn-drop']
+            heads_str = str(para[dataset_name]['--heads'])
             heads = [int(i) for i in heads_str.split(',')]
     elif model_name == 'gin':
-        path = os.getcwd()
-        print(path)
+        # path = os.getcwd()
+        # print(path)
         # with open('./examples/pytorch/delta_gnn/gin_para.json', 'r') as f:
         with open('./gin_para.json', 'r') as f:
             para = json.load(f)
-            n_hidden = para[dataset]['--n-hidden']
-            n_layers = para[dataset]['--n-layers']
-            lr = para[dataset]['--lr']
-            weight_decay = para[dataset]['--weight-decay']
-            dropout = para[dataset]['--dropout']
+            n_hidden = para[dataset_name]['--n-hidden']
+            n_layers = para[dataset_name]['--n-layers']
+            lr = para[dataset_name]['--lr']
+            weight_decay = para[dataset_name]['--weight-decay']
+            dropout = para[dataset_name]['--dropout']
     else:
         assert ('Not define GNN model')
 
@@ -128,6 +129,13 @@ def main(args):
 
     device = th.device("cuda:" + str(gpu_id) if cuda else "cpu")
     mode = args.mode
+
+    print('\nTotal #Nodes: {:d}, #Edges: {:d}\n'.format(g.number_of_nodes(), g.number_of_edges()))
+    # Dump the train/val/test vertice index
+    # global train_idx_orig, val_idx_orig, test_idx_orig
+    # train_idx_orig, val_idx_orig, test_idx_orig = util.dump_dataset_index(
+    #     g, args.dataset, './data/')
+    util.dump_dataset_index(g, args.dataset, './data/')
 
     # """ Profiling workloads imbalance """
     # deg_th = 6
@@ -182,10 +190,12 @@ def main(args):
                 f.write(str(i) + '\n')
 
     # Gen node_seq
-    g_struct_init_ratio = 0.5
-    node_seq = util.gen_snapshot(g_struct_init_ratio, 10, g.number_of_nodes())
+    g_struct_init_ratio = 0.3
+    g_snapshot_total_num = 16
+    node_seq = util.gen_snapshot(g_struct_init_ratio, g_snapshot_total_num, g.number_of_nodes())
 
     # # Graph evolved size
+
     # cora_seq = [540, 691, 892, 1168, 1530, 2036, 2708]
     # citeseer_seq = [639, 824, 1080, 1414, 1881, 2502, 3327]
     # ogbn_arxiv_seq = [41125, 53160, 69499, 90941, 120740, 160451, 169343]
@@ -259,8 +269,8 @@ def main(args):
     init_nodes = node_q[:node_seq[0]]
     # g_evo = g_update.graph_evolve(init_nodes, g_csr, g, node_map_orig2evo, node_map_evo2orig,
     #                               n_layers)
-    g_evo = g_update.graph_struct_init(args, g_struct_init_ratio, init_nodes, g, node_map_orig2evo,
-                                       node_map_evo2orig)
+    g_evo = g_update.graph_struct_init(args, g_struct_init_ratio, g_snapshot_total_num, init_nodes,
+                                       g, node_map_orig2evo, node_map_evo2orig)
     ##
 
     # # Update train/val/test mask for ogbn-arxiv (Optional)
@@ -347,7 +357,7 @@ def main(args):
     #         print(name)
 
     # Train model_golden
-    print("\n>>> Accuracy on full graph with model_golden:")
+    print("\n>>> Accuracy of model_golden on the original graph:")
     test_mask = model_golden.g.ndata['test_mask']
     if model_name == 'gcn':
         # model_golden.reset_parameters()
@@ -427,16 +437,16 @@ def main(args):
         print('\n>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
         print('Add nodes @ iter = {:d}'.format(i + 1))
         inserted_nodes = node_q[node_seq[i]:node_seq[i + 1] - 1]
-        print('Add nodes: {:d}, Total nodes: {:d}'.format(len(inserted_nodes),
-                                                          model_retrain.g.number_of_nodes()))
+        print('Add nodes: {:d}, Total nodes: {:d}'.format(len(inserted_nodes), node_seq[i + 1]))
 
         ##
         """
-        # Periodic retraining
+        # No retraining
         """
-        print('\n>> Periodic retraining')
-        model.g = g_update.graph_evolve(inserted_nodes, g_csr, g, node_map_orig2evo,
-                                        node_map_evo2orig, n_layers, model.g)
+        print('\n>> No retraining')
+        model.g = g_update.graph_evolve(args, g_struct_init_ratio, g_snapshot_total_num, i + 1,
+                                        inserted_nodes, g, node_map_orig2evo, node_map_evo2orig,
+                                        model.g)
 
         print('Node_number:', model.g.number_of_nodes())
         print('Edge_number:', model.g.number_of_edges())
@@ -444,25 +454,59 @@ def main(args):
         test_mask = model.g.ndata['test_mask']
         retrain_epoch = 3
         if model_name == 'gcn':
-            if (i + 1) % retrain_epoch == 0 or i == 0:
-                gcn.train(args, model, device, lr, weight_decay)
+            # if (i + 1) % retrain_epoch == 0 or i == 0:
+            #     gcn.train(args, model, device, lr, weight_decay)
             acc = gcn.evaluate(model, test_mask, device)
         elif model_name == 'graphsage':
-            if (i + 1) % retrain_epoch == 0 or i == 0:
-                graphsage.train(args, model, device, fan_out, batch_size, lr, weight_decay)
+            # if (i + 1) % retrain_epoch == 0 or i == 0:
+            #     graphsage.train(args, model, device, fan_out, batch_size, lr, weight_decay)
             acc = graphsage.evaluate(device, model, test_mask, batch_size)
         elif model_name == 'gat':
-            if (i + 1) % retrain_epoch == 0 or i == 0:
-                gat.train(args, model, device, lr, weight_decay)
+            # if (i + 1) % retrain_epoch == 0 or i == 0:
+            #     gat.train(args, model, device, lr, weight_decay)
             acc = gat.evaluate(model, test_mask, device)
         elif model_name == 'gin':
-            if (i + 1) % retrain_epoch == 0 or i == 0:
-                gin.train(args, model, device, lr, weight_decay)
+            # if (i + 1) % retrain_epoch == 0 or i == 0:
+            #     gin.train(args, model, device, lr, weight_decay)
             acc = gin.evaluate(model, test_mask, device)
 
         print("Test accuracy of non-retrain @ {:d} nodes {:.2%}".format(
             model.g.number_of_nodes(), acc))
         acc_no_retrain = acc * 100
+
+        # ##
+        # """
+        # # Periodic retraining
+        # """
+        # print('\n>> Periodic retraining')
+        # model.g = g_update.graph_evolve(inserted_nodes, g_csr, g, node_map_orig2evo,
+        #                                 node_map_evo2orig, n_layers, model.g)
+
+        # print('Node_number:', model.g.number_of_nodes())
+        # print('Edge_number:', model.g.number_of_edges())
+
+        # test_mask = model.g.ndata['test_mask']
+        # retrain_epoch = 3
+        # if model_name == 'gcn':
+        #     if (i + 1) % retrain_epoch == 0 or i == 0:
+        #         gcn.train(args, model, device, lr, weight_decay)
+        #     acc = gcn.evaluate(model, test_mask, device)
+        # elif model_name == 'graphsage':
+        #     if (i + 1) % retrain_epoch == 0 or i == 0:
+        #         graphsage.train(args, model, device, fan_out, batch_size, lr, weight_decay)
+        #     acc = graphsage.evaluate(device, model, test_mask, batch_size)
+        # elif model_name == 'gat':
+        #     if (i + 1) % retrain_epoch == 0 or i == 0:
+        #         gat.train(args, model, device, lr, weight_decay)
+        #     acc = gat.evaluate(model, test_mask, device)
+        # elif model_name == 'gin':
+        #     if (i + 1) % retrain_epoch == 0 or i == 0:
+        #         gin.train(args, model, device, lr, weight_decay)
+        #     acc = gin.evaluate(model, test_mask, device)
+
+        # print("Test accuracy of non-retrain @ {:d} nodes {:.2%}".format(
+        #     model.g.number_of_nodes(), acc))
+        # acc_no_retrain = acc * 100
 
         # Get node index of added_nodes in evolve graph
         inserted_nodes_evo = g_update.get_nodes_reindex(node_map_orig2evo, inserted_nodes)
@@ -525,11 +569,16 @@ def main(args):
             # Full graph retraining
             """
             print('\n>> Full graph retraining')
-            model_retrain.g = g_update.graph_evolve(inserted_nodes, g_csr, g, node_map_orig2evo,
-                                                    node_map_evo2orig, n_layers, model_retrain.g)
+            # model_retrain.g = g_update.graph_evolve(args, inserted_nodes, g_csr, g,
+            #                                         node_map_orig2evo, node_map_evo2orig, n_layers,
+            #                                         model_retrain.g)
+            model_retrain.g = g_update.graph_evolve(args, g_struct_init_ratio, g_snapshot_total_num,
+                                                    i + 1, inserted_nodes, g, node_map_orig2evo,
+                                                    node_map_evo2orig, model_retrain.g)
 
             time_start = time.perf_counter()
             test_mask = model_retrain.g.ndata['test_mask']
+            model_retrain.reset_parameters()
             if model_name == 'gcn':
                 gcn.train(args, model_retrain, device, lr, weight_decay)
                 acc = gcn.evaluate(model_retrain, test_mask, device)
@@ -555,24 +604,31 @@ def main(args):
             # Delta retraining only on inserted nodes
             """
             print('\n>> Delta retraining')
-            # Execute full retraining at the beginning
-            if i <= 0:
-                model_delta.g = g_update.graph_evolve(inserted_nodes, g_csr, g, node_map_orig2evo,
-                                                      node_map_evo2orig, n_layers, model_delta.g)
-            else:
-                model_delta.g = g_update.graph_evolve_delta(inserted_nodes, g_csr, g,
-                                                            node_map_orig2evo, node_map_evo2orig,
-                                                            model_delta.g)
+            # # Execute full retraining at the beginning
+            # if i <= 0:
+            #     model_delta.g = g_update.graph_evolve(args, inserted_nodes, g_csr, g,
+            #                                           node_map_orig2evo, node_map_evo2orig,
+            #                                           n_layers, model_delta.g)
+            # else:
+            #     model_delta.g = g_update.graph_evolve_delta(args, inserted_nodes, g_csr, g,
+            #                                                 node_map_orig2evo, node_map_evo2orig,
+            #                                                 model_delta.g)
+
+            model_delta.g = g_update.graph_evolve(args, g_struct_init_ratio, g_snapshot_total_num,
+                                                  i + 1, inserted_nodes, g, node_map_orig2evo,
+                                                  node_map_evo2orig, model_delta.g)
 
             time_start = time.perf_counter()
             test_mask = model_delta.g.ndata['test_mask']
+            model_delta.reset_parameters()
             if model_name == 'gcn':
                 gcn.train(args, model_delta, device, lr, weight_decay)
-                if i <= 3:
-                    acc = gcn.evaluate(model_delta, test_mask, device)
-                else:
-                    acc = gcn.evaluate_delta(model_delta, test_mask, device, inserted_nodes_evo)
-                    # acc = evaluate(model_delta, test_mask, device)
+                acc = gcn.evaluate(model_delta, test_mask, device)
+                # if i <= 3:
+                #     acc = gcn.evaluate(model_delta, test_mask, device)
+                # else:
+                #     acc = gcn.evaluate_delta(model_delta, test_mask, device, inserted_nodes_evo)
+                # acc = evaluate(model_delta, test_mask, device)
             elif model_name == 'graphsage':
                 graphsage.train(args, model_delta, device, fan_out, batch_size, lr, weight_decay)
                 acc = graphsage.evaluate(device, model_delta, test_mask, batch_size)
@@ -622,7 +678,8 @@ def main(args):
         args.dataset, util.time_format(time.perf_counter() - Task_time_start)))
 
     for i in range(len(accuracy)):
-        print(i, round(accuracy[i][3], 2), round(accuracy[i][2], 2))
+        print('{:d}\t{:.2f}  {:.2f}  {:.2f}'.format(i, accuracy[i][2], accuracy[i][3],
+                                                    accuracy[i][4]))
 
 
 if __name__ == '__main__':
@@ -638,13 +695,8 @@ if __name__ == '__main__':
         help=
         "Dataset name ('cora', 'citeseer', 'pubmed', 'reddit', 'ogbn-arxiv', 'ogbn-mag', 'amazon_comp')."
     )
-    # parser.add_argument("--dropout", type=float, default=0.5, help="dropout probability")
     parser.add_argument("--gpu", type=int, default=-1, help="gpu")
-    # parser.add_argument("--lr", type=float, default=1e-2, help="learning rate")
     parser.add_argument("--n-epochs", type=int, default=200, help="number of training epochs")
-    # parser.add_argument("--n-hidden", type=int, default=16, help="number of hidden gcn units")
-    # parser.add_argument("--n-layers", type=int, default=2, help="number of gcn layers")
-    # parser.add_argument("--weight-decay", type=float, default=5e-4, help="Weight for L2 loss")
     parser.add_argument("--self-loop",
                         default=True,
                         action='store_true',
@@ -660,21 +712,20 @@ if __name__ == '__main__':
                         type=int,
                         default=None,
                         help="degree threshold of neighbors nodes")
-    # parser.set_defaults(self_loop=True)
     args = parser.parse_args()
 
-    # args.model = 'gcn'
-    args.model = 'graphsage'
+    args.model = 'gcn'
+    # args.model = 'graphsage'
     # args.model = 'gat'
     # args.model = 'gin'
 
-    args.dataset = 'cora'
-    # args.dataset = 'citeseer'
+    # args.dataset = 'cora'
+    args.dataset = 'citeseer'
     # args.dataset = 'ogbn-arxiv'
     # args.dataset = 'ogbn-mag'
 
     args.n_epochs = 200
-    args.gpu = 0
+    args.gpu = 1
     # args.mode = 'mixed'
 
     dump_accuracy_flag = 1

@@ -84,7 +84,8 @@ def main(args):
 
     # Gen node_seq
     g_struct_init_ratio = 0.5
-    node_seq = util.gen_snapshot(g_struct_init_ratio, 10, g.number_of_nodes())
+    g_snapshot_total_num = 10
+    node_seq = util.gen_snapshot(g_struct_init_ratio, g_snapshot_total_num, g.number_of_nodes())
 
     # Gen node_mapping from g_orig to g_evo, for DGL compels consecutive node id
     node_map_orig2evo = dict()
@@ -128,8 +129,9 @@ def main(args):
 
         # g_evo = g_update.graph_evolve(inserted_nodes, g_csr, g, node_map_orig2evo,
         #                               node_map_evo2orig, n_layer, g_evo)
-        g_evo = g_update.graph_evolve_by_trace(args, g_struct_init_ratio, i, inserted_nodes, g,
-                                               node_map_orig2evo, node_map_evo2orig, n_layer, g_evo)
+        g_evo = g_update.graph_evolve_by_trace(args, g_struct_init_ratio, g_snapshot_total_num,
+                                               i + 1, inserted_nodes, g, node_map_orig2evo,
+                                               node_map_evo2orig, g_evo)
 
         # Get node index of added_nodes in evolve graph
         inserted_nodes_evo = g_update.get_nodes_reindex(node_map_orig2evo, inserted_nodes)

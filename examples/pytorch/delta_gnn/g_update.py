@@ -53,8 +53,8 @@ def get_nodes_reindex(node_map, nodes_id_prev):
     return nodes_id_new
 
 
-def update_g_struct_init(args, init_ratio, init_nodes, g_orig, node_map_orig2evo,
-                         node_map_evo2orig):
+def update_g_struct_init(args, total_snapshot_num, init_ratio, init_nodes, g_orig,
+                         node_map_orig2evo, node_map_evo2orig):
     """
     Load the init g_struct_update (src_nodes & dst_nodes) from files for time saving
     """
@@ -71,11 +71,14 @@ def update_g_struct_init(args, init_ratio, init_nodes, g_orig, node_map_orig2evo
     #                                  '_map_evo2orig_' + str(init_ratio) + '.txt')
 
     file_edge_nodes = pathlib.Path('./snapshots/edge_src_dst_nodes/' + args.dataset +
-                                   '_g_struct_init_' + str(init_ratio) + '.txt')
+                                   '_g_struct_' + 'init_' + str(init_ratio) + '_snapshot_' +
+                                   str(total_snapshot_num) + '_0' + '.txt')
     file_map_orig2evo = pathlib.Path('./snapshots/edge_src_dst_nodes/' + args.dataset +
-                                     '_map_orig2evo_' + str(init_ratio) + '.txt')
+                                     '_map_orig2evo_' + 'init_' + str(init_ratio) + '_snapshot_' +
+                                     str(total_snapshot_num) + '_0' + '.txt')
     file_map_evo2orig = pathlib.Path('./snapshots/edge_src_dst_nodes/' + args.dataset +
-                                     '_map_evo2orig_' + str(init_ratio) + '.txt')
+                                     '_map_evo2orig_' + 'init_' + str(init_ratio) + '_snapshot_' +
+                                     str(total_snapshot_num) + '_0' + '.txt')
 
     if file_edge_nodes.exists() and file_map_orig2evo.exists() and file_map_evo2orig.exists():
         # Read edge nodes
@@ -225,26 +228,26 @@ def update_g_struct_evo(new_nodes, g_orig, node_map_orig2evo, node_map_evo2orig,
     return g_evo
 
 
-def update_g_struct_evo_by_trace(args, init_ratio, evo_iter, new_nodes, g_orig, node_map_orig2evo,
-                                 node_map_evo2orig, g_evo):
+def update_g_struct_evo_by_trace(args, init_ratio, snapshot_total_num, evo_iter, new_nodes, g_orig,
+                                 node_map_orig2evo, node_map_evo2orig, g_evo):
     """
     Dump and read nodes from file, to save time for large graph
     
-    evo_iter: the times of evo iter
+    evo_iter: snapshot ID
     """
 
     print('>> Start update graph structure')
     time_start = time.perf_counter()
 
     file_edge_nodes = pathlib.Path('./snapshots/edge_src_dst_nodes/' + args.dataset +
-                                   '_g_struct_evo_' + str(init_ratio) + '_evo_iter_' +
-                                   str(evo_iter) + '.txt')
+                                   '_g_struct_' + 'init_' + str(init_ratio) + '_snapshot_' +
+                                   str(snapshot_total_num) + '_' + str(evo_iter) + '.txt')
     file_map_orig2evo = pathlib.Path('./snapshots/edge_src_dst_nodes/' + args.dataset +
-                                     '_map_orig2evo_' + str(init_ratio) + '_evo_iter_' +
-                                     str(evo_iter) + '.txt')
+                                     '_map_orig2evo_' + 'init_' + str(init_ratio) + '_snapshot_' +
+                                     str(snapshot_total_num) + '_' + str(evo_iter) + '.txt')
     file_map_evo2orig = pathlib.Path('./snapshots/edge_src_dst_nodes/' + args.dataset +
-                                     '_map_evo2orig_' + str(init_ratio) + '_evo_iter_' +
-                                     str(evo_iter) + '.txt')
+                                     '_map_evo2orig_' + 'init_' + str(init_ratio) + '_snapshot_' +
+                                     str(snapshot_total_num) + '_' + str(evo_iter) + '.txt')
 
     if file_edge_nodes.exists() and file_map_orig2evo.exists() and file_map_evo2orig.exists():
         # Read edge nodes
@@ -391,26 +394,27 @@ def update_g_struct_evo_by_trace(args, init_ratio, evo_iter, new_nodes, g_orig, 
 #     return g_evo, edge_src_nodes_reindex, edge_dst_nodes_reindex
 
 
-def graph_struct_init(args, init_ratio, new_nodes, g_orig, node_map_orig2evo, node_map_evo2orig):
+def graph_struct_init(args, init_ratio, total_snapshot_num, new_nodes, g_orig, node_map_orig2evo,
+                      node_map_evo2orig):
     """
     Initialize graph
     """
-    g_evo = update_g_struct_init(args, init_ratio, new_nodes, g_orig, node_map_orig2evo,
-                                 node_map_evo2orig)
+    g_evo = update_g_struct_init(args, total_snapshot_num, init_ratio, new_nodes, g_orig,
+                                 node_map_orig2evo, node_map_evo2orig)
     # update_g_attr_init(g_evo, g_orig, node_map_evo2orig)
     update_g_attr(args, g_evo, g_orig, node_map_evo2orig, node_map_orig2evo)
 
     return g_evo
 
 
-def graph_evolve_by_trace(args, init_ratio, evo_iter, new_nodes, g_orig, node_map_orig2evo,
-                          node_map_evo2orig, layer_num, g_evo):
+def graph_evolve_by_trace(args, init_ratio, total_snapshot_num, evo_iter, new_nodes, g_orig,
+                          node_map_orig2evo, node_map_evo2orig, g_evo):
     """
     Construct evolve graph from trace for saving time
     """
 
-    g_evo = update_g_struct_evo_by_trace(args, init_ratio, evo_iter, new_nodes, g_orig,
-                                         node_map_orig2evo, node_map_evo2orig, g_evo)
+    g_evo = update_g_struct_evo_by_trace(args, init_ratio, total_snapshot_num, evo_iter, new_nodes,
+                                         g_orig, node_map_orig2evo, node_map_evo2orig, g_evo)
     # update_g_attr_evo(new_nodes, g_evo, g_orig, node_map_orig2evo, node_map_evo2orig, layer_num)
 
     return g_evo
@@ -442,16 +446,28 @@ def graph_evolve_by_trace(args, init_ratio, evo_iter, new_nodes, g_orig, node_ma
 #     return g_evo
 
 
-def graph_evolve(args, new_nodes, g_orig, node_map_orig2evo, node_map_evo2orig, g_evo=None):
+def graph_evolve(args,
+                 init_ratio,
+                 total_snapshot_num,
+                 evo_iter,
+                 new_nodes,
+                 g_orig,
+                 node_map_orig2evo,
+                 node_map_evo2orig,
+                 g_evo):
     """
     Construct evolving graph
     """
-    if g_evo is None:
-        # Construct a new graph
-        g_evo = update_g_struct_evo(new_nodes, g_orig, node_map_orig2evo, node_map_evo2orig)
-    else:
-        g_evo = update_g_struct_evo(new_nodes, g_orig, node_map_orig2evo, node_map_evo2orig, g_evo)
+    # if g_evo is None:
+    #     # Construct a new graph
+    #     g_evo = update_g_struct_evo_by_trace(args, init_ratio, total_snapshot_num, evo_iter, new_nodes, g_orig,
+    #                                          node_map_orig2evo, node_map_evo2orig)
+    # else:
+    #     g_evo = update_g_struct_evo_by_trace(args, init_ratio, total_snapshot_num, evo_iter, new_nodes, g_orig,
+    #                                          node_map_orig2evo, node_map_evo2orig, g_evo)
 
+    g_evo = update_g_struct_evo_by_trace(args, init_ratio, total_snapshot_num, evo_iter, new_nodes, g_orig,
+                                             node_map_orig2evo, node_map_evo2orig, g_evo)
     update_g_attr(args, g_evo, g_orig, node_map_evo2orig, node_map_orig2evo)
     return g_evo
 
