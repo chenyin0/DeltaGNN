@@ -70,11 +70,11 @@ def update_g_struct_init(args, init_ratio, init_nodes, g_orig, node_map_orig2evo
     # file_map_evo2orig = pathlib.Path('./dataset/edge_src_dst_nodes/' + args.dataset +
     #                                  '_map_evo2orig_' + str(init_ratio) + '.txt')
 
-    file_edge_nodes = pathlib.Path('../../../dataset/edge_src_dst_nodes/' + args.dataset +
+    file_edge_nodes = pathlib.Path('./snapshots/edge_src_dst_nodes/' + args.dataset +
                                    '_g_struct_init_' + str(init_ratio) + '.txt')
-    file_map_orig2evo = pathlib.Path('../../../dataset/edge_src_dst_nodes/' + args.dataset +
+    file_map_orig2evo = pathlib.Path('./snapshots/edge_src_dst_nodes/' + args.dataset +
                                      '_map_orig2evo_' + str(init_ratio) + '.txt')
-    file_map_evo2orig = pathlib.Path('../../../dataset/edge_src_dst_nodes/' + args.dataset +
+    file_map_evo2orig = pathlib.Path('./snapshots/edge_src_dst_nodes/' + args.dataset +
                                      '_map_evo2orig_' + str(init_ratio) + '.txt')
 
     if file_edge_nodes.exists() and file_map_orig2evo.exists() and file_map_evo2orig.exists():
@@ -236,13 +236,13 @@ def update_g_struct_evo_by_trace(args, init_ratio, evo_iter, new_nodes, g_orig, 
     print('>> Start update graph structure')
     time_start = time.perf_counter()
 
-    file_edge_nodes = pathlib.Path('../../../dataset/edge_src_dst_nodes/' + args.dataset +
+    file_edge_nodes = pathlib.Path('./snapshots/edge_src_dst_nodes/' + args.dataset +
                                    '_g_struct_evo_' + str(init_ratio) + '_evo_iter_' +
                                    str(evo_iter) + '.txt')
-    file_map_orig2evo = pathlib.Path('../../../dataset/edge_src_dst_nodes/' + args.dataset +
+    file_map_orig2evo = pathlib.Path('./snapshots/edge_src_dst_nodes/' + args.dataset +
                                      '_map_orig2evo_' + str(init_ratio) + '_evo_iter_' +
                                      str(evo_iter) + '.txt')
-    file_map_evo2orig = pathlib.Path('../../../dataset/edge_src_dst_nodes/' + args.dataset +
+    file_map_evo2orig = pathlib.Path('./snapshots/edge_src_dst_nodes/' + args.dataset +
                                      '_map_evo2orig_' + str(init_ratio) + '_evo_iter_' +
                                      str(evo_iter) + '.txt')
 
@@ -528,25 +528,59 @@ def update_g_attr(args, g_evo, g_orig, node_map_evo2orig, node_map_orig2evo):
 
     if args.dataset == 'cora':
         # train:val:test = 140:500:1000; total vertex = 2708
-        train_ratio = round(140 / 2708, 4)
-        val_ratio = round(500 / 2708, 4)
-        test_ratio = round(1000 / 2708, 4)
+        total_node_num = 2708
+        train_idx_orig_num = 140
+        val_idx_orig_num = 500
+        test_idx_orig_num = 1000
+    if args.dataset == 'citeseer':
+        # train:val:test = 120:500:1000; total vertex = 3327
+        total_node_num = 3327
+        train_idx_orig_num = 120
+        val_idx_orig_num = 500
+        test_idx_orig_num = 1000
+    elif args.dataset == 'ogbn-arxiv':
+        # train:val:test = 90941:29799:48603; total vertex = 169343
+        total_node_num = 169343
+        train_idx_orig_num = 90941
+        val_idx_orig_num = 29799
+        test_idx_orig_num = 48603
+    if args.dataset == 'ogbn-mag':
+        # train:val:test = 629571:64879:41939; total vertex = 736389
+        total_node_num = 736389
+        train_idx_orig_num = 629571
+        val_idx_orig_num = 64879
+        test_idx_orig_num = 41939
 
-        g_node_num = g_evo.number_of_nodes()
-        train_num = round(g_node_num * train_ratio)
-        val_num = round(g_node_num * val_ratio)
-        test_num = round(g_node_num * test_ratio)
+    train_ratio = round(train_idx_orig_num / total_node_num, 4)
+    val_ratio = round(val_idx_orig_num / total_node_num, 4)
+    test_ratio = round(test_idx_orig_num / total_node_num, 4)
 
-        train_idx_orig = range(train_num)
-        val_idx_orig = range(train_num, train_num + val_num)
-        test_idx_orig = range(g_node_num - test_num, g_node_num)
+    g_node_num = g_evo.number_of_nodes()
+    train_num = round(g_node_num * train_ratio)
+    val_num = round(g_node_num * val_ratio)
+    test_num = round(g_node_num * test_ratio)
 
-    else:
+    train_idx_orig = range(train_num)
+    val_idx_orig = range(train_num, train_num + val_num)
+    test_idx_orig = range(g_node_num - test_num, g_node_num)
+
+    if args.dataset == 'citeseer':
         train_idx_orig, val_idx_orig, test_idx_orig = util.load_dataset_index(
             args.dataset, './data/')
+        nodes_orig_index.sort()
+        np.savetxt('./tmp/init_v_idx.txt', nodes_orig_index, fmt='%d')
         train_idx_orig = list(set(nodes_orig_index).intersection(set(train_idx_orig.tolist())))
         val_idx_orig = list(set(nodes_orig_index).intersection(set(val_idx_orig.tolist())))
         test_idx_orig = list(set(nodes_orig_index).intersection(set(test_idx_orig.tolist())))
+
+    # else:
+    #     train_idx_orig, val_idx_orig, test_idx_orig = util.load_dataset_index(
+    #         args.dataset, './data/')
+    #     nodes_orig_index.sort()
+    #     np.savetxt('./tmp/init_v_idx.txt', nodes_orig_index, fmt='%d')
+    #     train_idx_orig = list(set(nodes_orig_index).intersection(set(train_idx_orig.tolist())))
+    #     val_idx_orig = list(set(nodes_orig_index).intersection(set(val_idx_orig.tolist())))
+    #     test_idx_orig = list(set(nodes_orig_index).intersection(set(test_idx_orig.tolist())))
 
     # Remap idx_orig to idx_evo
     train_idx = []
@@ -561,6 +595,9 @@ def update_g_attr(args, g_evo, g_orig, node_map_evo2orig, node_map_orig2evo):
     for i in test_idx_orig:
         if i in node_map_orig2evo:
             test_idx.append(node_map_orig2evo[i])
+
+    # Print train/val/test size
+    print('Train:Val:Test = {:d}:{:d}:{:d}'.format(len(train_idx), len(val_idx), len(test_idx)))
 
     train_mask = generate_mask_tensor(_sample_mask(train_idx, labels.shape[0])).to(g_evo.device)
     g_evo.ndata['train_mask'] = train_mask
