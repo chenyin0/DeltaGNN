@@ -12,6 +12,7 @@ import numpy as np
 import copy as cp
 import time
 import pathlib
+from torch_sparse import SparseTensor
 
 
 def gen_root_node_queue(g):
@@ -675,6 +676,204 @@ def gen_edge_mask(g, inserted_nodes, deg_th, layer_num):
     print('>> Finish gen edge mask ({})'.format(time_format(time.perf_counter() - time_start)))
 
     return th.Tensor(edge_mask).to(g.device), nodes_high_deg, nodes_low_deg
+
+
+# def gen_graph_adj_t(g, inserted_nodes, deg_th, layer_num):
+#     """
+#     g_adj_t: adj matrix for delta updating
+#     v_sensitive: full-updating
+#     v_insensitive: delta-updating
+#     """
+#     print('>> Start to gen graph_adj_t')
+#     time_start = time.perf_counter()
+
+#     device = g.device
+#     g = g.cpu()
+
+#     # g = dgl.remove_self_loop(g)
+#     v_insensitive = set()
+#     v_sensitive = set()
+#     # Record edges which should remove from adj_t
+#     src_nodes_rm = []
+#     dst_nodes_rm = []
+
+#     # # Reserve shield edges for delta updating
+#     # src_nodes_shield = []
+#     # dst_nodes_shield = []
+
+#     aggr_edges = 0
+#     reduce_edges = 0
+
+#     # Regard inserted nodes as sensitive nodes
+#     v_sensitive.update(inserted_nodes)
+#     # for node in inserted_nodes:
+#     #     pred_nghs = g.predecessors(node).cpu().numpy().tolist()
+#     #     src_nodes.extend(pred_nghs)
+#     #     dst_nodes.extend([node for i in range(len(pred_nghs))])
+
+#     nodes_q = cp.deepcopy(inserted_nodes)
+#     ngh_per_layer = []
+#     # Traverse L-hops nghs of inserted nodes
+#     for i in range(layer_num):
+#         for node in nodes_q:
+#             nghs = g.successors(node).cpu().numpy().tolist()
+#             ngh_per_layer.extend(nghs)
+#             for ngh in nghs:
+#                 deg = g.out_degrees(ngh)
+#                 # For high deg nodes
+#                 # if deg >= deg_th[i]:
+#                 aggr_edges += deg
+#                 if deg >= int(deg_th):
+#                     v_sensitive.add(ngh)
+#                 # For low deg nodes
+#                 elif ngh not in v_sensitive:
+#                     v_insensitive.add(ngh)
+#                     pred_nghs = g.predecessors(ngh).cpu().numpy().tolist()
+#                     src_nodes_rm.extend(pred_nghs)
+#                     dst_nodes_rm.extend(ngh for i in range(len(pred_nghs)))
+#                     reduce_edges += deg - 1
+
+#         nodes_q = cp.deepcopy(ngh_per_layer)
+#         ngh_per_layer.clear()
+
+#     # src_nodes_rm = th.tensor(src_nodes_rm, dtype=th.long)
+#     # dst_nodes_rm = th.tensor(dst_nodes_rm, dtype=th.long)
+
+#     print('Reduced_edges: {:d}, Total_edges: {:d}, reduction_ratio: {:.2%}'.format(
+#         reduce_edges, aggr_edges, reduce_edges / aggr_edges))
+
+#     v_sensitive = list(v_sensitive)
+#     v_insensitive = list(v_insensitive)
+#     print('N_sensitive: {:d}, N_insensitive: {:d}, insensitive_ratio: {:.2%}'.format(
+#         len(v_sensitive), len(v_insensitive),
+#         len(v_insensitive) / (len(v_sensitive) + len(v_insensitive))))
+
+#     v_src, v_dst = rm_edge_adj(g.all_edges()[0].numpy().tolist(),
+#                                g.all_edges()[1].numpy().tolist(), src_nodes_rm, dst_nodes_rm)
+#     v_src = th.tensor(v_src, dtype=th.long)
+#     v_dst = th.tensor(v_dst, dtype=th.long)
+
+#     adj = SparseTensor(row=v_src,
+#                        col=v_dst,
+#                        sparse_sizes=(g.number_of_nodes(), g.number_of_nodes()))
+#     adj_t = adj.to_symmetric()
+
+#     g = g.to(device)
+
+#     print('>> Finish gen g_adj_t ({})'.format(time_format(time.perf_counter() - time_start)))
+#     return adj_t, v_sensitive, v_insensitive
+
+
+# def rm_edge_adj(v_src, v_dst, v_src_rm, v_dst_rm):
+#     """
+#     Remove edge:[v_src_rm, v_dst_rm] from [v_src, v_dst] 
+#     """
+
+#     # Construct a dict of rm edges
+#     rm_dict = dict()
+#     for i in range(len(v_src_rm)):
+#         if v_src_rm[i] not in rm_dict:
+#             rm_dict[v_src_rm[i]] = set([v_dst_rm[i]])
+#         else:
+#             rm_dict[v_src_rm[i]].add(v_dst_rm[i])
+
+#     # Gen v_src/dst_final
+#     v_src_final = []
+#     v_dst_final = []
+#     for i in range(len(v_src)):
+#         v_src_ = v_src[i]
+#         v_dst_ = v_dst[i]
+#         if v_src_ not in rm_dict:
+#             v_src_final.append(v_src_)
+#             v_dst_final.append(v_dst_)
+#         elif v_dst_ not in rm_dict[v_src_]:
+#             v_src_final.append(v_src_)
+#             v_dst_final.append(v_dst_)
+
+#     return v_src_final, v_dst_final
+
+
+def gen_graph_adj_t_affected(g, inserted_nodes, deg_th, layer_num):
+    """
+    g_adj_t: adj matrix for delta updating (only on the affected vertices of the inserted vertices)
+    v_sensitive: full-updating
+    v_insensitive: delta-updating
+    """
+    print('>> Start to gen graph_adj_t_affected')
+    time_start = time.perf_counter()
+
+    device = g.device
+    g = g.cpu()
+
+    # g = dgl.remove_self_loop(g)
+    v_insensitive = []
+    v_sensitive = []
+    # Record edges which need be set in adj_t
+    src_nodes = []
+    dst_nodes = []
+
+    # # Reserve shield edges for delta updating
+    # src_nodes_shield = []
+    # dst_nodes_shield = []
+
+    aggr_edges = 0
+    reduce_edges = 0
+
+    # Regard inserted nodes as sensitive nodes
+    v_sensitive.extend(inserted_nodes)
+    for node in inserted_nodes:
+        pred_nghs = g.predecessors(node).cpu().numpy().tolist()
+        src_nodes.extend(pred_nghs)
+        dst_nodes.extend([node for i in range(len(pred_nghs))])
+
+    nodes_q = cp.deepcopy(inserted_nodes)
+    ngh_per_layer = []
+    # Traverse L-hops nghs of inserted nodes
+    for i in range(layer_num + 1):
+        for node in nodes_q:
+            nghs = g.successors(node).cpu().numpy().tolist()
+            ngh_per_layer.extend(nghs)
+            for ngh in nghs:
+                deg = g.out_degrees(ngh)
+                aggr_edges += deg
+                # For high deg nodes
+                # if deg >= deg_th[i]:
+                if deg >= int(deg_th):
+                    v_sensitive.append(ngh)
+                    pred_nghs = g.predecessors(node).cpu().numpy().tolist()
+                    src_nodes.extend(pred_nghs)
+                    dst_nodes.extend([node for i in range(len(pred_nghs))])
+                # For low deg nodes
+                else:
+                    v_insensitive.append(ngh)
+                    src_nodes.append(node)
+                    dst_nodes.append(ngh)
+                    reduce_edges += deg - 1
+
+        nodes_q = cp.deepcopy(ngh_per_layer)
+        ngh_per_layer.clear()
+
+    src_nodes = th.tensor(src_nodes, dtype=th.long)
+    dst_nodes = th.tensor(dst_nodes, dtype=th.long)
+
+    v_sensitive = list(set(v_sensitive))
+    v_insensitive = list(set(v_insensitive))
+
+    print('Reduced_edges: {:d}, Total_edges: {:d}, reduct_ratio: {:.2%}'.format(
+        reduce_edges, aggr_edges, reduce_edges / aggr_edges))
+    print('V_Sen: {:d}, V_Insen: {:d}, insensitive_ratio: {:.2%}'.format(
+        len(v_sensitive), len(v_insensitive),
+        len(v_insensitive) / (len(v_sensitive) + len(v_insensitive))))
+
+    g = g.to(device)
+
+    adj = SparseTensor(row=src_nodes,
+                       col=dst_nodes,
+                       sparse_sizes=(g.number_of_nodes(), g.number_of_nodes()))
+    adj_t = adj.to_symmetric()
+
+    print('>> Finish gen g_adj_t ({})'.format(time_format(time.perf_counter() - time_start)))
+    return adj_t, v_sensitive, v_insensitive
 
 
 def count_neighbor(nodes, g_csr, node_map_orig2evo, layer_num, mem_access_q=None):
