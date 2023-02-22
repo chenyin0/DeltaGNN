@@ -70,8 +70,8 @@ def update_g_struct_init(args, total_snapshot_num, init_ratio, init_nodes, g_ori
     # file_map_evo2orig = pathlib.Path('./dataset/edge_src_dst_nodes/' + args.dataset +
     #                                  '_map_evo2orig_' + str(init_ratio) + '.txt')
 
-    file_edge_nodes = pathlib.Path('./snapshots/edge_src_dst_nodes/' + args.dataset +
-                                   '_g_struct_' + 'init_' + str(init_ratio) + '_snapshot_' +
+    file_edge_nodes = pathlib.Path('./snapshots/edge_src_dst_nodes/' + args.dataset + '_g_struct_' +
+                                   'init_' + str(init_ratio) + '_snapshot_' +
                                    str(total_snapshot_num) + '_0' + '.txt')
     file_map_orig2evo = pathlib.Path('./snapshots/edge_src_dst_nodes/' + args.dataset +
                                      '_map_orig2evo_' + 'init_' + str(init_ratio) + '_snapshot_' +
@@ -239,8 +239,8 @@ def update_g_struct_evo_by_trace(args, init_ratio, snapshot_total_num, evo_iter,
     print('>> Start update graph structure')
     time_start = time.perf_counter()
 
-    file_edge_nodes = pathlib.Path('./snapshots/edge_src_dst_nodes/' + args.dataset +
-                                   '_g_struct_' + 'init_' + str(init_ratio) + '_snapshot_' +
+    file_edge_nodes = pathlib.Path('./snapshots/edge_src_dst_nodes/' + args.dataset + '_g_struct_' +
+                                   'init_' + str(init_ratio) + '_snapshot_' +
                                    str(snapshot_total_num) + '_' + str(evo_iter) + '.txt')
     file_map_orig2evo = pathlib.Path('./snapshots/edge_src_dst_nodes/' + args.dataset +
                                      '_map_orig2evo_' + 'init_' + str(init_ratio) + '_snapshot_' +
@@ -402,7 +402,7 @@ def graph_struct_init(args, init_ratio, total_snapshot_num, new_nodes, g_orig, n
     g_evo = update_g_struct_init(args, total_snapshot_num, init_ratio, new_nodes, g_orig,
                                  node_map_orig2evo, node_map_evo2orig)
     # update_g_attr_init(g_evo, g_orig, node_map_evo2orig)
-    update_g_attr(args, g_evo, g_orig, node_map_evo2orig, node_map_orig2evo)
+    update_g_attr(args, new_nodes, g_evo, g_orig, node_map_evo2orig, node_map_orig2evo)
 
     return g_evo
 
@@ -446,15 +446,8 @@ def graph_evolve_by_trace(args, init_ratio, total_snapshot_num, evo_iter, new_no
 #     return g_evo
 
 
-def graph_evolve(args,
-                 init_ratio,
-                 total_snapshot_num,
-                 evo_iter,
-                 new_nodes,
-                 g_orig,
-                 node_map_orig2evo,
-                 node_map_evo2orig,
-                 g_evo):
+def graph_evolve(args, init_ratio, total_snapshot_num, evo_iter, new_nodes, g_orig,
+                 node_map_orig2evo, node_map_evo2orig, g_evo):
     """
     Construct evolving graph
     """
@@ -466,9 +459,9 @@ def graph_evolve(args,
     #     g_evo = update_g_struct_evo_by_trace(args, init_ratio, total_snapshot_num, evo_iter, new_nodes, g_orig,
     #                                          node_map_orig2evo, node_map_evo2orig, g_evo)
 
-    g_evo = update_g_struct_evo_by_trace(args, init_ratio, total_snapshot_num, evo_iter, new_nodes, g_orig,
-                                             node_map_orig2evo, node_map_evo2orig, g_evo)
-    update_g_attr(args, g_evo, g_orig, node_map_evo2orig, node_map_orig2evo)
+    g_evo = update_g_struct_evo_by_trace(args, init_ratio, total_snapshot_num, evo_iter, new_nodes,
+                                         g_orig, node_map_orig2evo, node_map_evo2orig, g_evo)
+    update_g_attr(args, new_nodes, g_evo, g_orig, node_map_evo2orig, node_map_orig2evo)
     return g_evo
 
 
@@ -526,7 +519,7 @@ def graph_evolve_delta_all_ngh(new_nodes,
     return g_evo
 
 
-def update_g_attr(args, g_evo, g_orig, node_map_evo2orig, node_map_orig2evo):
+def update_g_attr(args, new_nodes, g_evo, g_orig, node_map_evo2orig, node_map_orig2evo):
     """
     Update graph attribution:
     Set train/val/test idx according to the original dataset
@@ -560,6 +553,12 @@ def update_g_attr(args, g_evo, g_orig, node_map_evo2orig, node_map_orig2evo):
         train_idx_orig_num = 90941
         val_idx_orig_num = 29799
         test_idx_orig_num = 48603
+    if args.dataset == 'ogbn-products':
+        # train:val:test = 196615:39323:2213091; total vertex = 2449029
+        total_node_num = 2449029
+        train_idx_orig_num = 196615
+        val_idx_orig_num = 39323
+        test_idx_orig_num = 2213091
     if args.dataset == 'ogbn-mag':
         # train:val:test = 629571:64879:41939; total vertex = 736389
         total_node_num = 736389
@@ -598,6 +597,18 @@ def update_g_attr(args, g_evo, g_orig, node_map_evo2orig, node_map_orig2evo):
     #     val_idx_orig = list(set(nodes_orig_index).intersection(set(val_idx_orig.tolist())))
     #     test_idx_orig = list(set(nodes_orig_index).intersection(set(test_idx_orig.tolist())))
 
+    # Add new_nodes's successor nodes as test set
+    test_idx_inserted_v = set()
+    for v in new_nodes:
+        if v in node_map_orig2evo:
+            v_evo = node_map_orig2evo[v]
+            test_idx_inserted_v.update(g_evo.successors(v_evo).cpu().numpy().tolist())
+    # test_idx_orig = set([*test_idx_orig])
+    # test_idx_orig.update(test_idx_inserted_v)
+    # test_idx_orig = list(test_idx_orig)
+
+    # test_idx_orig = test_idx_inserted_v
+
     # Remap idx_orig to idx_evo
     train_idx = []
     val_idx = []
@@ -611,6 +622,11 @@ def update_g_attr(args, g_evo, g_orig, node_map_evo2orig, node_map_orig2evo):
     for i in test_idx_orig:
         if i in node_map_orig2evo:
             test_idx.append(node_map_orig2evo[i])
+
+    # Add new_nodes's successor nodes in test set
+    # test_idx.extend(test_idx_inserted_v)
+    # test_idx = list(set(test_idx))
+    test_idx = list(test_idx_inserted_v)
 
     # Print train/val/test size
     print('Train:Val:Test = {:d}:{:d}:{:d}'.format(len(train_idx), len(val_idx), len(test_idx)))
