@@ -287,7 +287,7 @@ def main(args):
     print("Test accuracy {:.2%}".format(acc))
 
     # Evolve graph
-    print("\n>>> Accuracy on evolove graph: ")
+    print("\n>>> Accuracy on evolved graph: ")
 
     # Add new edges
     # n_nodes = model.g.number_of_nodes()
