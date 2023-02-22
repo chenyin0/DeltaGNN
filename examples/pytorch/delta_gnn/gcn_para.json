@@ -20,6 +20,13 @@
     "--lr": 0.01,
     "--dropout": 0.5
   },
+  "ogbn-products": {
+    "--n-hidden": 256,
+    "--n-layers": 2,
+    "--weight-decay": 0.0005,
+    "--lr": 0.01,
+    "--dropout": 0.5
+  },
   "ogbn-mag": {
     "--n-hidden": 256,
     "--n-layers": 2,

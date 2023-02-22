@@ -26,6 +26,15 @@
     "--lr": 0.001,
     "--dropout": 0.5
   },
+  "ogbn-products": {
+    "--n-hidden": 256,
+    "--n-layers": 2,
+    "--fan-out": "10,25",
+    "--batch-size": 1024,
+    "--weight-decay": 0.0005,
+    "--lr": 0.001,
+    "--dropout": 0.5
+  },
   "ogbn-mag": {
     "--n-hidden": 256,
     "--n-layers": 2,
