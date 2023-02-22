@@ -763,10 +763,9 @@ def gen_edge_mask(g, inserted_nodes, deg_th, layer_num):
 #     print('>> Finish gen g_adj_t ({})'.format(time_format(time.perf_counter() - time_start)))
 #     return adj_t, v_sensitive, v_insensitive
 
-
 # def rm_edge_adj(v_src, v_dst, v_src_rm, v_dst_rm):
 #     """
-#     Remove edge:[v_src_rm, v_dst_rm] from [v_src, v_dst] 
+#     Remove edge:[v_src_rm, v_dst_rm] from [v_src, v_dst]
 #     """
 
 #     # Construct a dict of rm edges
@@ -793,17 +792,123 @@ def gen_edge_mask(g, inserted_nodes, deg_th, layer_num):
 #     return v_src_final, v_dst_final
 
 
+def gen_graph_adj_t_affected_by_trace(args, init_ratio, snapshot_total_num, evo_iter, g,
+                                      inserted_nodes, deg_th, layer_num):
+    print('>> Start to gen graph_adj_t_affected')
+    time_start = time.perf_counter()
+    device = g.device
+    g = g.cpu()
+
+    file_adj_t = pathlib.Path('./snapshots/msg_pass/' + args.dataset + '_g_adj_t_' + 'init_' +
+                              str(init_ratio) + '_snapshot_' + str(snapshot_total_num) + '_' +
+                              str(evo_iter) + '.txt')
+
+    file_v_sensitive = pathlib.Path('./snapshots/msg_pass/' + args.dataset + '_sensitive_v_' +
+                                    'init_' + str(init_ratio) + '_snapshot_' +
+                                    str(snapshot_total_num) + '_' + str(evo_iter) + '.txt')
+
+    file_v_insensitive = pathlib.Path('./snapshots/msg_pass/' + args.dataset + '_insensitive_v_' +
+                                      'init_' + str(init_ratio) + '_snapshot_' +
+                                      str(snapshot_total_num) + '_' + str(evo_iter) + '.txt')
+
+    file_edge_num = pathlib.Path('./snapshots/msg_pass/' + args.dataset + '_edge_num_' + 'init_' +
+                                 str(init_ratio) + '_snapshot_' + str(snapshot_total_num) + '_' +
+                                 str(evo_iter) + '.txt')
+
+    if file_adj_t.exists() and file_v_sensitive.exists() and file_v_insensitive.exists(
+    ) and file_edge_num.exists():
+        # Read adj_t (file format: src_node dst_node)
+        src_nodes = []
+        dst_nodes = []
+        f = open(file_adj_t, "r")
+        lines = f.readlines()
+        for line in lines:
+            line = line.strip('\n')  # Delete '\n'
+            tmp = line.split(' ')
+            src_nodes.append(int(tmp[0]))
+            dst_nodes.append(int(tmp[1]))
+
+        # Read v_sensitive
+        v_sensitive = []
+        f = open(file_v_sensitive, "r")
+        lines = f.readlines()
+        for line in lines:
+            line = line.strip('\n')  # Delete '\n'
+            v_sensitive.append(int(line))
+
+        # Read v_insensitive
+        v_insensitive = []
+        f = open(file_v_insensitive, "r")
+        lines = f.readlines()
+        for line in lines:
+            line = line.strip('\n')  # Delete '\n'
+            v_insensitive.append(int(line))
+
+        # Read edge_num (file format: reduced_edge_num and aggr_edge_num)
+        f = open(file_edge_num, "r")
+        lines = f.readlines()
+        for line in lines:
+            line = line.strip('\n')  # Delete '\n'
+            tmp = line.split(' ')
+            reduced_edges = int(tmp[0])
+            total_edges = int(tmp[1])
+
+    else:
+        src_nodes, dst_nodes, v_sensitive, v_insensitive, reduced_edges, total_edges = gen_graph_adj_t_affected(
+            g, inserted_nodes, deg_th, layer_num)
+
+        # Dump g_adj_t (file format: src_node dst_node)
+        with open(file_adj_t, 'w') as f:
+            for i in range(len(src_nodes)):
+                edge_src_n = src_nodes[i]
+                edge_dst_n = dst_nodes[i]
+                f.write(str(edge_src_n) + ' ' + str(edge_dst_n) + '\n')
+
+        # Dump v_sensitive
+        with open(file_v_sensitive, 'w') as f:
+            for v in v_sensitive:
+                f.write(str(v) + '\n')
+
+        # Dump v_insensitive
+        with open(file_v_insensitive, 'w') as f:
+            for v in v_insensitive:
+                f.write(str(v) + '\n')
+
+        # Dump edge_num (file format: reduced_edge_num and aggr_edge_num)
+        with open(file_edge_num, 'w') as f:
+            f.write(str(reduced_edges) + ' ' + str(total_edges) + '\n')
+
+    src_nodes = th.tensor(src_nodes, dtype=th.long)
+    dst_nodes = th.tensor(dst_nodes, dtype=th.long)
+
+    print('Reduced_edges: {:d}, Total_edges: {:d}, reduct_ratio: {:.2%}'.format(
+        reduced_edges, total_edges, reduced_edges / total_edges))
+    print('V_Sen: {:d}, V_Insen: {:d}, insensitive_ratio: {:.2%}'.format(
+        len(v_sensitive), len(v_insensitive),
+        len(v_insensitive) / (len(v_sensitive) + len(v_insensitive))))
+
+    g = g.to(device)
+
+    adj = SparseTensor(row=src_nodes,
+                       col=dst_nodes,
+                       sparse_sizes=(g.number_of_nodes(), g.number_of_nodes()))
+    adj_t = adj.to_symmetric()
+
+    print('>> Finish gen g_adj_t ({})'.format(time_format(time.perf_counter() - time_start)))
+    return adj_t, v_sensitive, v_insensitive
+
+
 def gen_graph_adj_t_affected(g, inserted_nodes, deg_th, layer_num):
     """
     g_adj_t: adj matrix for delta updating (only on the affected vertices of the inserted vertices)
     v_sensitive: full-updating
     v_insensitive: delta-updating
     """
-    print('>> Start to gen graph_adj_t_affected')
-    time_start = time.perf_counter()
+    # print('>> Start to gen graph_adj_t_affected')
+    # time_start = time.perf_counter()
 
-    device = g.device
-    g = g.cpu()
+    # device = g.device
+    # g = g.cpu()
 
     # g = dgl.remove_self_loop(g)
     v_insensitive = []
@@ -816,8 +921,8 @@ def gen_graph_adj_t_affected(g, inserted_nodes, deg_th, layer_num):
     # src_nodes_shield = []
     # dst_nodes_shield = []
 
-    aggr_edges = 0
-    reduce_edges = 0
+    total_edges = 0
+    reduced_edges = 0
 
     # Regard inserted nodes as sensitive nodes
     v_sensitive.extend(inserted_nodes)
@@ -835,7 +940,7 @@ def gen_graph_adj_t_affected(g, inserted_nodes, deg_th, layer_num):
             ngh_per_layer.extend(nghs)
             for ngh in nghs:
                 deg = g.out_degrees(ngh)
-                aggr_edges += deg
+                total_edges += deg
                 # For high deg nodes
                 # if deg >= deg_th[i]:
                 if deg >= int(deg_th):
@@ -848,32 +953,98 @@ def gen_graph_adj_t_affected(g, inserted_nodes, deg_th, layer_num):
                     v_insensitive.append(ngh)
                     src_nodes.append(node)
                     dst_nodes.append(ngh)
-                    reduce_edges += deg - 1
+                    reduced_edges += deg - 1
 
         nodes_q = cp.deepcopy(ngh_per_layer)
         ngh_per_layer.clear()
 
-    src_nodes = th.tensor(src_nodes, dtype=th.long)
-    dst_nodes = th.tensor(dst_nodes, dtype=th.long)
-
     v_sensitive = list(set(v_sensitive))
     v_insensitive = list(set(v_insensitive))
 
-    print('Reduced_edges: {:d}, Total_edges: {:d}, reduct_ratio: {:.2%}'.format(
-        reduce_edges, aggr_edges, reduce_edges / aggr_edges))
-    print('V_Sen: {:d}, V_Insen: {:d}, insensitive_ratio: {:.2%}'.format(
-        len(v_sensitive), len(v_insensitive),
-        len(v_insensitive) / (len(v_sensitive) + len(v_insensitive))))
+    return src_nodes, dst_nodes, v_sensitive, v_insensitive, reduced_edges, total_edges
 
-    g = g.to(device)
 
-    adj = SparseTensor(row=src_nodes,
-                       col=dst_nodes,
-                       sparse_sizes=(g.number_of_nodes(), g.number_of_nodes()))
-    adj_t = adj.to_symmetric()
+# def gen_graph_adj_t_affected(g, inserted_nodes, deg_th, layer_num):
+#     """
+#     g_adj_t: adj matrix for delta updating (only on the affected vertices of the inserted vertices)
+#     v_sensitive: full-updating
+#     v_insensitive: delta-updating
+#     """
+#     print('>> Start to gen graph_adj_t_affected')
+#     time_start = time.perf_counter()
 
-    print('>> Finish gen g_adj_t ({})'.format(time_format(time.perf_counter() - time_start)))
-    return adj_t, v_sensitive, v_insensitive
+#     device = g.device
+#     g = g.cpu()
+
+#     # g = dgl.remove_self_loop(g)
+#     v_insensitive = []
+#     v_sensitive = []
+#     # Record edges which need be set in adj_t
+#     src_nodes = []
+#     dst_nodes = []
+
+#     # # Reserve shield edges for delta updating
+#     # src_nodes_shield = []
+#     # dst_nodes_shield = []
+
+#     aggr_edges = 0
+#     reduce_edges = 0
+
+#     # Regard inserted nodes as sensitive nodes
+#     v_sensitive.extend(inserted_nodes)
+#     for node in inserted_nodes:
+#         pred_nghs = g.predecessors(node).cpu().numpy().tolist()
+#         src_nodes.extend(pred_nghs)
+#         dst_nodes.extend([node for i in range(len(pred_nghs))])
+
+#     nodes_q = cp.deepcopy(inserted_nodes)
+#     ngh_per_layer = []
+#     # Traverse L-hops nghs of inserted nodes
+#     for i in range(layer_num + 1):
+#         for node in nodes_q:
+#             nghs = g.successors(node).cpu().numpy().tolist()
+#             ngh_per_layer.extend(nghs)
+#             for ngh in nghs:
+#                 deg = g.out_degrees(ngh)
+#                 aggr_edges += deg
+#                 # For high deg nodes
+#                 # if deg >= deg_th[i]:
+#                 if deg >= int(deg_th):
+#                     v_sensitive.append(ngh)
+#                     pred_nghs = g.predecessors(node).cpu().numpy().tolist()
+#                     src_nodes.extend(pred_nghs)
+#                     dst_nodes.extend([node for i in range(len(pred_nghs))])
+#                 # For low deg nodes
+#                 else:
+#                     v_insensitive.append(ngh)
+#                     src_nodes.append(node)
+#                     dst_nodes.append(ngh)
+#                     reduce_edges += deg - 1
+
+#         nodes_q = cp.deepcopy(ngh_per_layer)
+#         ngh_per_layer.clear()
+
+#     src_nodes = th.tensor(src_nodes, dtype=th.long)
+#     dst_nodes = th.tensor(dst_nodes, dtype=th.long)
+
+#     v_sensitive = list(set(v_sensitive))
+#     v_insensitive = list(set(v_insensitive))
+
+#     print('Reduced_edges: {:d}, Total_edges: {:d}, reduct_ratio: {:.2%}'.format(
+#         reduce_edges, aggr_edges, reduce_edges / aggr_edges))
+#     print('V_Sen: {:d}, V_Insen: {:d}, insensitive_ratio: {:.2%}'.format(
+#         len(v_sensitive), len(v_insensitive),
+#         len(v_insensitive) / (len(v_sensitive) + len(v_insensitive))))
+
+#     g = g.to(device)
+
+#     adj = SparseTensor(row=src_nodes,
+#                        col=dst_nodes,
+#                        sparse_sizes=(g.number_of_nodes(), g.number_of_nodes()))
+#     adj_t = adj.to_symmetric()
+
+#     print('>> Finish gen g_adj_t ({})'.format(time_format(time.perf_counter() - time_start)))
+#     return adj_t, v_sensitive, v_insensitive
 
 
 def count_neighbor(nodes, g_csr, node_map_orig2evo, layer_num, mem_access_q=None):
