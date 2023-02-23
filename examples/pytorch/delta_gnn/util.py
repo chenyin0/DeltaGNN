@@ -914,8 +914,9 @@ def gen_graph_adj_t_affected(g, inserted_nodes, deg_th, layer_num):
     v_insensitive = []
     v_sensitive = []
     # Record edges which need be set in adj_t
-    src_nodes = []
-    dst_nodes = []
+    # src_nodes = []
+    # dst_nodes = []
+    edge_dict = dict()
 
     # # Reserve shield edges for delta updating
     # src_nodes_shield = []
@@ -928,8 +929,14 @@ def gen_graph_adj_t_affected(g, inserted_nodes, deg_th, layer_num):
     v_sensitive.extend(inserted_nodes)
     for node in inserted_nodes:
         pred_nghs = g.predecessors(node).cpu().numpy().tolist()
-        src_nodes.extend(pred_nghs)
-        dst_nodes.extend([node for i in range(len(pred_nghs))])
+        # src_nodes.extend(pred_nghs)
+        # dst_nodes.extend([node for i in range(len(pred_nghs))])
+        for v in pred_nghs:
+            edge_dict.setdefault(v, set([node])).add(node)
+            # if v not in edge_dict:
+            #     edge_dict[v] = set([node])
+            # else:
+            #     edge_dict[v].add(node)
 
     nodes_q = cp.deepcopy(inserted_nodes)
     ngh_per_layer = []
@@ -946,13 +953,25 @@ def gen_graph_adj_t_affected(g, inserted_nodes, deg_th, layer_num):
                 if deg >= int(deg_th):
                     v_sensitive.append(ngh)
                     pred_nghs = g.predecessors(node).cpu().numpy().tolist()
-                    src_nodes.extend(pred_nghs)
-                    dst_nodes.extend([node for i in range(len(pred_nghs))])
+                    # src_nodes.extend(pred_nghs)
+                    # dst_nodes.extend([node for i in range(len(pred_nghs))])
+                    for v in pred_nghs:
+                        edge_dict.setdefault(v, set([node])).add(node)
+                        # if v not in edge_dict:
+                        #     edge_dict[v] = set([node])
+                        # else:
+                        #     edge_dict[v].add(node)
+
                 # For low deg nodes
                 else:
                     v_insensitive.append(ngh)
-                    src_nodes.append(node)
-                    dst_nodes.append(ngh)
+                    # src_nodes.append(node)
+                    # dst_nodes.append(ngh)
+                    edge_dict.setdefault(node, set([ngh])).add(ngh)
+                    # if node not in edge_dict:
+                    #     edge_dict[node] = set([ngh])
+                    # else:
+                    #     edge_dict[v].add(node)
                     reduced_edges += deg - 1
 
         nodes_q = cp.deepcopy(ngh_per_layer)
@@ -960,6 +979,12 @@ def gen_graph_adj_t_affected(g, inserted_nodes, deg_th, layer_num):
 
     v_sensitive = list(set(v_sensitive))
     v_insensitive = list(set(v_insensitive))
+
+    src_nodes = []
+    dst_nodes = []
+    for key, val in edge_dict.items():
+        src_nodes.extend([key for i in range(len(val))])
+        dst_nodes.extend(list(val))
 
     return src_nodes, dst_nodes, v_sensitive, v_insensitive, reduced_edges, total_edges
 
