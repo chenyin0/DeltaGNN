@@ -307,9 +307,9 @@ def main(args):
         acc_always_retrain = gin.evaluate_delta_update(model_always_retrain, test_mask, device)
 
     accuracy = []
-    accuracy.append(
-        [model.g.number_of_nodes(),
-         model.g.number_of_edges(), acc * 100, acc_always_retrain * 100])
+    # accuracy.append(
+    #     [model.g.number_of_nodes(),
+    #      model.g.number_of_edges(), acc * 100, acc_always_retrain * 100])
 
     print("Test accuracy {:.2%}".format(acc))
 

@@ -17,6 +17,24 @@
     "--attn-drop": 0.6,
     "--heads": "8,1"
   },
+  "pubmed": {
+    "--n-hidden": 8,
+    "--n-layers": 2,
+    "--weight-decay": 0.0005,
+    "--lr": 0.005,
+    "--feat-drop": 0.6,
+    "--attn-drop": 0.6,
+    "--heads": "8,1"
+  },
+  "reddit": {
+    "--n-hidden": 8,
+    "--n-layers": 2,
+    "--weight-decay": 0.0005,
+    "--lr": 0.005,
+    "--feat-drop": 0.6,
+    "--attn-drop": 0.6,
+    "--heads": "8,1"
+  },
   "ogbn-arxiv": {
     "--n-hidden": 256,
     "--n-layers": 2,

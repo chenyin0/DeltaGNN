@@ -6,6 +6,7 @@ import torch.nn.functional as F
 
 import dgl
 import dgl.nn as dglnn
+from dgl.nn.pytorch import GraphConv
 from dgl import AddSelfLoop
 from dgl.data import CiteseerGraphDataset, CoraGraphDataset, PubmedGraphDataset
 from ogb.nodeproppred import DglNodePropPredDataset
@@ -19,9 +20,9 @@ class GCN(nn.Module):
         super().__init__()
         self.layers = nn.ModuleList()
         # two-layer GCN
-        self.layers.append(dglnn.GraphConv(in_size, hid_size, activation=F.relu))
-        self.layers.append(dglnn.GraphConv(hid_size, hid_size, activation=F.relu))
-        self.layers.append(dglnn.GraphConv(hid_size, out_size))
+        self.layers.append(GraphConv(in_size, hid_size, activation=F.relu))
+        self.layers.append(GraphConv(hid_size, hid_size, activation=F.relu))
+        self.layers.append(GraphConv(hid_size, out_size))
         self.dropout = nn.Dropout(0.5)
 
     def forward(self, g, features):
@@ -68,7 +69,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--dataset",
         type=str,
-        default="ogbn-arxiv",
+        default="pubmed",
         help="Dataset name ('cora', 'citeseer', 'pubmed').",
     )
     args = parser.parse_args()

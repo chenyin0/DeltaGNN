@@ -61,13 +61,31 @@ class GCN(torch.nn.Module):
         super(GCN, self).__init__()
 
         self.convs = torch.nn.ModuleList()
-        self.convs.append(GCNConv(in_channels, hidden_channels, cached=True))
+        self.convs.append(
+            GCNConv(in_channels,
+                    hidden_channels,
+                    cached=True,
+                    add_self_loops=True,
+                    normalize=True,
+                    bias=True))
         self.bns = torch.nn.ModuleList()
         self.bns.append(torch.nn.BatchNorm1d(hidden_channels))
         for _ in range(num_layers - 2):
-            self.convs.append(GCNConv(hidden_channels, hidden_channels, cached=True))
+            self.convs.append(
+                GCNConv(hidden_channels,
+                        hidden_channels,
+                        cached=True,
+                        add_self_loops=True,
+                        normalize=True,
+                        bias=True))
             self.bns.append(torch.nn.BatchNorm1d(hidden_channels))
-        self.convs.append(GCNConv(hidden_channels, out_channels, cached=True))
+        self.convs.append(
+            GCNConv(hidden_channels,
+                    out_channels,
+                    cached=True,
+                    add_self_loops=True,
+                    normalize=True,
+                    bias=True))
 
         self.dropout = dropout
 
@@ -177,7 +195,7 @@ def main():
     device = torch.device(device)
 
     dataset = PygNodePropPredDataset(name='ogbn-arxiv',
-                                     root='./dataset',
+                                     root='../../../../dataset',
                                      transform=T.ToSparseTensor())
     # dataset = PygNodePropPredDataset(name='ogbn-arxiv',
     #                                  root='./dataset')
@@ -190,6 +208,8 @@ def main():
 
     split_idx = dataset.get_idx_split()
     train_idx = split_idx['train'].to(device)
+    val_idx = split_idx['valid'].to(device)
+    test_idx = split_idx['test'].to(device)
 
     if args.use_sage:
         model = SAGE(data.num_features, args.hidden_channels, dataset.num_classes, args.num_layers,

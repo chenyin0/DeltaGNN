@@ -13,6 +13,7 @@ import argparse
 import numpy as np
 import time
 
+
 class SAGE(nn.Module):
 
     def __init__(self, in_size, hid_size, out_size):
@@ -158,6 +159,7 @@ if __name__ == '__main__':
     print('Loading data')
     # dataset = AsNodePredDataset(DglNodePropPredDataset('ogbn-arxiv', root='../../../../dataset'))
     dataset = CiteseerGraphDataset(raw_dir='../../../../dataset')
+    # dataset = RedditDataset(raw_dir='../../../../dataset')
     # dataset = CoraGraphDataset(raw_dir='../../../../dataset', transform=transform)
     g = dataset[0]
     device = torch.device('cpu' if args.mode == 'cpu' else 'cuda')

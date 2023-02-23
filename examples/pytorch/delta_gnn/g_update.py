@@ -547,6 +547,18 @@ def update_g_attr(args, new_nodes, g_evo, g_orig, node_map_evo2orig, node_map_or
         train_idx_orig_num = 120
         val_idx_orig_num = 500
         test_idx_orig_num = 1000
+    if args.dataset == 'pubmed':
+        # train:val:test = 60:500:1000; total vertex = 19717
+        total_node_num = 19717
+        train_idx_orig_num = 500
+        val_idx_orig_num = 500
+        test_idx_orig_num = 1000
+    if args.dataset == 'reddit':
+        # train:val:test = 153431:23831:55703; total vertex = 232965
+        total_node_num = 232965
+        train_idx_orig_num = 153431
+        val_idx_orig_num = 23831
+        test_idx_orig_num = 55703
     elif args.dataset == 'ogbn-arxiv':
         # train:val:test = 90941:29799:48603; total vertex = 169343
         total_node_num = 169343
@@ -626,6 +638,7 @@ def update_g_attr(args, new_nodes, g_evo, g_orig, node_map_evo2orig, node_map_or
     # Add new_nodes's successor nodes in test set
     # test_idx.extend(test_idx_inserted_v)
     # test_idx = list(set(test_idx))
+
     test_idx = list(test_idx_inserted_v)
 
     # Print train/val/test size

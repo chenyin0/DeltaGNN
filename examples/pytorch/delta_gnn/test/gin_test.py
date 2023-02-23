@@ -359,4 +359,4 @@ if __name__ == "__main__":
     test_mask = g.ndata['test_mask']
     train(args, model, device, lr, weight_decay)
     acc = evaluate(model, test_mask, device)
-    print(acc)
+    print('Eval Acc: ', acc)

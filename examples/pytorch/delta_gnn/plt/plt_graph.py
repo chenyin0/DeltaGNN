@@ -47,11 +47,12 @@ from matplotlib.pyplot import MultipleLocator
 
 def plot_degree_distribution(degree_list):
     node_totol_num = 0
+    degree_list = degree_list[1:]
     for i in degree_list:
         node_totol_num += i
 
     x = [i for i in range(len(degree_list))]
-    y = [round(degree_list[i]* 100 / node_totol_num) for i in range(len(degree_list))]
+    y = [round(degree_list[i] * 100 / node_totol_num) for i in range(len(degree_list))]
     # y = [degree_list[i] for i in range(len(degree_list))]
 
     fig = plt.figure(figsize=(3, 3.3))
@@ -63,12 +64,18 @@ def plot_degree_distribution(degree_list):
         ax.xaxis.set_tick_params(labelsize=13)
         ax.yaxis.set_tick_params(labelsize=13)
 
+        # ax.xaxis.set_tick_params(bottom=False)
+        # ax.yaxis.set_tick_params(bottom=False)
+
         ax.xaxis.set_major_locator(MultipleLocator(5))
 
     bax.set_xlabel('Vertex degree', labelpad=20, fontsize=16)
-    bax.set_ylabel('Vertex Distribution (%)', labelpad=35, fontsize=16)
+    bax.set_ylabel('Vertex Distribution (%)', labelpad=25, fontsize=16)
 
-    plt.savefig('../../../figure/degree_distribution.pdf', dpi=600, bbox_inches="tight", pad_inches=0)
+    plt.savefig('../../../figure/degree_distribution.pdf',
+                dpi=600,
+                bbox_inches="tight",
+                pad_inches=0)
 
 
 def plot_node_degree(degree_list, dataset_name):

@@ -122,9 +122,9 @@ def train(args, model, device, fanout, batch_size, lr, weight_decay):
             loss.backward()
             optimizer.step()
             total_loss += loss.item()
-        # acc = evaluate_with_sample(model, g, val_dataloader)
-        # print("Epoch {:05d} | Loss {:.4f} | Accuracy {:.4f} ".format(epoch, total_loss / (it + 1),
-        #                                                              acc.item()))
+        acc = evaluate_with_sample(model, g, val_dataloader)
+        print("Epoch {:05d} | Loss {:.4f} | Accuracy {:.4f} ".format(epoch, total_loss / (it + 1),
+                                                                     acc.item()))
 
 
 def evaluate_with_sample(model, g, dataloader):

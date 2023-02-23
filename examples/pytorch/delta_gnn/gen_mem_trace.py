@@ -96,7 +96,7 @@ def main(args):
                                        node_map_evo2orig)
 
     # Evolve graph
-    print(">>> Accuracy on evolove graph: ")
+    print(">>> Accuracy on evolved graph: ")
     ## Record memory trace
     """
     Memory trace format

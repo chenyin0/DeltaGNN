@@ -12,6 +12,7 @@ from dgl.data import AsNodePredDataset
 from ogb.nodeproppred import DglNodePropPredDataset
 from dgl import AddSelfLoop
 import preprocess
+from ogb.nodeproppred import PygNodePropPredDataset
 
 import util
 import g_update
@@ -111,6 +112,9 @@ def main(args):
         dataset = AsNodePredDataset(DglNodePropPredDataset('ogbn-arxiv', root='../../../dataset'))
     elif args.dataset == 'ogbn-mag':
         dataset = DglNodePropPredDataset('ogbn-mag', root='../../../dataset')
+    elif args.dataset == 'ogbn-products':
+        dataset = AsNodePredDataset(DglNodePropPredDataset('ogbn-products',
+                                                           root='../../../dataset'))
     elif args.dataset == 'amazon_comp':
         dataset = AmazonCoBuyComputerDataset(raw_dir='../../../dataset')
     else:
@@ -177,7 +181,7 @@ def main(args):
             line = line.strip('\n')  # Delete '\n'
             node_q.append(int(line))
     else:
-        if args.dataset == 'cora' or args.dataset == 'citeseer':
+        if args.dataset == 'cora' or args.dataset == 'citeseer' or args.dataset == 'pubmed' or args.dataset == 'reddit' or args.dataset == 'ogbn-products':
             # root_node_q = util.gen_root_node_queue(g)
             # node_q = util.bfs_traverse(g_csr, root_node_q)
             node_q = g.nodes().numpy().tolist()
@@ -401,7 +405,7 @@ def main(args):
     print("Test accuracy {:.2%}".format(acc))
 
     # Evolve graph
-    print("\n>>> Accuracy on evolove graph: ")
+    print("\n>>> Accuracy on evolved graph: ")
     # # Add new edges
     # interval = 10
     # i = 0
@@ -599,52 +603,52 @@ def main(args):
                 model_retrain.g.number_of_nodes(), acc))
             acc_retrain = acc * 100
 
-            ##
-            """
-            # Delta retraining only on inserted nodes
-            """
-            print('\n>> Delta retraining')
-            # # Execute full retraining at the beginning
-            # if i <= 0:
-            #     model_delta.g = g_update.graph_evolve(args, inserted_nodes, g_csr, g,
-            #                                           node_map_orig2evo, node_map_evo2orig,
-            #                                           n_layers, model_delta.g)
-            # else:
-            #     model_delta.g = g_update.graph_evolve_delta(args, inserted_nodes, g_csr, g,
-            #                                                 node_map_orig2evo, node_map_evo2orig,
-            #                                                 model_delta.g)
+            # ##
+            # """
+            # # Delta retraining only on inserted nodes
+            # """
+            # print('\n>> Delta retraining')
+            # # # Execute full retraining at the beginning
+            # # if i <= 0:
+            # #     model_delta.g = g_update.graph_evolve(args, inserted_nodes, g_csr, g,
+            # #                                           node_map_orig2evo, node_map_evo2orig,
+            # #                                           n_layers, model_delta.g)
+            # # else:
+            # #     model_delta.g = g_update.graph_evolve_delta(args, inserted_nodes, g_csr, g,
+            # #                                                 node_map_orig2evo, node_map_evo2orig,
+            # #                                                 model_delta.g)
 
-            model_delta.g = g_update.graph_evolve(args, g_struct_init_ratio, g_snapshot_total_num,
-                                                  i + 1, inserted_nodes, g, node_map_orig2evo,
-                                                  node_map_evo2orig, model_delta.g)
+            # model_delta.g = g_update.graph_evolve(args, g_struct_init_ratio, g_snapshot_total_num,
+            #                                       i + 1, inserted_nodes, g, node_map_orig2evo,
+            #                                       node_map_evo2orig, model_delta.g)
 
-            time_start = time.perf_counter()
-            test_mask = model_delta.g.ndata['test_mask']
-            model_delta.reset_parameters()
-            if model_name == 'gcn':
-                gcn.train(args, model_delta, device, lr, weight_decay)
-                acc = gcn.evaluate(model_delta, test_mask, device)
-                # if i <= 3:
-                #     acc = gcn.evaluate(model_delta, test_mask, device)
-                # else:
-                #     acc = gcn.evaluate_delta(model_delta, test_mask, device, inserted_nodes_evo)
-                # acc = evaluate(model_delta, test_mask, device)
-            elif model_name == 'graphsage':
-                graphsage.train(args, model_delta, device, fan_out, batch_size, lr, weight_decay)
-                acc = graphsage.evaluate(device, model_delta, test_mask, batch_size)
-            elif model_name == 'gat':
-                gat.train(args, model_delta, device, lr, weight_decay)
-                acc = gat.evaluate(model_delta, test_mask, device)
-            elif model_name == 'gin':
-                gin.train(args, model_delta, device, lr, weight_decay)
-                acc = gin.evaluate(model_delta, test_mask, device)
+            # time_start = time.perf_counter()
+            # test_mask = model_delta.g.ndata['test_mask']
+            # model_delta.reset_parameters()
+            # if model_name == 'gcn':
+            #     gcn.train(args, model_delta, device, lr, weight_decay)
+            #     acc = gcn.evaluate(model_delta, test_mask, device)
+            #     # if i <= 3:
+            #     #     acc = gcn.evaluate(model_delta, test_mask, device)
+            #     # else:
+            #     #     acc = gcn.evaluate_delta(model_delta, test_mask, device, inserted_nodes_evo)
+            #     # acc = evaluate(model_delta, test_mask, device)
+            # elif model_name == 'graphsage':
+            #     graphsage.train(args, model_delta, device, fan_out, batch_size, lr, weight_decay)
+            #     acc = graphsage.evaluate(device, model_delta, test_mask, batch_size)
+            # elif model_name == 'gat':
+            #     gat.train(args, model_delta, device, lr, weight_decay)
+            #     acc = gat.evaluate(model_delta, test_mask, device)
+            # elif model_name == 'gin':
+            #     gin.train(args, model_delta, device, lr, weight_decay)
+            #     acc = gin.evaluate(model_delta, test_mask, device)
 
-            time_delta_retrain = time.perf_counter() - time_start
-            print('>> Epoch training time in delta: {}'.format(
-                util.time_format(time_delta_retrain)))
-            print("Test accuracy of delta @ {:d} nodes {:.2%}".format(
-                model_delta.g.number_of_nodes(), acc))
-            acc_retrain_delta = acc * 100
+            # time_delta_retrain = time.perf_counter() - time_start
+            # print('>> Epoch training time in delta: {}'.format(
+            #     util.time_format(time_delta_retrain)))
+            # print("Test accuracy of delta @ {:d} nodes {:.2%}".format(
+            #     model_delta.g.number_of_nodes(), acc))
+            # acc_retrain_delta = acc * 100
 
             accuracy.append([
                 model.g.number_of_nodes(),
@@ -678,8 +682,7 @@ def main(args):
         args.dataset, util.time_format(time.perf_counter() - Task_time_start)))
 
     for i in range(len(accuracy)):
-        print('{:d}\t{:.2f}  {:.2f}  {:.2f}'.format(i, accuracy[i][2], accuracy[i][3],
-                                                    accuracy[i][4]))
+        print('{:d}\t{:.2f}  {:.2f}'.format(i, accuracy[i][2], accuracy[i][3]))
 
 
 if __name__ == '__main__':
@@ -693,7 +696,7 @@ if __name__ == '__main__':
         type=str,
         default="cora",
         help=
-        "Dataset name ('cora', 'citeseer', 'pubmed', 'reddit', 'ogbn-arxiv', 'ogbn-mag', 'amazon_comp')."
+        "Dataset name ('cora', 'citeseer', 'pubmed', 'reddit', 'ogbn-arxiv', 'ogbn-products', 'ogbn-mag', 'amazon_comp')."
     )
     parser.add_argument("--gpu", type=int, default=-1, help="gpu")
     parser.add_argument("--n-epochs", type=int, default=200, help="number of training epochs")
@@ -714,17 +717,20 @@ if __name__ == '__main__':
                         help="degree threshold of neighbors nodes")
     args = parser.parse_args()
 
-    args.model = 'gcn'
+    # args.model = 'gcn'
     # args.model = 'graphsage'
-    # args.model = 'gat'
+    args.model = 'gat'
     # args.model = 'gin'
 
     # args.dataset = 'cora'
-    args.dataset = 'citeseer'
+    # args.dataset = 'citeseer'
+    args.dataset = 'pubmed'
+    # args.dataset = 'reddit'
     # args.dataset = 'ogbn-arxiv'
+    # args.dataset = 'ogbn-products'
     # args.dataset = 'ogbn-mag'
 
-    args.n_epochs = 200
+    args.n_epochs = 100
     args.gpu = 1
     # args.mode = 'mixed'
 

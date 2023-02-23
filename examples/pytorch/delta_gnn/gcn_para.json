@@ -8,7 +8,21 @@
   },
   "citeseer": {
     "--n-hidden": 256,
-    "--n-layers": 1,
+    "--n-layers": 2,
+    "--weight-decay": 0.0005,
+    "--lr": 0.01,
+    "--dropout": 0.5
+  },
+  "pubmed": {
+    "--n-hidden": 256,
+    "--n-layers": 2,
+    "--weight-decay": 0.0005,
+    "--lr": 0.01,
+    "--dropout": 0.5
+  },
+  "reddit": {
+    "--n-hidden": 256,
+    "--n-layers": 2,
     "--weight-decay": 0.0005,
     "--lr": 0.01,
     "--dropout": 0.5

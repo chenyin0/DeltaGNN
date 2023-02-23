@@ -53,6 +53,12 @@ class GAT(nn.Module):
         # Record previous logits
         self.logits = torch.zeros(g.number_of_nodes(), n_classes)
 
+    def reset_parameters(self):
+        for layer in self.layers:
+            layer.reset_parameters()
+        # for bn in self.bns:
+        #     bn.reset_parameters()
+
     def forward(self, g, inputs):
         h = inputs
 

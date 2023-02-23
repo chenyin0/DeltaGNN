@@ -19,7 +19,7 @@ import numpy as np
 import time
 import util
 from torch_sparse import SparseTensor
-from util import gen_graph_adj_t
+# from util import gen_graph_adj_t
 
 
 class GCN(nn.Module):
@@ -304,8 +304,13 @@ class GCN_delta(nn.Module):
 
         # if not self.training:
         if v_sensitive is not None or v_insensitive is not None:
+            if not self.training:
+                time_start = time.perf_counter()
             # Combine delta-inferenced embedding and previous embedding
             h = self.combine_embedding(self.embedding, h, v_sensitive, v_insensitive)
+            if not self.training:
+                print('Time cost of embedding combine: {:.4f}'.format(time.perf_counter() -
+                                                                      time_start))
 
         return h.log_softmax(dim=-1), h
 
