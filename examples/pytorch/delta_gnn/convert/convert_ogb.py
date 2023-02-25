@@ -98,7 +98,7 @@ def arxiv():
              val_idx=val_idx,
              test_idx=test_idx,
              labels=labels,
-             n_classes = n_classes)
+             n_classes=n_classes)
 
     # train_labels = train_labels.numpy().T
     # val_labels = val_labels.numpy().T
@@ -139,9 +139,12 @@ def arxiv():
     row = row.numpy()
     col = col.numpy()
 
+    # # Write edge_idx (src_edge, dst_edge)
+    # write_packed_edges('../data/arxiv/arxiv_init_src_edge.txt', 'I', row)
+    # write_packed_edges('../data/arxiv/arxiv_init_dst_edge.txt', 'I', col)
+    
     # Write edge_idx (src_edge, dst_edge)
-    write_packed_file('../data/arxiv/arxiv_init_src_edge.txt', 'I', row)
-    write_packed_file('../data/arxiv/arxiv_init_dst_edge.txt', 'I', col)
+    write_packed_edges('../data/arxiv/arxiv_init_edges.txt', row, col)
 
     save_adj(row, col, N=data.num_nodes, dataset_name='arxiv', savename='arxiv_init', snap='init')
     num_snap = 16
@@ -418,10 +421,18 @@ def save_adj(row, col, N, dataset_name, savename, snap, full=False):
     gc.collect()
 
 
-def write_packed_file(f_path, pack_fmt, data):
+# def write_packed_file(f_path, pack_fmt, data):
+#     with open(f_path, 'wb') as f:
+#         for i in data:
+#             m = struct.pack(pack_fmt, i)
+#             f.write(m)
+
+
+def write_packed_edges(f_path, edge_src, edge_dst):
+    assert len(edge_src) == len(edge_dst)
     with open(f_path, 'wb') as f:
-        for i in data:
-            m = struct.pack(pack_fmt, i)
+        for i in range(len(edge_src)):
+            m = struct.pack("ii", edge_src[i], edge_dst[i])
             f.write(m)
 
 

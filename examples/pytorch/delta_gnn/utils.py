@@ -43,21 +43,11 @@ def load_aminer_init(datastr, rmax, alpha):
     return features, train_labels, val_labels, test_labels, train_idx, val_idx, test_idx, memory_dataset, py_alg
 
 
-def load_ogb_init(datastr, alpha, rmax):
-    if (datastr == "papers100M"):
-        m = 3259203018
-        n = 111059956  ##init graph
-    elif (datastr == "arxiv"):
-        m = 597039
-        n = 169343
-    elif (datastr == "products"):
-        m = 69634445
-        n = 2449029
+def load_dataset_init(datastr):
     print("Load %s!" % datastr)
 
     # py_alg = InstantGNN()
     features = np.load('./data/' + datastr + '/' + datastr + '_feat.npy')
-    # memory_dataset = py_alg.initial_operation('./data/'+datastr+'/', datastr+'_init', m, n, rmax, alpha, features)
 
     data = np.load('./data/' + datastr + '/' + datastr + '_labels.npz')
     train_idx = torch.LongTensor(data['train_idx'])
@@ -66,21 +56,10 @@ def load_ogb_init(datastr, alpha, rmax):
     labels = torch.LongTensor(data['labels'])
     n_classes = data['n_classes']
 
-    # train_labels = torch.LongTensor(data['train_labels'])
-    # val_labels = torch.LongTensor(data['val_labels'])
-    # test_labels = torch.LongTensor(data['test_labels'])
-    # train_labels = train_labels.reshape(train_labels.size(0), 1)
-    # val_labels = val_labels.reshape(val_labels.size(0), 1)
-    # test_labels = test_labels.reshape(test_labels.size(0), 1)
+    # src_edges = read_packed_edges('./data/' + datastr + '/' + datastr + '_init_src_edge.txt', 'I')
+    # dst_edges = read_packed_edges('./data/' + datastr + '/' + datastr + '_init_dst_edge.txt', 'I')
 
-    # adj_el = read_packed_file('./data/' + datastr + '/' + datastr + '_init_adj_el.txt', 'I')
-    # adj_pl = read_packed_file('./data/' + datastr + '/' + datastr + '_init_adj_pl.txt', 'I')
-
-    # adj_el = torch.LongTensor(adj_el)
-    # adj_pl = torch.LongTensor(adj_pl)
-
-    src_edges = read_packed_file('./data/' + datastr + '/' + datastr + '_init_src_edge.txt', 'I')
-    dst_edges = read_packed_file('./data/' + datastr + '/' + datastr + '_init_dst_edge.txt', 'I')
+    src_edges, dst_edges = read_packed_edges('./data/' + datastr + '/' + datastr + '_init_edges.txt', 'I')
 
     src_edges = torch.LongTensor(src_edges)
     dst_edges = torch.LongTensor(dst_edges)
@@ -89,13 +68,20 @@ def load_ogb_init(datastr, alpha, rmax):
         [torch.cat([src_edges, dst_edges], dim=0),
          torch.cat([dst_edges, src_edges], dim=0)], dim=0)
 
-    # g_size = features.shape[0]
-    # # adj_csr = torch.sparse_csr_tensor(adj_pl_, adj_el_, size=(g_size, g_size))
-    # # adj = SparseTensor.from_torch_sparse_csr_tensor(adj_csr, has_value=False)
-    # adj = SparseTensor(rowptr=adj_pl, col=adj_el, sparse_sizes=(g_size, g_size))
+    return features, labels, train_idx, val_idx, test_idx, n_classes, edge_index
 
-    # return features,train_labels,val_labels,test_labels,train_idx,val_idx,test_idx,memory_dataset, py_alg
-    # return features, train_labels, val_labels, test_labels, train_idx, val_idx, test_idx, edge_index, labels
+
+def load_updated_edges(datastr, snapshot_id):
+    src_edges = read_packed_edges(
+        './data/' + datastr + '/' + datastr + 'Edgeupdate_snap' + str(snapshot_id) + '.txt', 'I')
+
+    src_edges = torch.LongTensor(src_edges)
+    dst_edges = torch.LongTensor(dst_edges)
+
+    edge_index = torch.stack(
+        [torch.cat([src_edges, dst_edges], dim=0),
+         torch.cat([dst_edges, src_edges], dim=0)], dim=0)
+
     return features, labels, train_idx, val_idx, test_idx, n_classes, edge_index
 
 
@@ -192,22 +178,40 @@ class SimpleDataset(Dataset):
         return self.x[idx], self.y[idx]
 
 
-def read_packed_file(f_path, pack_fmt):
-    length = struct.calcsize(pack_fmt)
+# def read_packed_file(f_path, pack_fmt):
+#     length = struct.calcsize(pack_fmt)
+#     with open(f_path, 'rb') as f:
+#         l = []
+#         while True:
+#             tmp = f.read(length)
+#             if tmp == b'':
+#                 break
+#             m = struct.unpack(pack_fmt, tmp)[0]
+#             # print(m)
+#             l.append(m)
+#         return l
+
+
+def read_packed_edges(f_path, pack_fmt):
+    length = struct.calcsize(pack_fmt)*2
     with open(f_path, 'rb') as f:
-        l = []
+        edge_src = []
+        edge_dst = []
         while True:
             tmp = f.read(length)
             if tmp == b'':
                 break
-            m = struct.unpack(pack_fmt, tmp)[0]
+            m = struct.unpack('ii', tmp)
+            src = m[0]
+            dst = m[1]
             # print(m)
-            l.append(m)
-        return l
+            edge_src.append(src)
+            edge_dst.append(dst)
+        return edge_src, edge_dst
 
 
-def write_packed_file(f_path, pack_fmt, data):
-    with open(f_path, 'wb') as f:
-        for i in data:
-            m = struct.pack(pack_fmt, i)
-            f.write(m)
+# def write_packed_file(f_path, pack_fmt, data):
+#     with open(f_path, 'wb') as f:
+#         for i in data:
+#             m = struct.pack(pack_fmt, i)
+#             f.write(m)
