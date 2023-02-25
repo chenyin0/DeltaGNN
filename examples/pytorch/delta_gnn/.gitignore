@@ -1,1 +1,4 @@
 snapshots/msg_pass/*
+dataset/*
+data/*
+pretrained/*
