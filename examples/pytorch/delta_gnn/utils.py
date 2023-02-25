@@ -5,6 +5,8 @@ from sklearn.metrics import f1_score
 from torch.utils.data import Dataset
 # from propagation import InstantGNN
 import pdb
+import struct
+from torch_sparse import SparseTensor
 
 
 def load_aminer_init(datastr, rmax, alpha):
@@ -61,16 +63,40 @@ def load_ogb_init(datastr, alpha, rmax):
     train_idx = torch.LongTensor(data['train_idx'])
     val_idx = torch.LongTensor(data['val_idx'])
     test_idx = torch.LongTensor(data['test_idx'])
+    labels = torch.LongTensor(data['labels'])
+    n_classes = data['n_classes']
 
-    train_labels = torch.LongTensor(data['train_labels'])
-    val_labels = torch.LongTensor(data['val_labels'])
-    test_labels = torch.LongTensor(data['test_labels'])
-    train_labels = train_labels.reshape(train_labels.size(0), 1)
-    val_labels = val_labels.reshape(val_labels.size(0), 1)
-    test_labels = test_labels.reshape(test_labels.size(0), 1)
+    # train_labels = torch.LongTensor(data['train_labels'])
+    # val_labels = torch.LongTensor(data['val_labels'])
+    # test_labels = torch.LongTensor(data['test_labels'])
+    # train_labels = train_labels.reshape(train_labels.size(0), 1)
+    # val_labels = val_labels.reshape(val_labels.size(0), 1)
+    # test_labels = test_labels.reshape(test_labels.size(0), 1)
+
+    # adj_el = read_packed_file('./data/' + datastr + '/' + datastr + '_init_adj_el.txt', 'I')
+    # adj_pl = read_packed_file('./data/' + datastr + '/' + datastr + '_init_adj_pl.txt', 'I')
+
+    # adj_el = torch.LongTensor(adj_el)
+    # adj_pl = torch.LongTensor(adj_pl)
+
+    src_edges = read_packed_file('./data/' + datastr + '/' + datastr + '_init_src_edge.txt', 'I')
+    dst_edges = read_packed_file('./data/' + datastr + '/' + datastr + '_init_dst_edge.txt', 'I')
+
+    src_edges = torch.LongTensor(src_edges)
+    dst_edges = torch.LongTensor(dst_edges)
+
+    edge_index = torch.stack(
+        [torch.cat([src_edges, dst_edges], dim=0),
+         torch.cat([dst_edges, src_edges], dim=0)], dim=0)
+
+    # g_size = features.shape[0]
+    # # adj_csr = torch.sparse_csr_tensor(adj_pl_, adj_el_, size=(g_size, g_size))
+    # # adj = SparseTensor.from_torch_sparse_csr_tensor(adj_csr, has_value=False)
+    # adj = SparseTensor(rowptr=adj_pl, col=adj_el, sparse_sizes=(g_size, g_size))
 
     # return features,train_labels,val_labels,test_labels,train_idx,val_idx,test_idx,memory_dataset, py_alg
-    return features, train_labels, val_labels, test_labels, train_idx, val_idx, test_idx, py_alg
+    # return features, train_labels, val_labels, test_labels, train_idx, val_idx, test_idx, edge_index, labels
+    return features, labels, train_idx, val_idx, test_idx, n_classes, edge_index
 
 
 def load_sbm_init(datastr, rmax, alpha):
@@ -137,10 +163,25 @@ def com_accuracy(y_pred, y):
     return accuracy
 
 
+# class SimpleDataset(Dataset):
+
+#     def __init__(self, x, y):
+#         self.x = x
+#         self.y = y
+#         assert self.x.size(0) == self.y.size(0)
+
+#     def __len__(self):
+#         return self.x.size(0)
+
+#     def __getitem__(self, idx):
+#         return self.x[idx], self.y[idx]
+
+
 class SimpleDataset(Dataset):
 
-    def __init__(self, x, y):
+    def __init__(self, x, edge_index, y):
         self.x = x
+        self.edge_index = edge_index
         self.y = y
         assert self.x.size(0) == self.y.size(0)
 
@@ -149,3 +190,24 @@ class SimpleDataset(Dataset):
 
     def __getitem__(self, idx):
         return self.x[idx], self.y[idx]
+
+
+def read_packed_file(f_path, pack_fmt):
+    length = struct.calcsize(pack_fmt)
+    with open(f_path, 'rb') as f:
+        l = []
+        while True:
+            tmp = f.read(length)
+            if tmp == b'':
+                break
+            m = struct.unpack(pack_fmt, tmp)[0]
+            # print(m)
+            l.append(m)
+        return l
+
+
+def write_packed_file(f_path, pack_fmt, data):
+    with open(f_path, 'wb') as f:
+        for i in data:
+            m = struct.pack(pack_fmt, i)
+            f.write(m)
