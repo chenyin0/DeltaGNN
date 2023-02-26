@@ -8,6 +8,7 @@ import torch.nn.functional as F
 from torch_sparse import SparseTensor
 from torch_geometric.utils import to_undirected
 from ogb.nodeproppred import PygNodePropPredDataset
+from torch_geometric.datasets import Planetoid
 import sklearn.preprocessing
 import tracemalloc
 import gc
@@ -63,7 +64,113 @@ def filter_adj(row, col, edge_attr, mask):
     return row[mask], col[mask], None if edge_attr is None else edge_attr[mask]
 
 
-def arxiv():
+def gen_dataset_snapshot(dataset_name, num_snap):
+    if dataset_name == 'Cora' or dataset_name == 'CiteSeer' or dataset_name == 'PubMed':
+        dataset = Planetoid(name=dataset_name, root='../dataset/')
+        data = dataset[0]
+        n_classes = np.array(dataset.num_classes, dtype=np.int32)
+        train_idx = torch.nonzero(data.train_mask).squeeze()
+        val_idx = torch.nonzero(data.val_mask).squeeze()
+        test_idx = torch.nonzero(data.test_mask).squeeze()
+        # all_idx = torch.cat([train_idx, val_idx, test_idx])
+
+        base_path = '../data/' + dataset_name + '/' + dataset_name
+        # Feature normalization
+        feat = data.x.numpy()
+        feat = np.array(feat, dtype=np.float64)
+        scaler = sklearn.preprocessing.StandardScaler()
+        scaler.fit(feat)
+        feat = scaler.transform(feat)
+        np.save(base_path + '_feat.npy', feat)
+
+        #get labels
+        labels = data.y
+        labels = torch.unsqueeze(labels, 1)
+        # train_labels = labels.data[train_idx]
+        # val_labels = labels.data[val_idx]
+        # test_labels = labels.data[test_idx]
+        labels = np.array(labels, dtype=np.int32)
+
+        train_idx = train_idx.numpy()
+        val_idx = val_idx.numpy()
+        test_idx = test_idx.numpy()
+        train_idx = np.array(train_idx, dtype=np.int32)
+        val_idx = np.array(val_idx, dtype=np.int32)
+        test_idx = np.array(test_idx, dtype=np.int32)
+
+        np.savez(base_path + '_labels.npz',
+                 train_idx=train_idx,
+                 val_idx=val_idx,
+                 test_idx=test_idx,
+                 labels=labels,
+                 n_classes=n_classes)
+
+        data.edge_index = to_undirected(data.edge_index, data.num_nodes)
+        data.edge_index, drop_edge_index, _ = dropout_adj(data.edge_index,
+                                                          train_idx,
+                                                          num_nodes=data.num_nodes)
+        data.edge_index = to_undirected(data.edge_index, data.num_nodes)
+
+        row_drop, col_drop = np.array(drop_edge_index)
+
+        f = open(base_path + '_update_full.txt', 'w+')
+        for k in range(row_drop.shape[0]):
+            v_from = row_drop[k]
+            v_to = col_drop[k]
+            f.write('%d %d\n' % (v_from, v_to))
+            f.write('%d %d\n' % (v_to, v_from))
+        f.close()
+
+        row, col = data.edge_index
+        print(row_drop.shape)
+        row = row.numpy()
+        col = col.numpy()
+
+        # # Write edge_idx (src_edge, dst_edge)
+        # write_packed_edges('../data/arxiv/arxiv_init_src_edge.txt', 'I', row)
+        # write_packed_edges('../data/arxiv/arxiv_init_dst_edge.txt', 'I', col)
+
+        # Write edge_idx (src_edge, dst_edge)
+        write_packed_edges(base_path + '_init_edges.txt', row, col)
+
+        # save_adj(row, col, N=data.num_nodes, dataset_name='arxiv', savename='arxiv_init', snap='init')
+        snapshot = math.floor(row_drop.shape[0] / num_snap)
+        print('num_snap: ', num_snap)
+
+        for sn in range(num_snap):
+            print(sn)
+            row_sn = row_drop[sn * snapshot:(sn + 1) * snapshot]
+            col_sn = col_drop[sn * snapshot:(sn + 1) * snapshot]
+            if sn == 0:
+                row_tmp = row
+                col_tmp = col
+
+            row_tmp = np.concatenate((row_tmp, row_sn))
+            col_tmp = np.concatenate((col_tmp, col_sn))
+            row_tmp = np.concatenate((row_tmp, col_sn))
+            col_tmp = np.concatenate((col_tmp, row_sn))
+            # if (sn + 1) % 20 == 0 or (sn + 1) == num_snap:
+            # save_adj(row_tmp,
+            #         col_tmp,
+            #         N=data.num_nodes,
+            #         dataset_name='arxiv',
+            #         savename='arxiv_snap' + str(sn + 1),
+            #         snap=(sn + 1))
+
+            with open(base_path + '_Edgeupdate_snap' + str(sn + 1) + '.txt', 'w') as f:
+                for i, j in zip(row_sn, col_sn):
+                    f.write("%d %d\n" % (i, j))
+                    f.write("%d %d\n" % (j, i))
+        print(dataset_name + ' -- save snapshots finish')
+    elif dataset_name == 'arxiv':
+        arxiv(num_snap)
+    elif dataset_name == 'products':
+        products(num_snap)
+    elif dataset_name == 'arpapers100Mxiv':
+        papers100M(num_snap)
+
+
+def arxiv(num_snap):
     dataset = PygNodePropPredDataset(name='ogbn-arxiv', root='../dataset/')
     data = dataset[0]
     n_classes = np.array(dataset.meta_info['num classes'], dtype=np.int32)
@@ -100,24 +207,6 @@ def arxiv():
              labels=labels,
              n_classes=n_classes)
 
-    # train_labels = train_labels.numpy().T
-    # val_labels = val_labels.numpy().T
-    # test_labels = test_labels.numpy().T
-
-    # train_labels = np.array(train_labels, dtype=np.int32)
-    # val_labels = np.array(val_labels, dtype=np.int32)
-    # test_labels = np.array(test_labels, dtype=np.int32)
-    # train_labels = train_labels.reshape(train_labels.shape[1])
-    # val_labels = val_labels.reshape(val_labels.shape[1])
-    # test_labels = test_labels.reshape(test_labels.shape[1])
-    # np.savez('../data/arxiv/arxiv_labels.npz',
-    #          train_idx=train_idx,
-    #          val_idx=val_idx,
-    #          test_idx=test_idx,
-    #          train_labels=train_labels,
-    #          val_labels=val_labels,
-    #          test_labels=test_labels)
-
     data.edge_index = to_undirected(data.edge_index, data.num_nodes)
     data.edge_index, drop_edge_index, _ = dropout_adj(data.edge_index,
                                                       train_idx,
@@ -146,8 +235,8 @@ def arxiv():
     # Write edge_idx (src_edge, dst_edge)
     write_packed_edges('../data/arxiv/arxiv_init_edges.txt', row, col)
 
-    save_adj(row, col, N=data.num_nodes, dataset_name='arxiv', savename='arxiv_init', snap='init')
-    num_snap = 16
+    # save_adj(row, col, N=data.num_nodes, dataset_name='arxiv', savename='arxiv_init', snap='init')
+    # num_snap = 16
     snapshot = math.floor(row_drop.shape[0] / num_snap)
     print('num_snap: ', num_snap)
 
@@ -163,13 +252,13 @@ def arxiv():
         col_tmp = np.concatenate((col_tmp, col_sn))
         row_tmp = np.concatenate((row_tmp, col_sn))
         col_tmp = np.concatenate((col_tmp, row_sn))
-        if (sn + 1) % 20 == 0 or (sn + 1) == num_snap:
-            save_adj(row_tmp,
-                     col_tmp,
-                     N=data.num_nodes,
-                     dataset_name='arxiv',
-                     savename='arxiv_snap' + str(sn + 1),
-                     snap=(sn + 1))
+        # if (sn + 1) % 20 == 0 or (sn + 1) == num_snap:
+        # save_adj(row_tmp,
+        #          col_tmp,
+        #          N=data.num_nodes,
+        #          dataset_name='arxiv',
+        #          savename='arxiv_snap' + str(sn + 1),
+        #          snap=(sn + 1))
 
         with open('../data/arxiv/arxiv_Edgeupdate_snap' + str(sn + 1) + '.txt', 'w') as f:
             for i, j in zip(row_sn, col_sn):
@@ -178,7 +267,7 @@ def arxiv():
     print('Arxiv -- save snapshots finish')
 
 
-def products():
+def products(num_snap):
     dataset = PygNodePropPredDataset(name='ogbn-products', root='../dataset/')
     data = dataset[0]
     n_classes = np.array(dataset.meta_info['num classes'], dtype=np.int32)
@@ -256,13 +345,13 @@ def products():
     # Write edge_idx (src_edge, dst_edge)
     write_packed_edges('../data/products/products_init_edges.txt', row, col)
 
-    save_adj(row,
-             col,
-             N=data.num_nodes,
-             dataset_name='products',
-             savename='products_init',
-             snap='init')
-    num_snap = 15
+    # save_adj(row,
+    #          col,
+    #          N=data.num_nodes,
+    #          dataset_name='products',
+    #          savename='products_init',
+    #          snap='init')
+    # num_snap = 15
     snapshot = math.floor(row_drop.shape[0] / num_snap)
     print('num_snap: ', num_snap)
 
@@ -293,7 +382,7 @@ def products():
     print('Products -- save snapshots finish')
 
 
-def papers100M():
+def papers100M(num_snap):
     s_time = time.time()
     dataset = PygNodePropPredDataset("ogbn-papers100M", root='../dataset/')
     split_idx = dataset.get_idx_split()
@@ -367,15 +456,15 @@ def papers100M():
     # Write edge_idx (src_edge, dst_edge)
     write_packed_edges('../data/papers100M/papers100M_init_edges.txt', row, col)
 
-    save_adj(row,
-             col,
-             N=data.num_nodes,
-             dataset_name='papers100M',
-             savename='papers100M_init',
-             snap='init')
+    # save_adj(row,
+    #          col,
+    #          N=data.num_nodes,
+    #          dataset_name='papers100M',
+    #          savename='papers100M_init',
+    #          snap='init')
     row = row.numpy()
     col = col.numpy()
-    num_snap = 20
+    # num_snap = 20
     print('num_snap: ', num_snap)
     snapshot = math.floor(row_drop.shape[0] / num_snap)
 
@@ -456,6 +545,13 @@ def write_packed_edges(f_path, edge_src, edge_dst):
 
 
 if __name__ == "__main__":
-    papers100M()
+    # papers100M()
     # products()
     # arxiv()
+
+    # gen_dataset_snapshot('Cora', 16)
+    # gen_dataset_snapshot('CiteSeer', 16)
+    gen_dataset_snapshot('PubMed', 16)
+    # gen_dataset_snapshot('arxiv', 16)
+    # gen_dataset_snapshot('products', 15)
+    # gen_dataset_snapshot('papers100M', 20)
