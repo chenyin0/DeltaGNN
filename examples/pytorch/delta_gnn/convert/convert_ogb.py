@@ -142,7 +142,7 @@ def arxiv():
     # # Write edge_idx (src_edge, dst_edge)
     # write_packed_edges('../data/arxiv/arxiv_init_src_edge.txt', 'I', row)
     # write_packed_edges('../data/arxiv/arxiv_init_dst_edge.txt', 'I', col)
-    
+
     # Write edge_idx (src_edge, dst_edge)
     write_packed_edges('../data/arxiv/arxiv_init_edges.txt', row, col)
 
@@ -179,8 +179,9 @@ def arxiv():
 
 
 def products():
-    dataset = PygNodePropPredDataset(name='ogbn-products')
+    dataset = PygNodePropPredDataset(name='ogbn-products', root='../dataset/')
     data = dataset[0]
+    n_classes = np.array(dataset.meta_info['num classes'], dtype=np.int32)
     split_idx = dataset.get_idx_split()
     train_idx, val_idx, test_idx = split_idx['train'], split_idx['valid'], split_idx['test']
     all_idx = torch.cat([train_idx, val_idx, test_idx])
@@ -201,6 +202,7 @@ def products():
     train_labels = labels.data[train_idx]
     val_labels = labels.data[val_idx]
     test_labels = labels.data[test_idx]
+    labels = np.array(labels, dtype=np.int32)
 
     train_idx = train_idx.numpy()
     val_idx = val_idx.numpy()
@@ -219,13 +221,16 @@ def products():
     train_labels = train_labels.reshape(train_labels.shape[1])
     val_labels = val_labels.reshape(val_labels.shape[1])
     test_labels = test_labels.reshape(test_labels.shape[1])
-    np.savez('../data/products/products_labels.npz',
-             train_idx=train_idx,
-             val_idx=val_idx,
-             test_idx=test_idx,
-             train_labels=train_labels,
-             val_labels=val_labels,
-             test_labels=test_labels)
+    np.savez(
+        '../data/products/products_labels.npz',
+        train_idx=train_idx,
+        val_idx=val_idx,
+        test_idx=test_idx,
+        #  train_labels=train_labels,
+        #  val_labels=val_labels,
+        #  test_labels=test_labels,
+        labels=labels,
+        n_classes=n_classes)
 
     data.edge_index = to_undirected(data.edge_index, data.num_nodes)
     data.edge_index, drop_edge_index, _ = dropout_adj(data.edge_index,
@@ -247,6 +252,10 @@ def products():
     row, col = data.edge_index
     row = row.numpy()
     col = col.numpy()
+
+    # Write edge_idx (src_edge, dst_edge)
+    write_packed_edges('../data/products/products_init_edges.txt', row, col)
+
     save_adj(row,
              col,
              N=data.num_nodes,
@@ -270,12 +279,12 @@ def products():
         row_tmp = np.concatenate((row_tmp, col_sn))
         col_tmp = np.concatenate((col_tmp, row_sn))
 
-        save_adj(row_tmp,
-                 col_tmp,
-                 N=data.num_nodes,
-                 dataset_name='products',
-                 savename='products_snap' + str(sn + 1),
-                 snap=(sn + 1))
+        # save_adj(row_tmp,
+        #          col_tmp,
+        #          N=data.num_nodes,
+        #          dataset_name='products',
+        #          savename='products_snap' + str(sn + 1),
+        #          snap=(sn + 1))
 
         with open('../data/products/products_Edgeupdate_snap' + str(sn + 1) + '.txt', 'w') as f:
             for i, j in zip(row_sn, col_sn):
@@ -286,9 +295,10 @@ def products():
 
 def papers100M():
     s_time = time.time()
-    dataset = PygNodePropPredDataset("ogbn-papers100M")
+    dataset = PygNodePropPredDataset("ogbn-papers100M", root='../dataset/')
     split_idx = dataset.get_idx_split()
     data = dataset[0]
+    n_classes = np.array(dataset.meta_info['num classes'], dtype=np.int32)
 
     feat = data.x.numpy()
     feat = np.array(feat, dtype=np.float64)
@@ -311,6 +321,7 @@ def papers100M():
     train_labels = labels.data[train_idx]
     val_labels = labels.data[val_idx]
     test_labels = labels.data[test_idx]
+    labels = np.array(labels, dtype=np.int32)
 
     train_idx = train_idx.numpy()
     val_idx = val_idx.numpy()
@@ -329,13 +340,16 @@ def papers100M():
     train_labels = train_labels.reshape(train_labels.shape[1])
     val_labels = val_labels.reshape(val_labels.shape[1])
     test_labels = test_labels.reshape(test_labels.shape[1])
-    np.savez('../data/papers100M/papers100M_labels.npz',
-             train_idx=train_idx,
-             val_idx=val_idx,
-             test_idx=test_idx,
-             train_labels=train_labels,
-             val_labels=val_labels,
-             test_labels=test_labels)
+    np.savez(
+        '../data/papers100M/papers100M_labels.npz',
+        train_idx=train_idx,
+        val_idx=val_idx,
+        test_idx=test_idx,
+        #  train_labels=train_labels,
+        #  val_labels=val_labels,
+        #  test_labels=test_labels,
+        labels=labels,
+        n_classes=n_classes)
 
     print('making the graph undirected')
     data.edge_index = to_undirected(data.edge_index, data.num_nodes)
@@ -348,6 +362,11 @@ def papers100M():
 
     row_drop, col_drop = np.array(drop_edge_index)
     row, col = data.edge_index
+    row = row.numpy()
+    col = col.numpy()
+    # Write edge_idx (src_edge, dst_edge)
+    write_packed_edges('../data/papers100M/papers100M_init_edges.txt', row, col)
+
     save_adj(row,
              col,
              N=data.num_nodes,
@@ -437,6 +456,6 @@ def write_packed_edges(f_path, edge_src, edge_dst):
 
 
 if __name__ == "__main__":
-    #papers100M()
-    #products()
-    arxiv()
+    papers100M()
+    # products()
+    # arxiv()
