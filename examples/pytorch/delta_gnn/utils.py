@@ -59,7 +59,8 @@ def load_dataset_init(datastr):
     # src_edges = read_packed_edges('./data/' + datastr + '/' + datastr + '_init_src_edge.txt', 'I')
     # dst_edges = read_packed_edges('./data/' + datastr + '/' + datastr + '_init_dst_edge.txt', 'I')
 
-    src_edges, dst_edges = read_packed_edges('./data/' + datastr + '/' + datastr + '_init_edges.txt', 'I')
+    src_edges, dst_edges = read_packed_edges(
+        './data/' + datastr + '/' + datastr + '_init_edges.txt', 'I')
 
     src_edges = torch.LongTensor(src_edges)
     dst_edges = torch.LongTensor(dst_edges)
@@ -72,17 +73,29 @@ def load_dataset_init(datastr):
 
 
 def load_updated_edges(datastr, snapshot_id):
-    src_edges = read_packed_edges(
-        './data/' + datastr + '/' + datastr + 'Edgeupdate_snap' + str(snapshot_id) + '.txt', 'I')
+    edges = np.loadtxt('./data/' + datastr + '/' + datastr + '_Edgeupdate_snap' + str(snapshot_id) +
+                       '.txt')
+    edges = torch.LongTensor(edges)
+    # edge_index = edges.reshape(2, edges.shape[0], dim=0)
+    edge_src = edges[:, 0]
+    edge_dst = edges[:, 1]
+    edge_index = torch.stack([edge_src, edge_dst], dim=0)
+    return edge_index
 
-    src_edges = torch.LongTensor(src_edges)
-    dst_edges = torch.LongTensor(dst_edges)
 
-    edge_index = torch.stack(
-        [torch.cat([src_edges, dst_edges], dim=0),
-         torch.cat([dst_edges, src_edges], dim=0)], dim=0)
+def insert_edges(orig_edge_index, inserted_edge_index):
+    """
+    orig_edge_index: format (src, dst)
+    inserted _edge_index: format (src, dst)
+    """
+    return torch.cat([orig_edge_index, inserted_edge_index], dim=-1)
 
-    return features, labels, train_idx, val_idx, test_idx, n_classes, edge_index
+
+def insert_edges_delta(orig_edge_index, inserted_edge_index, threshold):
+    """
+    orig_edge_index: format (src, dst)
+    inserted _edge_index: format (src, dst)
+    """
 
 
 def load_sbm_init(datastr, rmax, alpha):
@@ -193,7 +206,7 @@ class SimpleDataset(Dataset):
 
 
 def read_packed_edges(f_path, pack_fmt):
-    length = struct.calcsize(pack_fmt)*2
+    length = struct.calcsize(pack_fmt) * 2
     with open(f_path, 'rb') as f:
         edge_src = []
         edge_dst = []
@@ -208,10 +221,3 @@ def read_packed_edges(f_path, pack_fmt):
             edge_src.append(src)
             edge_dst.append(dst)
         return edge_src, edge_dst
-
-
-# def write_packed_file(f_path, pack_fmt, data):
-#     with open(f_path, 'wb') as f:
-#         for i in data:
-#             m = struct.pack(pack_fmt, i)
-#             f.write(m)
