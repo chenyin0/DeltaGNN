@@ -13,7 +13,7 @@ from torch.utils.data import Dataset, DataLoader
 from ogb.nodeproppred import Evaluator
 from utils import SimpleDataset
 # from model import ClassMLP
-from model.gcn_t import GCN
+from model.gcn_t import GCN, GCN_delta
 import model.gcn_t as gcn
 from utils import *
 from glob import glob
@@ -82,7 +82,7 @@ def main():
     checkpt_file_retrain = 'pretrained/retrain/' + uuid.uuid4().hex + '.pt'
     checkpt_file_delta = 'pretrained/delta/' + uuid.uuid4().hex + '.pt'
 
-    features, labels, train_idx, val_idx, test_idx, n_classes, edge_idx_init = load_dataset_init(
+    features, labels, train_idx, val_idx, test_idx, n_classes, edge_index_init = load_dataset_init(
         args.dataset)  ##
 
     in_feats = features.shape[-1]
@@ -92,17 +92,21 @@ def main():
 
     model_wo_retrain = GCN(in_feats, n_hidden, n_classes, n_layers, dropout).cuda(device)
     model_retrain = GCN(in_feats, n_hidden, n_classes, n_layers, dropout).cuda(device)
-    model_delta = GCN(in_feats, n_hidden, n_classes, n_layers, dropout).cuda(device)
+    model_delta = GCN_delta(in_feats, n_hidden, n_classes, n_layers, dropout,
+                            features.shape[0]).cuda(device)
 
     accuracy = []
-    print('Edges_init: ', edge_idx_init.shape)
+    print('Edges_init: ', edge_index_init.shape)
     # Training for the initial snapshot
     num_nghs = [-1, -1]
 
-    edge_index_evolved = edge_idx_init.clone().detach()
+    edge_index_evolved = edge_index_init.clone().detach()
     train_loader, valid_loader, test_loader = gen_dataloader(args, edge_index_evolved, train_idx,
                                                              val_idx, test_idx, features, labels,
                                                              num_nghs)
+    # Gen edge_dict
+    edge_dict = gen_edge_dict(edge_index_evolved)
+
     # Without retrain
     print('--- Model_wo_retrain:')
     # edge_index_wo_retrain = edge_idx_init.clone().detach()
@@ -117,9 +121,9 @@ def main():
 
     # Delta-retrain
     print('--- Model_retrain_delta:')
-    edge_index_delta = edge_idx_init.clone().detach()
-    train(args, model_delta, train_loader, valid_loader, device, checkpt_file_delta)
-    acc_delta = test(model_delta, test_loader, device, checkpt_file_delta)
+    edge_index_delta = edge_index_init.clone().detach()
+    train_delta(args, model_delta, train_loader, valid_loader, device, checkpt_file_delta)
+    acc_delta = test_delta(model_delta, test_loader, device, checkpt_file_delta)
 
     accuracy.append([0, acc_wo_retrain, acc_retrain, acc_delta])
 
@@ -146,18 +150,27 @@ def main():
         train(args, model_retrain, train_loader, valid_loader, device, checkpt_file_retrain)
         acc_retrain = test(model_retrain, test_loader, device, checkpt_file_retrain)
 
-        # print('--- Model_delta:')
-        # threshold = 0
-        # edge_index_delta, v_sen, v_insen = insert_edges_delta(edge_index_delta, inserted_edge_index,
-        #                                                       threshold)
-        # train_loader_delta, valid_loader_delta, test_loader_delta = gen_dataloader(
-        #     args, edge_index_delta, train_idx, val_idx, test_idx, features, labels, num_nghs)
-        # print('Edges_delta: ', edge_index_delta.shape)
-        # train_delta(model_delta, train_loader_delta, valid_loader_delta, device, checkpt_file_delta,
-        #             v_sen, v_insen)
-        # acc_delta = test_delta(model_delta, test_loader_delta, device, checkpt_file_delta, v_sen,
-        #                        v_insen)
-        acc_delta = 0
+        print('--- Model_delta:')
+        threshold = 0
+        edge_dict, edge_index_delta, v_sen, v_insen = insert_edges_delta(
+            edge_dict, inserted_edge_index, threshold, args.layer)
+        train_loader_delta, valid_loader_delta, test_loader_delta = gen_dataloader_delta(
+            args, edge_index_delta, train_idx, val_idx, test_idx, features, labels, num_nghs)
+
+        # for step, batch in enumerate(train_loader_delta):
+        #     x, edge_index, y = batch.x.to(device), batch.edge_index.to(device), batch.y.to(device)
+        #     aa,bb = torch.split(y, 1, dim=1)
+        #     k = bb.squeeze().cpu().numpy().tolist()
+        #     print(k, len(k))
+        #     print(len(set(k)))
+        #     print(step, y.shape)
+
+        print('Edges_delta: ', edge_index_delta.shape)
+        train_delta(args, model_delta, train_loader_delta, valid_loader_delta, device,
+                    checkpt_file_delta, v_sen, v_insen)
+        acc_delta = test_delta(model_delta, test_loader_delta, device, checkpt_file_delta, v_sen,
+                               v_insen)
+        # acc_delta = 0
 
         accuracy.append([i + 1, acc_wo_retrain, acc_retrain, acc_delta])
 
@@ -178,7 +191,34 @@ def gen_dataloader(args, edge_index, train_idx, val_idx, test_idx, features, lab
     train_loader = NeighborLoader(data,
                                   input_nodes=train_idx,
                                   num_neighbors=num_nghs,
-                                  shuffle=True,
+                                  shuffle=False,
+                                  batch_size=args.batch_size)
+    valid_loader = NeighborLoader(data,
+                                  input_nodes=val_idx,
+                                  num_neighbors=num_nghs,
+                                  shuffle=False,
+                                  batch_size=args.batch_size)
+    test_loader = NeighborLoader(data,
+                                 input_nodes=test_idx,
+                                 num_neighbors=num_nghs,
+                                 shuffle=False,
+                                 batch_size=args.batch_size)
+    return train_loader, valid_loader, test_loader
+
+
+def gen_dataloader_delta(args, edge_index, train_idx, val_idx, test_idx, features, labels,
+                         num_nghs):
+    features = torch.FloatTensor(features)
+    index = torch.LongTensor([[i] for i in range(labels.shape[0])])
+    labels = torch.cat((labels, index), 1)
+    data = Data(x=features, edge_index=edge_index, y=labels)
+    del features
+    gc.collect()
+
+    train_loader = NeighborLoader(data,
+                                  input_nodes=train_idx,
+                                  num_neighbors=num_nghs,
+                                  shuffle=False,
                                   batch_size=args.batch_size)
     valid_loader = NeighborLoader(data,
                                   input_nodes=val_idx,
@@ -231,7 +271,14 @@ def test(model, test_loader, device, checkpt_file):
     return test_acc
 
 
-def train_delta(args, model, train_loader, valid_loader, device, checkpt_file, v_sen, v_insen):
+def train_delta(args,
+                model,
+                train_loader,
+                valid_loader,
+                device,
+                checkpt_file,
+                v_sen=None,
+                v_insen=None):
     bad_counter = 0
     best = 0
     best_epoch = 0
@@ -264,7 +311,7 @@ def train_delta(args, model, train_loader, valid_loader, device, checkpt_file, v
     print('The best epoch: {}th'.format(best_epoch))
 
 
-def test_delta(model, test_loader, device, checkpt_file, v_sen, v_insen):
+def test_delta(model, test_loader, device, checkpt_file, v_sen=None, v_insen=None):
     test_acc = gcn.test_delta(model, device, test_loader, checkpt_file, v_sen, v_insen)
     print('Test accuracy:{:.2f}%'.format(100 * test_acc))
     return test_acc
