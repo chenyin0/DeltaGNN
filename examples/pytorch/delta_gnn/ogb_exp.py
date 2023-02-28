@@ -21,12 +21,67 @@ import copy as cp
 from torch_geometric.data import Data
 from torch_geometric.loader import NeighborLoader
 import util
+import json
 
 
 def main(args):
     # import os
     # os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
     Task_time_start = time.time()
+
+    # Load GNN model parameter
+    model_name = args.model
+    dataset_name = args.dataset
+    if model_name == 'gcn':
+        # path = os.getcwd()
+        # print(path)
+        # with open('./examples/pytorch/delta_gnn/gcn_para.json', 'r') as f:
+        with open('./gcn_para.json', 'r') as f:
+            para = json.load(f)
+            n_hidden = para[dataset_name]['--n-hidden']
+            n_layers = para[dataset_name]['--n-layers']
+            lr = para[dataset_name]['--lr']
+            weight_decay = para[dataset_name]['--weight-decay']
+            dropout = para[dataset_name]['--dropout']
+    elif model_name == 'graphsage':
+        # with open('./examples/pytorch/delta_gnn/graphsage_para.json', 'r') as f:
+        with open('./graphsage_para.json', 'r') as f:
+            para = json.load(f)
+            n_hidden = para[dataset_name]['--n-hidden']
+            n_layers = para[dataset_name]['--n-layers']
+            # num_negs = para['--num-negs']
+            fan_out = str(para[dataset_name]['--fan-out'])
+            batch_size = para[dataset_name]['--batch-size']
+            # log_every = para['--log-every']
+            # eval_every = para['--eval-every']
+            lr = para[dataset_name]['--lr']
+            weight_decay = para[dataset_name]['--weight-decay']
+            dropout = para[dataset_name]['--dropout']
+    elif model_name == 'gat':
+        # with open('./examples/pytorch/delta_gnn/gat_para.json', 'r') as f:
+        with open('./gat_para.json', 'r') as f:
+            para = json.load(f)
+            n_hidden = para[dataset_name]['--n-hidden']
+            n_layers = para[dataset_name]['--n-layers']
+            lr = para[dataset_name]['--lr']
+            weight_decay = para[dataset_name]['--weight-decay']
+            feat_dropout = para[dataset_name]['--feat-drop']
+            attn_dropout = para[dataset_name]['--attn-drop']
+            heads_str = str(para[dataset_name]['--heads'])
+            heads = [int(i) for i in heads_str.split(',')]
+    elif model_name == 'gin':
+        # path = os.getcwd()
+        # print(path)
+        # with open('./examples/pytorch/delta_gnn/gin_para.json', 'r') as f:
+        with open('./gin_para.json', 'r') as f:
+            para = json.load(f)
+            n_hidden = para[dataset_name]['--n-hidden']
+            n_layers = para[dataset_name]['--n-layers']
+            lr = para[dataset_name]['--lr']
+            weight_decay = para[dataset_name]['--weight-decay']
+            dropout = para[dataset_name]['--dropout']
+    else:
+        assert ('Not define GNN model')
 
     if args.gpu < 0:
         cuda = False
@@ -35,6 +90,7 @@ def main(args):
         gpu_id = args.gpu
 
     device = torch.device("cuda:" + str(gpu_id) if cuda else "cpu")
+    batch_size = args.batch_size
 
     random.seed(args.seed)
     np.random.seed(args.seed)
@@ -52,9 +108,9 @@ def main(args):
         args.dataset)  ##
 
     in_feats = features.shape[-1]
-    n_hidden = args.hidden
-    n_layers = args.layer
-    dropout = args.dropout
+    # n_hidden = args.hidden
+    # n_layers = args.layer
+    # dropout = args.dropout
 
     model_wo_retrain = GCN(in_feats, n_hidden, n_classes, n_layers, dropout).cuda(device)
     model_retrain = GCN(in_feats, n_hidden, n_classes, n_layers, dropout).cuda(device)
@@ -64,31 +120,37 @@ def main(args):
     accuracy = []
     print('Edges_init: ', edge_index_init.shape)
     # Training for the initial snapshot
-    num_nghs = [-1, -1]
+    if model_name == 'graphsage':
+        num_nghs = [int(fanout_) for fanout_ in fan_out.split(',')]
+    else:
+        num_nghs = [-1 for layer in range(n_layers)]
 
     edge_index_evolved = edge_index_init.clone().detach()
-    train_loader, valid_loader, test_loader = gen_dataloader(args, edge_index_evolved, train_idx,
-                                                             val_idx, test_idx, features, labels,
-                                                             num_nghs)
+    train_loader, valid_loader, test_loader = gen_dataloader(edge_index_evolved, train_idx, val_idx,
+                                                             test_idx, features, labels, num_nghs,
+                                                             batch_size)
     # Gen edge_dict
     edge_dict = gen_edge_dict(edge_index_evolved)
 
     # Without retrain
     print('--- Model_wo_retrain:')
     # edge_index_wo_retrain = edge_idx_init.clone().detach()
-    train(args, model_wo_retrain, train_loader, valid_loader, device, checkpt_file_wo_retrain)
+    train(args, model_wo_retrain, train_loader, valid_loader, device, checkpt_file_wo_retrain, lr,
+          weight_decay)
     acc_wo_retrain = test(model_wo_retrain, test_loader, device, checkpt_file_wo_retrain)
 
     # Retrain
     print('--- Model_retrain:')
     # edge_index_retrain = edge_idx_init.clone().detach()
-    train(args, model_retrain, train_loader, valid_loader, device, checkpt_file_retrain)
+    train(args, model_retrain, train_loader, valid_loader, device, checkpt_file_retrain, lr,
+          weight_decay)
     acc_retrain = test(model_retrain, test_loader, device, checkpt_file_retrain)
 
     # Delta-retrain
     print('--- Model_retrain_delta:')
     edge_index_delta = edge_index_init.clone().detach()
-    train_delta(args, model_delta, train_loader, valid_loader, device, checkpt_file_delta)
+    train_delta(args, model_delta, train_loader, valid_loader, device, checkpt_file_delta, lr,
+                weight_decay)
     acc_delta = test_delta(model_delta, test_loader, device, checkpt_file_delta)
 
     accuracy.append([0, acc_wo_retrain, acc_retrain, acc_delta])
@@ -102,9 +164,9 @@ def main(args):
         # Update edge_index according to inserted edges
         inserted_edge_index = load_updated_edges(args.dataset, i + 1)
         edge_index_evolved = insert_edges(edge_index_evolved, inserted_edge_index)
-        train_loader, valid_loader, test_loader = gen_dataloader(args, edge_index_evolved,
-                                                                 train_idx, val_idx, test_idx,
-                                                                 features, labels, num_nghs)
+        train_loader, valid_loader, test_loader = gen_dataloader(edge_index_evolved, train_idx,
+                                                                 val_idx, test_idx, features,
+                                                                 labels, num_nghs, batch_size)
         print('--- Model_wo_retrain:')
         # edge_index_wo_retrain = insert_edges(edge_index_wo_retrain, inserted_edge_index)
         print('Edges_wo_retrain: ', edge_index_evolved.shape)
@@ -113,19 +175,21 @@ def main(args):
         print('--- Model_retrain:')
         # edge_index_retrain = insert_edges(edge_index_retrain, inserted_edge_index)
         print('Edges_retrain: ', edge_index_evolved.shape)
-        train(args, model_retrain, train_loader, valid_loader, device, checkpt_file_retrain)
+        train(args, model_retrain, train_loader, valid_loader, device, checkpt_file_retrain, lr,
+              weight_decay)
         acc_retrain = test(model_retrain, test_loader, device, checkpt_file_retrain)
 
         print('--- Model_delta:')
         threshold = 200
         edge_dict, edge_index_delta, v_sen, v_insen = insert_edges_delta(
-            edge_dict, inserted_edge_index, threshold, args.layer)
+            edge_dict, inserted_edge_index, threshold, n_layers)
         print('fjapgwajhgi', len(v_sen), len(v_insen))
         train_loader_delta, valid_loader_delta, test_loader_delta = gen_dataloader_delta(
-            args, edge_index_evolved, train_idx, val_idx, test_idx, features, labels, num_nghs)
+            edge_index_evolved, train_idx, val_idx, test_idx, features, labels, num_nghs,
+            batch_size)
         print('Edges_delta: ', edge_index_delta.shape)
         train_delta(args, model_delta, train_loader_delta, valid_loader_delta, device,
-                    checkpt_file_delta, v_sen, v_insen)
+                    checkpt_file_delta, lr, weight_decay, v_sen, v_insen)
         acc_delta = test_delta(model_delta, test_loader_delta, device, checkpt_file_delta, v_sen,
                                v_insen)
         # acc_delta = 0
@@ -140,7 +204,8 @@ def main(args):
         args.dataset, util.time_format(time.perf_counter() - Task_time_start)))
 
 
-def gen_dataloader(args, edge_index, train_idx, val_idx, test_idx, features, labels, num_nghs):
+def gen_dataloader(edge_index, train_idx, val_idx, test_idx, features, labels, num_nghs,
+                   batch_size):
     features = torch.FloatTensor(features)
     data = Data(x=features, edge_index=edge_index, y=labels)
     del features
@@ -150,22 +215,22 @@ def gen_dataloader(args, edge_index, train_idx, val_idx, test_idx, features, lab
                                   input_nodes=train_idx,
                                   num_neighbors=num_nghs,
                                   shuffle=False,
-                                  batch_size=args.batch_size)
+                                  batch_size=batch_size)
     valid_loader = NeighborLoader(data,
                                   input_nodes=val_idx,
                                   num_neighbors=num_nghs,
                                   shuffle=False,
-                                  batch_size=args.batch_size)
+                                  batch_size=batch_size)
     test_loader = NeighborLoader(data,
                                  input_nodes=test_idx,
                                  num_neighbors=num_nghs,
                                  shuffle=False,
-                                 batch_size=args.batch_size)
+                                 batch_size=batch_size)
     return train_loader, valid_loader, test_loader
 
 
-def gen_dataloader_delta(args, edge_index, train_idx, val_idx, test_idx, features, labels,
-                         num_nghs):
+def gen_dataloader_delta(edge_index, train_idx, val_idx, test_idx, features, labels, num_nghs,
+                         batch_size):
     features = torch.FloatTensor(features)
     index = torch.LongTensor([[i] for i in range(labels.shape[0])])
     labels = torch.cat((labels, index), 1)
@@ -177,21 +242,21 @@ def gen_dataloader_delta(args, edge_index, train_idx, val_idx, test_idx, feature
                                   input_nodes=train_idx,
                                   num_neighbors=num_nghs,
                                   shuffle=False,
-                                  batch_size=args.batch_size)
+                                  batch_size=batch_size)
     valid_loader = NeighborLoader(data,
                                   input_nodes=val_idx,
                                   num_neighbors=num_nghs,
                                   shuffle=False,
-                                  batch_size=args.batch_size)
+                                  batch_size=batch_size)
     test_loader = NeighborLoader(data,
                                  input_nodes=test_idx,
                                  num_neighbors=num_nghs,
                                  shuffle=False,
-                                 batch_size=args.batch_size)
+                                 batch_size=batch_size)
     return train_loader, valid_loader, test_loader
 
 
-def train(args, model, train_loader, valid_loader, device, checkpt_file):
+def train(args, model, train_loader, valid_loader, device, checkpt_file, lr, weight_decay):
     bad_counter = 0
     best = 0
     best_epoch = 0
@@ -200,7 +265,7 @@ def train(args, model, train_loader, valid_loader, device, checkpt_file):
     print("--------------------------")
     print("Training...")
     for epoch in range(args.epochs):
-        loss_tra, train_ep = gcn.train(model, device, train_loader, args.lr, args.weight_decay)
+        loss_tra, train_ep = gcn.train(model, device, train_loader, lr, weight_decay)
         t_st = time.time()
         f1_val = gcn.validate(model, device, valid_loader)
         train_time += train_ep
@@ -235,6 +300,8 @@ def train_delta(args,
                 valid_loader,
                 device,
                 checkpt_file,
+                lr,
+                weight_decay,
                 v_sen=None,
                 v_insen=None):
     bad_counter = 0
@@ -245,8 +312,8 @@ def train_delta(args,
     print("--------------------------")
     print("Training...")
     for epoch in range(args.epochs):
-        loss_tra, train_ep = gcn.train_delta(model, device, train_loader, args.lr,
-                                             args.weight_decay, v_sen, v_insen)
+        loss_tra, train_ep = gcn.train_delta(model, device, train_loader, lr, weight_decay, v_sen,
+                                             v_insen)
         t_st = time.time()
         f1_val = gcn.validate_delta(model, device, valid_loader, v_sen, v_insen)
         train_time += train_ep
@@ -345,6 +412,10 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     # Dataset and Algorithom
     parser.add_argument('--seed', type=int, default=20159, help='random seed..')
+    parser.add_argument("--model",
+                        type=str,
+                        default=None,
+                        help="Model name ('gcn', 'graphsage', 'gin', 'gat').")
     parser.add_argument('--dataset', default='papers100M', help='dateset.')
     # Algorithm parameters
     parser.add_argument('--alpha', type=float, default=0.2, help='alpha.')
@@ -362,17 +433,22 @@ if __name__ == '__main__':
     parser.add_argument('--gpu', type=int, default=-1, help='gpu')
     args = parser.parse_args()
 
+    args.model = 'gcn'
+    # args.model = 'graphsage'
+    # args.model = 'gat'
+    # args.model = 'gin'
+
     # args.dataset = 'Cora'
     args.dataset = 'CiteSeer'
     # args.dataset = 'PubMed'
     # args.dataset = 'arxiv'
     # args.dataset = 'products'
 
-    args.layer = 2
-    args.hidden = 128
-    args.lr = 1e-2
-    args.weight_decay = 0
-    args.dropout = 0.5
+    # args.layer = 2
+    # args.hidden = 128
+    # args.lr = 1e-2
+    # args.weight_decay = 0
+    # args.dropout = 0.5
     # args.epochs = 1
     args.gpu = 0
     args.batch_size = pow(2, 13)
