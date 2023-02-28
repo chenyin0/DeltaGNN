@@ -115,7 +115,56 @@ def insert_edge_dict(edge_dict, edge_index_inserted):
     return edge_dict
 
 
-def insert_edges_delta(edge_dict, edge_index_inserted, threshold, layer_num):
+# def insert_edges_delta(edge_dict, edge_index_inserted, threshold, layer_num):
+#     """
+#     edge_dict: key,val = edge_src, edge_dst
+#     edge_index_inserted: new inserted edges, format edge_src, edge_dst
+#     edge_index_delta: to represent delta-msg propagating
+#     """
+#     v_sen = set()
+#     v_insen = set()
+#     edge_index_delta = []
+#     edge_src_insen = []
+#     edge_dst_insen = []
+#     edge_src_sen = []
+#     edge_dst_sen = []
+#     for i in range(edge_index_inserted.shape[-1]):
+#         edge_src = edge_index_inserted[0][i].item()
+#         edge_dst = edge_index_inserted[1][i].item()
+#         if edge_dst in edge_dict:
+#             deg_v = len(edge_dict[edge_dst])
+#             if deg_v > threshold:
+#                 v_sen.add(edge_dst)
+#             else:
+#                 v_insen.add(edge_dst)
+#                 edge_src_insen.append(edge_src)
+#                 edge_dst_insen.append(edge_dst)
+
+#     # Update edge_dict
+#     edge_dict = insert_edge_dict(edge_dict, edge_index_inserted)
+#     # Gen edge_index_delta
+#     nodes_q = cp.deepcopy(v_sen)
+#     ngh_per_layer = set()
+#     # Traverse L-hops nghs of inserted nodes
+#     for i in range(layer_num):
+#         for node in nodes_q:
+#             nghs = edge_dict[node]  # For graph is undirected, we can obtain src_v by dst_v
+#             ngh_per_layer.update(nghs)
+#             src_v = list(nghs)
+#             dst_v = [node for i in range(len(nghs))]
+#             edge_src_sen.extend(src_v)
+#             edge_dst_sen.extend(dst_v)
+#         nodes_q = cp.deepcopy(ngh_per_layer)
+#         ngh_per_layer.clear()
+
+#     edge_index_sen = torch.LongTensor([edge_src_sen, edge_dst_sen])
+#     edge_index_insen = torch.LongTensor([edge_src_insen, edge_dst_insen])
+#     edge_index_delta = insert_edges(edge_index_sen, edge_index_insen)
+
+#     return edge_dict, edge_index_delta, v_sen, v_insen
+
+
+def insert_edges_delta(edge_index_evo_delta, edge_dict, edge_index_inserted, threshold, layer_num):
     """
     edge_dict: key,val = edge_src, edge_dst
     edge_index_inserted: new inserted edges, format edge_src, edge_dst
@@ -160,8 +209,9 @@ def insert_edges_delta(edge_dict, edge_index_inserted, threshold, layer_num):
     edge_index_sen = torch.LongTensor([edge_src_sen, edge_dst_sen])
     edge_index_insen = torch.LongTensor([edge_src_insen, edge_dst_insen])
     edge_index_delta = insert_edges(edge_index_sen, edge_index_insen)
+    edge_index_evo_delta = insert_edges(edge_index_evo_delta, edge_index_delta)
 
-    return edge_dict, edge_index_delta, v_sen, v_insen
+    return edge_dict, edge_index_evo_delta, v_sen, v_insen
 
 
 def load_sbm_init(datastr, rmax, alpha):
