@@ -23,44 +23,10 @@ from torch_geometric.loader import NeighborLoader
 import util
 
 
-def main():
+def main(args):
     # import os
     # os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
     Task_time_start = time.time()
-    parser = argparse.ArgumentParser()
-    # Dataset and Algorithom
-    parser.add_argument('--seed', type=int, default=20159, help='random seed..')
-    parser.add_argument('--dataset', default='papers100M', help='dateset.')
-    # Algorithm parameters
-    parser.add_argument('--alpha', type=float, default=0.2, help='alpha.')
-    parser.add_argument('--rmax', type=float, default=1e-7, help='threshold.')
-    # Learining parameters
-    parser.add_argument('--lr', type=float, default=0.0001, help='learning rate.')
-    parser.add_argument('--weight_decay', type=float, default=0, help='weight decay.')
-    parser.add_argument('--layer', type=int, default=3, help='number of layers.')
-    parser.add_argument('--hidden', type=int, default=2048, help='hidden dimensions.')
-    parser.add_argument('--dropout', type=float, default=0.3, help='dropout rate.')
-    parser.add_argument('--bias', default='none', help='bias.')
-    parser.add_argument('--epochs', type=int, default=1000, help='number of epochs.')
-    parser.add_argument('--batch_size', type=int, default=10000, help='batch size.')
-    parser.add_argument('--patience', type=int, default=50, help='patience.')
-    parser.add_argument('--gpu', type=int, default=-1, help='gpu')
-    args = parser.parse_args()
-
-    # args.dataset = 'Cora'
-    args.dataset = 'CiteSeer'
-    # args.dataset = 'PubMed'
-    # args.dataset = 'arxiv'
-    # args.dataset = 'products'
-
-    args.layer = 2
-    args.hidden = 128
-    args.lr = 1e-2
-    args.weight_decay = 0
-    args.dropout = 0.5
-    # args.epochs = 1
-    args.gpu = 0
-    args.batch_size = pow(2, 13)
 
     if args.gpu < 0:
         cuda = False
@@ -375,4 +341,43 @@ def test_delta(model, test_loader, device, checkpt_file, v_sen=None, v_insen=Non
 #     return test_acc
 
 if __name__ == '__main__':
-    main()
+
+    parser = argparse.ArgumentParser()
+    # Dataset and Algorithom
+    parser.add_argument('--seed', type=int, default=20159, help='random seed..')
+    parser.add_argument('--dataset', default='papers100M', help='dateset.')
+    # Algorithm parameters
+    parser.add_argument('--alpha', type=float, default=0.2, help='alpha.')
+    parser.add_argument('--rmax', type=float, default=1e-7, help='threshold.')
+    # Learining parameters
+    parser.add_argument('--lr', type=float, default=0.0001, help='learning rate.')
+    parser.add_argument('--weight_decay', type=float, default=0, help='weight decay.')
+    parser.add_argument('--layer', type=int, default=3, help='number of layers.')
+    parser.add_argument('--hidden', type=int, default=2048, help='hidden dimensions.')
+    parser.add_argument('--dropout', type=float, default=0.3, help='dropout rate.')
+    parser.add_argument('--bias', default='none', help='bias.')
+    parser.add_argument('--epochs', type=int, default=1000, help='number of epochs.')
+    parser.add_argument('--batch_size', type=int, default=10000, help='batch size.')
+    parser.add_argument('--patience', type=int, default=50, help='patience.')
+    parser.add_argument('--gpu', type=int, default=-1, help='gpu')
+    args = parser.parse_args()
+
+    # args.dataset = 'Cora'
+    args.dataset = 'CiteSeer'
+    # args.dataset = 'PubMed'
+    # args.dataset = 'arxiv'
+    # args.dataset = 'products'
+
+    args.layer = 2
+    args.hidden = 128
+    args.lr = 1e-2
+    args.weight_decay = 0
+    args.dropout = 0.5
+    # args.epochs = 1
+    args.gpu = 0
+    args.batch_size = pow(2, 13)
+
+    print('\n************ {:s} ************'.format(args.dataset))
+    print(args)
+
+    main(args)
