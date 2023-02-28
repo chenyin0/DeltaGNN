@@ -1,12 +1,19 @@
 {
-  "cora": {
+  "Cora": {
     "--n-hidden": 32,
     "--n-layers": 2,
     "--weight-decay": 0.05,
     "--lr": 0.01,
     "--dropout": 0.5
   },
-  "citeseer": {
+  "CiteSeer": {
+    "--n-hidden": 32,
+    "--n-layers": 2,
+    "--weight-decay": 0.05,
+    "--lr": 0.01,
+    "--dropout": 0.5
+  },
+  "PubMed": {
     "--n-hidden": 32,
     "--n-layers": 2,
     "--weight-decay": 0.05,
