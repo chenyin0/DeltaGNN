@@ -15,6 +15,8 @@ from utils import SimpleDataset
 # from model import ClassMLP
 from model.gcn_t import GCN, GCN_delta
 import model.gcn_t as gcn
+from model.graphsage_t import GraphSAGE, GraphSAGE_delta
+import model.graphsage_t as graphsage
 from utils import *
 from glob import glob
 import copy as cp
@@ -112,10 +114,38 @@ def main(args):
     # n_layers = args.layer
     # dropout = args.dropout
 
-    model_wo_retrain = GCN(in_feats, n_hidden, n_classes, n_layers, dropout).cuda(device)
-    model_retrain = GCN(in_feats, n_hidden, n_classes, n_layers, dropout).cuda(device)
-    model_delta = GCN_delta(in_feats, n_hidden, n_classes, n_layers, dropout,
-                            features.shape[0]).cuda(device)
+    # create GNN model
+    if model_name == 'gcn':
+        model_wo_retrain = GCN(in_feats, n_hidden, n_classes, n_layers, dropout).cuda(device)
+        model_retrain = GCN(in_feats, n_hidden, n_classes, n_layers, dropout).cuda(device)
+        model_delta = GCN_delta(in_feats, n_hidden, n_classes, n_layers, dropout,
+                                features.shape[0]).cuda(device)
+    elif model_name == 'graphsage':
+        model_wo_retrain = GraphSAGE(in_feats, n_hidden, n_classes, n_layers, dropout).cuda(device)
+        model_retrain = GraphSAGE(in_feats, n_hidden, n_classes, n_layers, dropout).cuda(device)
+        model_delta = GraphSAGE_delta(in_feats, n_hidden, n_classes, n_layers, dropout,
+                                      features.shape[0]).cuda(device)
+    # elif model_name == 'gat':
+    #     model_golden = GAT(g, in_feats, n_hidden, n_classes, n_layers, F.relu, feat_dropout,
+    #                        attn_dropout, heads).to(device)
+    #     model = GAT(g_evo, in_feats, n_hidden, n_classes, n_layers, F.relu, feat_dropout,
+    #                 attn_dropout, heads).to(device)
+    #     model_retrain = GAT(g_evo, in_feats, n_hidden, n_classes, n_layers, F.relu, feat_dropout,
+    #                         attn_dropout, heads).to(device)
+    #     model_delta = GAT(g_evo, in_feats, n_hidden, n_classes, n_layers, F.relu, feat_dropout,
+    #                       attn_dropout, heads).to(device)
+    # elif model_name == 'gin':
+    #     model_golden = GIN(g, in_feats, n_hidden, n_classes, n_layers, F.relu, dropout).to(device)
+    #     model = GIN(g_evo, in_feats, n_hidden, n_classes, n_layers, F.relu, dropout).to(device)
+    #     model_retrain = GIN(g_evo, in_feats, n_hidden, n_classes, n_layers, F.relu,
+    #                         dropout).to(device)
+    #     model_delta = GIN(g_evo, in_feats, n_hidden, n_classes, n_layers, F.relu,
+    #                       dropout).to(device)
+
+    # model_wo_retrain = GCN(in_feats, n_hidden, n_classes, n_layers, dropout).cuda(device)
+    # model_retrain = GCN(in_feats, n_hidden, n_classes, n_layers, dropout).cuda(device)
+    # model_delta = GCN_delta(in_feats, n_hidden, n_classes, n_layers, dropout,
+    #                         features.shape[0]).cuda(device)
 
     accuracy = []
     print('Edges_init: ', edge_index_init.shape)
@@ -438,8 +468,8 @@ if __name__ == '__main__':
     # args.model = 'gat'
     # args.model = 'gin'
 
-    # args.dataset = 'Cora'
-    args.dataset = 'CiteSeer'
+    args.dataset = 'Cora'
+    # args.dataset = 'CiteSeer'
     # args.dataset = 'PubMed'
     # args.dataset = 'arxiv'
     # args.dataset = 'products'
