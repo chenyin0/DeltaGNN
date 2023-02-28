@@ -47,8 +47,8 @@ def main():
     parser.add_argument('--gpu', type=int, default=-1, help='gpu')
     args = parser.parse_args()
 
-    args.dataset = 'Cora'
-    # args.dataset = 'CiteSeer'
+    # args.dataset = 'Cora'
+    args.dataset = 'CiteSeer'
     # args.dataset = 'PubMed'
     # args.dataset = 'arxiv'
     # args.dataset = 'products'
@@ -151,20 +151,12 @@ def main():
         acc_retrain = test(model_retrain, test_loader, device, checkpt_file_retrain)
 
         print('--- Model_delta:')
-        threshold = 0
+        threshold = 200
         edge_dict, edge_index_delta, v_sen, v_insen = insert_edges_delta(
             edge_dict, inserted_edge_index, threshold, args.layer)
+        print('fjapgwajhgi', len(v_sen), len(v_insen))
         train_loader_delta, valid_loader_delta, test_loader_delta = gen_dataloader_delta(
-            args, edge_index_delta, train_idx, val_idx, test_idx, features, labels, num_nghs)
-
-        # for step, batch in enumerate(train_loader_delta):
-        #     x, edge_index, y = batch.x.to(device), batch.edge_index.to(device), batch.y.to(device)
-        #     aa,bb = torch.split(y, 1, dim=1)
-        #     k = bb.squeeze().cpu().numpy().tolist()
-        #     print(k, len(k))
-        #     print(len(set(k)))
-        #     print(step, y.shape)
-
+            args, edge_index_evolved, train_idx, val_idx, test_idx, features, labels, num_nghs)
         print('Edges_delta: ', edge_index_delta.shape)
         train_delta(args, model_delta, train_loader_delta, valid_loader_delta, device,
                     checkpt_file_delta, v_sen, v_insen)

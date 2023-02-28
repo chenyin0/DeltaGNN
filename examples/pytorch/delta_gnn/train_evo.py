@@ -717,14 +717,14 @@ if __name__ == '__main__':
                         help="degree threshold of neighbors nodes")
     args = parser.parse_args()
 
-    # args.model = 'gcn'
+    args.model = 'gcn'
     # args.model = 'graphsage'
-    args.model = 'gat'
+    # args.model = 'gat'
     # args.model = 'gin'
 
-    # args.dataset = 'cora'
+    args.dataset = 'cora'
     # args.dataset = 'citeseer'
-    args.dataset = 'pubmed'
+    # args.dataset = 'pubmed'
     # args.dataset = 'reddit'
     # args.dataset = 'ogbn-arxiv'
     # args.dataset = 'ogbn-products'
