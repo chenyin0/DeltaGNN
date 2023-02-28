@@ -17,6 +17,9 @@ from model.gcn_t import GCN, GCN_delta
 import model.gcn_t as gcn
 from model.graphsage_t import GraphSAGE, GraphSAGE_delta
 import model.graphsage_t as graphsage
+from model.gat_t import GAT, GAT_delta
+import model.gat_t as gat
+
 from utils import *
 from glob import glob
 import copy as cp
@@ -125,15 +128,12 @@ def main(args):
         model_retrain = GraphSAGE(in_feats, n_hidden, n_classes, n_layers, dropout).cuda(device)
         model_delta = GraphSAGE_delta(in_feats, n_hidden, n_classes, n_layers, dropout,
                                       features.shape[0]).cuda(device)
-    # elif model_name == 'gat':
-    #     model_golden = GAT(g, in_feats, n_hidden, n_classes, n_layers, F.relu, feat_dropout,
-    #                        attn_dropout, heads).to(device)
-    #     model = GAT(g_evo, in_feats, n_hidden, n_classes, n_layers, F.relu, feat_dropout,
-    #                 attn_dropout, heads).to(device)
-    #     model_retrain = GAT(g_evo, in_feats, n_hidden, n_classes, n_layers, F.relu, feat_dropout,
-    #                         attn_dropout, heads).to(device)
-    #     model_delta = GAT(g_evo, in_feats, n_hidden, n_classes, n_layers, F.relu, feat_dropout,
-    #                       attn_dropout, heads).to(device)
+    elif model_name == 'gat':
+        model_wo_retrain = GAT(in_feats, n_hidden, n_classes, n_layers, feat_dropout,
+                               heads).to(device)
+        model_retrain = GAT(in_feats, n_hidden, n_classes, n_layers, feat_dropout, heads).to(device)
+        model_delta = GAT_delta(in_feats, n_hidden, n_classes, n_layers, feat_dropout, heads,
+                                features.shape[0]).to(device)
     # elif model_name == 'gin':
     #     model_golden = GIN(g, in_feats, n_hidden, n_classes, n_layers, F.relu, dropout).to(device)
     #     model = GIN(g_evo, in_feats, n_hidden, n_classes, n_layers, F.relu, dropout).to(device)
@@ -463,13 +463,13 @@ if __name__ == '__main__':
     parser.add_argument('--gpu', type=int, default=-1, help='gpu')
     args = parser.parse_args()
 
-    args.model = 'gcn'
+    # args.model = 'gcn'
     # args.model = 'graphsage'
-    # args.model = 'gat'
+    args.model = 'gat'
     # args.model = 'gin'
 
-    args.dataset = 'Cora'
-    # args.dataset = 'CiteSeer'
+    # args.dataset = 'Cora'
+    args.dataset = 'CiteSeer'
     # args.dataset = 'PubMed'
     # args.dataset = 'arxiv'
     # args.dataset = 'products'

@@ -12,7 +12,7 @@ class GAT(nn.Module):
     def __init__(self, g, in_feats, n_hidden, n_classes, n_layers, activation, feat_drop, attn_drop,
                  heads):
         super().__init__()
-        self.g = g
+        # self.g = g
         self.layers = nn.ModuleList()
 
         if n_layers != len(heads):
