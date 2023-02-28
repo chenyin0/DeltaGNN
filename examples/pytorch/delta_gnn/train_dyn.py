@@ -212,9 +212,9 @@ def main(args):
 
         print('--- Model_delta:')
         threshold = args.threshold
-        edge_dict, edge_index_evo_delta, v_sen, v_insen = insert_edges_delta(
+        edge_dict, edge_index_evo_delta, v_sen, v_insen,  = insert_edges_delta(
             edge_index_evo_delta, edge_dict, inserted_edge_index, threshold, n_layers)
-        print('fjapgwajhgi', len(v_sen), len(v_insen))
+        print('Node_num: ', len(v_sen), len(v_insen))
         # train_loader_delta, valid_loader_delta, test_loader_delta = gen_dataloader_delta(
         #     edge_index_evolved, train_idx, val_idx, test_idx, features, labels, num_nghs,
         #     batch_size)
