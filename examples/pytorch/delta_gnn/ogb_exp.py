@@ -19,6 +19,8 @@ from model.graphsage_t import GraphSAGE, GraphSAGE_delta
 import model.graphsage_t as graphsage
 from model.gat_t import GAT, GAT_delta
 import model.gat_t as gat
+from model.gin_t import GIN, GIN_delta
+import model.gin_t as gin
 
 from utils import *
 from glob import glob
@@ -134,13 +136,11 @@ def main(args):
         model_retrain = GAT(in_feats, n_hidden, n_classes, n_layers, feat_dropout, heads).to(device)
         model_delta = GAT_delta(in_feats, n_hidden, n_classes, n_layers, feat_dropout, heads,
                                 features.shape[0]).to(device)
-    # elif model_name == 'gin':
-    #     model_golden = GIN(g, in_feats, n_hidden, n_classes, n_layers, F.relu, dropout).to(device)
-    #     model = GIN(g_evo, in_feats, n_hidden, n_classes, n_layers, F.relu, dropout).to(device)
-    #     model_retrain = GIN(g_evo, in_feats, n_hidden, n_classes, n_layers, F.relu,
-    #                         dropout).to(device)
-    #     model_delta = GIN(g_evo, in_feats, n_hidden, n_classes, n_layers, F.relu,
-    #                       dropout).to(device)
+    elif model_name == 'gin':
+        model_wo_retrain = GIN(in_feats, n_hidden, n_classes, n_layers, dropout).to(device)
+        model_retrain = GIN(in_feats, n_hidden, n_classes, n_layers, dropout).to(device)
+        model_delta = GIN_delta(in_feats, n_hidden, n_classes, n_layers, dropout,
+                                features.shape[0]).to(device)
 
     # model_wo_retrain = GCN(in_feats, n_hidden, n_classes, n_layers, dropout).cuda(device)
     # model_retrain = GCN(in_feats, n_hidden, n_classes, n_layers, dropout).cuda(device)
@@ -176,12 +176,13 @@ def main(args):
           weight_decay)
     acc_retrain = test(model_retrain, test_loader, device, checkpt_file_retrain)
 
-    # Delta-retrain
-    print('--- Model_retrain_delta:')
-    edge_index_delta = edge_index_init.clone().detach()
-    train_delta(args, model_delta, train_loader, valid_loader, device, checkpt_file_delta, lr,
-                weight_decay)
-    acc_delta = test_delta(model_delta, test_loader, device, checkpt_file_delta)
+    # # Delta-retrain
+    # print('--- Model_retrain_delta:')
+    # edge_index_delta = edge_index_init.clone().detach()
+    # train_delta(args, model_delta, train_loader, valid_loader, device, checkpt_file_delta, lr,
+    #             weight_decay)
+    # acc_delta = test_delta(model_delta, test_loader, device, checkpt_file_delta)
+    acc_delta = 0
 
     accuracy.append([0, acc_wo_retrain, acc_retrain, acc_delta])
 
