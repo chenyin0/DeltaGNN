@@ -6,8 +6,7 @@ import torch.nn.functional as F
 from torch.optim import Adam
 import numpy as np
 import time
-import util
-from tqdm import tqdm
+# from tqdm import tqdm
 
 
 class GIN(nn.Module):
