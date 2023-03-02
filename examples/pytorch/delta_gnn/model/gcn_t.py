@@ -468,7 +468,6 @@ def combine_embedding(embedding_entire, feat, ind, v_sen, v_insen):
     1. First, replace items in "feat" to which in "feat_prev" with the corresponding node_id
     2. Then, merge "feat_low_deg" with "add" operation to "feat"
     """
-
     ind = ind.cpu().squeeze().numpy()
     v_sen = np.array(list(v_sen))
     v_insen = np.array(list(v_insen))
@@ -477,15 +476,19 @@ def combine_embedding(embedding_entire, feat, ind, v_sen, v_insen):
     sen_mask = ~insen_mask
     # sen_mask = [True for i in range(ind.shape[0])]
 
-    # print(sen_mask, insen_mask)
+    # # sen_mask_resize = [[i for col in range(feat.shape[-1])] for i in sen_mask]
+    # sen_mask_resize = [[i] * feat.shape[-1] for i in sen_mask]
+    # # print(sen_mask_resize)
+    # # insen_mask_resize = [[i for col in range(feat.shape[-1])] for i in insen_mask]
+    # insen_mask_resize = [[i] * feat.shape[-1] for i in insen_mask]
 
-    sen_mask_resize = [[i for col in range(feat.shape[-1])] for i in sen_mask]
-    # print(sen_mask_resize)
-    insen_mask_resize = [[i for col in range(feat.shape[-1])] for i in insen_mask]
-
-    sen_feat = th.masked_select(feat, th.tensor(sen_mask_resize))
+    # sen_feat = th.masked_select(feat, th.tensor(sen_mask_resize, dtype=torch.bool))
+    sen_mask_ts = torch.unsqueeze(th.tensor(sen_mask, dtype=torch.bool), 1)
+    sen_feat = th.masked_select(feat, sen_mask_ts)
     sen_feat = th.reshape(sen_feat, (-1, feat.shape[-1]))
-    insen_feat = th.masked_select(feat, th.tensor(insen_mask_resize))
+    # insen_feat = th.masked_select(feat, th.tensor(insen_mask_resize, dtype=torch.bool))
+    insen_mask_ts = torch.unsqueeze(th.tensor(insen_mask, dtype=torch.bool), 1)
+    insen_feat = th.masked_select(feat, insen_mask_ts)
     insen_feat = th.reshape(insen_feat, (-1, feat.shape[-1]))
 
     # print(sen_feat.shape[0], insen_feat.shape[0])
@@ -493,22 +496,26 @@ def combine_embedding(embedding_entire, feat, ind, v_sen, v_insen):
     ind_sen = ind[sen_mask]
     ind_insen = ind[insen_mask]
 
-    feat_index_sen = [[ind_sen[row] for col in range(embedding_entire.shape[1])]
+    # feat_index_sen = [[ind_sen[row] for col in range(embedding_entire.shape[1])]
+    #                   for row in range(sen_feat.shape[0])]
+    # feat_index_insen = [[ind_insen[row] for col in range(embedding_entire.shape[1])]
+    #                     for row in range(insen_feat.shape[0])]
+    feat_index_sen = [[ind_sen[row]] * embedding_entire.shape[1]
                       for row in range(sen_feat.shape[0])]
-    feat_index_insen = [[ind_insen[row] for col in range(embedding_entire.shape[1])]
+    feat_index_insen = [[ind_insen[row]] * embedding_entire.shape[1]
                         for row in range(insen_feat.shape[0])]
 
     feat_index_sen = th.tensor(feat_index_sen)
     feat_index_insen = th.tensor(feat_index_insen)
 
-    embedding_entire_2 = embedding_entire.scatter(0, feat_index_sen, sen_feat)
+    embedding_entire_tmp = embedding_entire.scatter(0, feat_index_sen, sen_feat)
     # embedding_entire_2 = embedding_entire_1.scatter_add(0, feat_index_insen, insen_feat)
 
     ind = th.tensor(ind)
-    feat = embedding_entire_2.index_select(0, ind).to(device)
+    feat = embedding_entire_tmp.index_select(0, ind).to(device)
 
-    embedding_entire_2 = embedding_entire_2.to(device)
-    return feat, embedding_entire_2
+    embedding_entire_tmp = embedding_entire_tmp.to(device)
+    return feat, embedding_entire_tmp
 
 
 def store_embedding(embedding, feat, ind):
@@ -542,8 +549,8 @@ def train_delta(model, device, train_loader, lr, weight_decay, v_sen=None, v_ins
             y, ind = torch.split(y, 1, dim=1)
             if v_sen is not None or v_insen is not None:
                 out, embedding = combine_embedding(model.embedding, out, ind, v_sen, v_insen)
-                    # Update embedding
-                    # model.embedding = torch.nn.Parameter(embedding)
+                # Update embedding
+                # model.embedding = torch.nn.Parameter(embedding)
                 # model.embedding = store_embedding(model.embedding, out, ind)
         # loss = F.cross_entropy(out, y.squeeze(1))
         loss = F.nll_loss(out, y.squeeze(1))
