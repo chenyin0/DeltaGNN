@@ -4,14 +4,7 @@ import random
 import argparse
 import gc
 import torch
-import resource
 import numpy as np
-import torch.nn as nn
-import torch.optim as optim
-import torch.nn.functional as F
-from torch.utils.data import Dataset, DataLoader
-from ogb.nodeproppred import Evaluator
-from utils import SimpleDataset
 # from model import ClassMLP
 from model.gcn_t import GCN, GCN_delta
 import model.gcn_t as gcn
@@ -184,7 +177,13 @@ def main(args):
     acc_delta = test_delta(model_delta, test_loader, device, checkpt_file_delta)
     # acc_delta = 0
 
-    accuracy.append([0, acc_wo_retrain, acc_retrain, acc_delta])
+    accuracy.append([0, acc_wo_retrain * 100, acc_retrain * 100, acc_delta * 100])
+    v_deg_delta_accumulate = 0
+    v_deg_total_accumulate = 0
+    e_num_delta_accumulate = 0
+    e_num_total_accumulate = 0
+    aggr_reduct_list = []
+    comb_reduct_list = []
 
     print('------------------ update -------------------')
     snapList = [f for f in glob('./data/' + args.dataset + '/*Edgeupdate_snap*.txt')]
@@ -212,9 +211,24 @@ def main(args):
 
         print('--- Model_delta:')
         threshold = args.threshold
-        edge_dict, edge_index_evo_delta, v_sen, v_insen,  = insert_edges_delta(
+        edge_dict, edge_index_evo_delta, v_sen, v_insen, v_deg_total, v_deg_delta, e_num_total, e_num_delta = insert_edges_delta(
             edge_index_evo_delta, edge_dict, inserted_edge_index, threshold, n_layers)
         print('Node_num: ', len(v_sen), len(v_insen))
+        v_deg_delta_accumulate += v_deg_delta
+        v_deg_total_accumulate += v_deg_total
+        e_num_delta_accumulate += e_num_delta
+        e_num_total_accumulate += e_num_total
+        aggr_reduction = round(
+            (v_deg_total_accumulate - v_deg_delta_accumulate) / v_deg_total_accumulate * 100, 2)
+        comb_reduction = round(
+            (e_num_total_accumulate - e_num_delta_accumulate) / e_num_total_accumulate * 100, 2)
+        aggr_reduct_list.append(aggr_reduction)
+        comb_reduct_list.append(comb_reduction)
+        print('Aggr reduction: {:d}/{:d} = {:.2f}%'.format(v_deg_delta, v_deg_total,
+                                                           aggr_reduction))
+        print('Comb reduction: {:d}/{:d} = {:.2f}%'.format(e_num_delta, e_num_total,
+                                                           comb_reduction))
+
         # train_loader_delta, valid_loader_delta, test_loader_delta = gen_dataloader_delta(
         #     edge_index_evolved, train_idx, val_idx, test_idx, features, labels, num_nghs,
         #     batch_size)
@@ -228,14 +242,36 @@ def main(args):
                                v_insen)
         # acc_delta = 0
 
-        accuracy.append([i + 1, acc_wo_retrain, acc_retrain, acc_delta])
+        accuracy.append([i + 1, acc_wo_retrain * 100, acc_retrain * 100, acc_delta * 100])
 
     for i in range(len(accuracy)):
-        print('{:d}\t{:.2f}  {:.2f}  {:.2f}'.format(i, accuracy[i][1] * 100, accuracy[i][2] * 100,
-                                                    accuracy[i][3] * 100))
+        if i == 0:
+            print('{:d}\t{:.2f}  {:.2f}  {:.2f}'.format(i, accuracy[i][1], accuracy[i][2],
+                                                        accuracy[i][3]))
+        else:
+            print('{:d}\t{:.2f}  {:.2f}  {:.2f}  aggr: {:.2f}%  comb: {:.2f}%'.format(
+                i, accuracy[i][1], accuracy[i][2], accuracy[i][3], aggr_reduct_list[i - 1],
+                comb_reduct_list[i - 1]))
+
+    aggr_reduct_avg = aggr_reduct_list[-1]
+    comb_reduct_avg = comb_reduct_list[-1]
+    print('Aggr_reduct_avg: {:.2f}%, Comb_reduct_avg: {:.2f}%'.format(aggr_reduct_avg,
+                                                                      comb_reduct_avg))
 
     print('\n>> Task {:s} execution time: {}'.format(
         args.dataset, util.time_format(time.perf_counter() - Task_time_start)))
+
+    acc_dump = [accuracy[i][1:] for i in range(len(accuracy))]
+    np.savetxt('./results/' + args.dataset + '_' + args.model + '_th' + str(args.threshold) +
+               '_acc.txt',
+               acc_dump,
+               fmt='%.2f, %.2f, %.2f')
+
+    reduction = [[aggr_reduct_list[i], comb_reduct_list[i]] for i in range(len(aggr_reduct_list))]
+    np.savetxt('./results/' + args.dataset + '_' + args.model + '_th' + str(args.threshold) +
+               '_reduction.txt',
+               reduction,
+               fmt='%.2f, %.2f')
 
 
 def gen_dataloader(edge_index, train_idx, val_idx, test_idx, features, labels, num_nghs,
@@ -399,7 +435,7 @@ if __name__ == '__main__':
     parser.add_argument('--epochs', type=int, default=1000, help='number of epochs.')
     parser.add_argument('--batch_size', type=int, default=10000, help='batch size.')
     parser.add_argument('--patience', type=int, default=50, help='patience.')
-    parser.add_argument('--threshold', type=float, default=0, help='Sensitivity threshold')
+    parser.add_argument('--threshold', type=int, default=0, help='Sensitivity threshold')
     parser.add_argument('--gpu', type=int, default=-1, help='gpu')
     args = parser.parse_args()
 
@@ -414,7 +450,7 @@ if __name__ == '__main__':
     # args.dataset = 'arxiv'
     # args.dataset = 'products'
 
-    args.threshold = 50
+    args.threshold = 10
 
     # args.layer = 2
     # args.hidden = 128

@@ -24,8 +24,6 @@ def load_aminer_init(datastr, rmax, alpha):
     # py_alg = InstantGNN()
 
     features = np.load('./data/aminer/aminer_dense_feat.npy')
-    memory_dataset = py_alg.initial_operation('./data/aminer/', datastr, m, n, rmax, alpha,
-                                              features)
     split = np.load('./data/aminer/aminer_dense_idx_split.npz')
     train_idx, val_idx, test_idx = split['train'], split['valid'], split['test']
 
@@ -41,7 +39,7 @@ def load_aminer_init(datastr, rmax, alpha):
     val_labels = val_labels.reshape(val_labels.size(0), 1)
     test_labels = test_labels.reshape(test_labels.size(0), 1)
 
-    return features, train_labels, val_labels, test_labels, train_idx, val_idx, test_idx, memory_dataset, py_alg
+    return features, train_labels, val_labels, test_labels, train_idx, val_idx, test_idx
 
 
 def load_dataset_init(datastr):
@@ -172,22 +170,35 @@ def insert_edges_delta(edge_index_evo_delta, edge_dict, edge_index_inserted, thr
     """
     v_sen = set()
     v_insen = set()
+    v_total = set()
     edge_index_delta = []
     edge_src_insen = []
     edge_dst_insen = []
     edge_src_sen = []
     edge_dst_sen = []
+
+    # Aggregation reduction
+    e_num_total = 0
+
+    # Combination reduction
+    v_deg_total = 0
+    v_deg_delta = 0
+
     for i in range(edge_index_inserted.shape[-1]):
         edge_src = edge_index_inserted[0][i].item()
         edge_dst = edge_index_inserted[1][i].item()
         if edge_dst in edge_dict:
             deg_v = len(edge_dict[edge_dst])
+            v_deg_total += deg_v
+            v_total.add(edge_dst)
             if deg_v > threshold:
                 v_sen.add(edge_dst)
+                v_deg_delta += deg_v
             else:
                 v_insen.add(edge_dst)
                 edge_src_insen.append(edge_src)
                 edge_dst_insen.append(edge_dst)
+                v_deg_delta += 1
 
     # Update edge_dict
     edge_dict = insert_edge_dict(edge_dict, edge_index_inserted)
@@ -206,12 +217,26 @@ def insert_edges_delta(edge_index_evo_delta, edge_dict, edge_index_inserted, thr
         nodes_q = cp.deepcopy(ngh_per_layer)
         ngh_per_layer.clear()
 
+    # Gen edge_index_delta
+    nodes_q = cp.deepcopy(v_total)
+    ngh_per_layer = set()
+    # Traverse L-hops nghs of inserted nodes
+    for i in range(layer_num):
+        for node in nodes_q:
+            nghs = edge_dict[node]  # For graph is undirected, we can obtain src_v by dst_v
+            ngh_per_layer.update(nghs)
+            e_num_total += len(nghs)
+        nodes_q = cp.deepcopy(ngh_per_layer)
+        ngh_per_layer.clear()
+
     edge_index_sen = torch.LongTensor([edge_src_sen, edge_dst_sen])
     edge_index_insen = torch.LongTensor([edge_src_insen, edge_dst_insen])
     edge_index_delta = insert_edges(edge_index_sen, edge_index_insen)
     edge_index_evo_delta = insert_edges(edge_index_evo_delta, edge_index_delta)
 
-    return edge_dict, edge_index_evo_delta, v_sen, v_insen
+    e_num_delta = edge_index_delta.shape[-1]
+
+    return edge_dict, edge_index_evo_delta, v_sen, v_insen, v_deg_total, v_deg_delta, e_num_total, e_num_delta
 
 
 def load_sbm_init(datastr, rmax, alpha):
