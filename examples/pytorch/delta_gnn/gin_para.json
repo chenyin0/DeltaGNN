@@ -7,7 +7,7 @@
     "--dropout": 0.5
   },
   "CiteSeer": {
-    "--n-hidden": 128,
+    "--n-hidden": 32,
     "--n-layers": 2,
     "--weight-decay": 0.05,
     "--lr": 0.01,
@@ -20,7 +20,7 @@
     "--lr": 0.01,
     "--dropout": 0.5
   },
-  "ogbn-arxiv": {
+  "arxiv": {
     "--n-hidden": 32,
     "--n-layers": 2,
     "--weight-decay": 0,

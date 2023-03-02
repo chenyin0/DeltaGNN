@@ -4,7 +4,7 @@
     "--n-layers": 2,
     "--weight-decay": 0.005,
     "--lr": 0.005,
-    "--feat-drop": 0.6,
+    "--feat-drop": 0.5,
     "--attn-drop": 0.6,
     "--heads": "8,1"
   },
@@ -13,7 +13,7 @@
     "--n-layers": 2,
     "--weight-decay": 0.005,
     "--lr": 0.005,
-    "--feat-drop": 0.6,
+    "--feat-drop": 0.5,
     "--attn-drop": 0.6,
     "--heads": "8,1"
   },
@@ -22,7 +22,7 @@
     "--n-layers": 2,
     "--weight-decay": 0.005,
     "--lr": 0.005,
-    "--feat-drop": 0.6,
+    "--feat-drop": 0.5,
     "--attn-drop": 0.6,
     "--heads": "8,1"
   },
@@ -31,25 +31,25 @@
     "--n-layers": 2,
     "--weight-decay": 0.0005,
     "--lr": 0.005,
-    "--feat-drop": 0.6,
+    "--feat-drop": 0.5,
     "--attn-drop": 0.6,
     "--heads": "8,1"
   },
-  "ogbn-arxiv": {
-    "--n-hidden": 256,
+  "arxiv": {
+    "--n-hidden": 8,
     "--n-layers": 2,
     "--weight-decay": 0,
     "--lr": 0.005,
-    "--feat-drop": 0.6,
+    "--feat-drop": 0.5,
     "--attn-drop": 0.6,
     "--heads": "8,1"
   },
   "ogbn-mag": {
-    "--n-hidden": 256,
+    "--n-hidden": 8,
     "--n-layers": 2,
     "--weight-decay": 0.0005,
     "--lr": 0.005,
-    "--feat-drop": 0.6,
+    "--feat-drop": 0.5,
     "--attn-drop": 0.6,
     "--heads": "8,1"
   }

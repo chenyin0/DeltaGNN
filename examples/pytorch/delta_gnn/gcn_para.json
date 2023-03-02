@@ -1,34 +1,34 @@
 {
   "Cora": {
-    "--n-hidden": 256,
+    "--n-hidden": 128,
     "--n-layers": 2,
     "--weight-decay": 0.0005,
     "--lr": 0.01,
     "--dropout": 0.5
   },
   "CiteSeer": {
-    "--n-hidden": 256,
+    "--n-hidden": 128,
     "--n-layers": 2,
     "--weight-decay": 0.0005,
     "--lr": 0.01,
     "--dropout": 0.5
   },
   "PubMed": {
-    "--n-hidden": 256,
+    "--n-hidden": 128,
     "--n-layers": 2,
     "--weight-decay": 0.0005,
     "--lr": 0.01,
     "--dropout": 0.5
   },
   "reddit": {
-    "--n-hidden": 256,
+    "--n-hidden": 128,
     "--n-layers": 2,
     "--weight-decay": 0.0005,
     "--lr": 0.01,
     "--dropout": 0.5
   },
-  "ogbn-arxiv": {
-    "--n-hidden": 256,
+  "arxiv": {
+    "--n-hidden": 128,
     "--n-layers": 2,
     "--weight-decay": 0,
     "--lr": 0.01,

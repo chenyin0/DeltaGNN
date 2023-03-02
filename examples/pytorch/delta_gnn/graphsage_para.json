@@ -1,6 +1,6 @@
 {
   "Cora": {
-    "--n-hidden": 256,
+    "--n-hidden": 32,
     "--n-layers": 2,
     "--fan-out": "10,25",
     "--batch-size": 1024,
@@ -9,7 +9,7 @@
     "--dropout": 0.5
   },
   "CiteSeer": {
-    "--n-hidden": 256,
+    "--n-hidden": 32,
     "--n-layers": 2,
     "--fan-out": "10,25",
     "--batch-size": 1024,
@@ -18,7 +18,7 @@
     "--dropout": 0.5
   },
   "PubMed": {
-    "--n-hidden": 256,
+    "--n-hidden": 32,
     "--n-layers": 2,
     "--fan-out": "10,25",
     "--batch-size": 1024,
@@ -27,7 +27,7 @@
     "--dropout": 0.5
   },
   "reddit": {
-    "--n-hidden": 256,
+    "--n-hidden": 32,
     "--n-layers": 2,
     "--fan-out": "10,25",
     "--batch-size": 1024,
@@ -35,8 +35,8 @@
     "--lr": 0.001,
     "--dropout": 0.5
   },
-  "ogbn-arxiv": {
-    "--n-hidden": 256,
+  "arxiv": {
+    "--n-hidden": 32,
     "--n-layers": 2,
     "--fan-out": "10,25",
     "--batch-size": 1024,
@@ -45,7 +45,7 @@
     "--dropout": 0.5
   },
   "ogbn-products": {
-    "--n-hidden": 256,
+    "--n-hidden": 32,
     "--n-layers": 2,
     "--fan-out": "10,25",
     "--batch-size": 1024,
@@ -54,7 +54,7 @@
     "--dropout": 0.5
   },
   "ogbn-mag": {
-    "--n-hidden": 256,
+    "--n-hidden": 32,
     "--n-layers": 2,
     "--fan-out": "10,25",
     "--batch-size": 1024,
