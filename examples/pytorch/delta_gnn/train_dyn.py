@@ -23,8 +23,11 @@ from torch_geometric.loader import NeighborLoader
 import util
 import json
 
+import faulthandler
+
 
 def main(args):
+    faulthandler.enable()
     # import os
     # os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
     Task_time_start = time.perf_counter()
@@ -184,6 +187,13 @@ def main(args):
     e_num_total_accumulate = 0
     aggr_reduct_list = []
     comb_reduct_list = []
+    access_delta_accumulate = 0
+    access_total_accumulate = 0
+    comp_delta_accumulate = 0
+    comp_total_accumulate = 0
+    access_reduct_list = []
+    comp_reduct_list = []
+    sensitive_ratio = [100]  # The sensitivity in the inital snapshot is 0
 
     print('------------------ update -------------------')
     snapList = [f for f in glob('./data/' + args.dataset + '/*Edgeupdate_snap*.txt')]
@@ -209,25 +219,46 @@ def main(args):
               weight_decay)
         acc_retrain = test(model_retrain, test_loader, device, checkpt_file_retrain)
 
-        print('--- Model_delta:')
+        # print('--- Model_delta:')
         threshold = args.threshold
-        edge_dict, edge_index_evo_delta, v_sen, v_insen, v_deg_total, v_deg_delta, e_num_total, e_num_delta = insert_edges_delta(
+        # edge_dict, edge_index_evo_delta, v_sen, v_insen, v_deg_total, v_deg_delta, e_num_total, e_num_delta = insert_edges_delta(
+        #     edge_index_evo_delta, edge_dict, inserted_edge_index, threshold, n_layers)
+        edge_dict, edge_index_evo_delta, v_sen, v_insen, comp_total, comp_delta, access_total, access_delta = insert_edges_delta(
             edge_index_evo_delta, edge_dict, inserted_edge_index, threshold, n_layers)
+
         print('Node_num: ', len(v_sen), len(v_insen))
-        v_deg_delta_accumulate += v_deg_delta
-        v_deg_total_accumulate += v_deg_total
-        e_num_delta_accumulate += e_num_delta
-        e_num_total_accumulate += e_num_total
-        aggr_reduction = round(
-            (v_deg_total_accumulate - v_deg_delta_accumulate) / v_deg_total_accumulate * 100, 2)
-        comb_reduction = round(
-            (e_num_total_accumulate - e_num_delta_accumulate) / e_num_total_accumulate * 100, 2)
-        aggr_reduct_list.append(aggr_reduction)
-        comb_reduct_list.append(comb_reduction)
-        print('Aggr reduction: {:d}/{:d} = {:.2f}%'.format(v_deg_delta, v_deg_total,
-                                                           aggr_reduction))
-        print('Comb reduction: {:d}/{:d} = {:.2f}%'.format(e_num_delta, e_num_total,
-                                                           comb_reduction))
+        sensitive_ratio.append(round(len(v_sen) * 100 / (len(v_sen) + len(v_insen)), 2))
+
+        # v_deg_delta_accumulate += v_deg_delta
+        # v_deg_total_accumulate += v_deg_total
+        # # v_deg_total_accumulate += e_num_total
+        # e_num_delta_accumulate += e_num_delta
+        # e_num_total_accumulate += e_num_total
+        # aggr_reduction = round(
+        #     (e_num_total_accumulate - e_num_delta_accumulate) / e_num_total_accumulate * 100, 2)
+        # comb_reduction = round(
+        #     (v_deg_total_accumulate - v_deg_delta_accumulate) / v_deg_total_accumulate * 100, 2)
+        # aggr_reduct_list.append(aggr_reduction)
+        # comb_reduct_list.append(comb_reduction)
+        # print('Aggr reduction: {:d}/{:d} = {:.2f}%'.format(v_deg_delta, v_deg_total,
+        #                                                    aggr_reduction))
+        # print('Comb reduction: {:d}/{:d} = {:.2f}%'.format(e_num_delta, e_num_total,
+        #                                                    comb_reduction))
+
+        comp_delta_accumulate += comp_delta
+        comp_total_accumulate += comp_total
+        access_delta_accumulate += access_delta
+        access_total_accumulate += access_total
+        comp_reduction = round(
+            (comp_total_accumulate - comp_delta_accumulate) / comp_total_accumulate * 100, 2)
+        access_reduction = round(
+            (access_total_accumulate - access_delta_accumulate) / access_total_accumulate * 100, 2)
+        access_reduct_list.append(access_reduction)
+        comp_reduct_list.append(comp_reduction)
+        print('Access reduction: {:d}/{:d} = {:.2f}%'.format(access_delta, access_total,
+                                                             access_reduction))
+        print('Computation reduction: {:d}/{:d} = {:.2f}%'.format(comp_delta, comp_total,
+                                                                  comp_reduction))
 
         # train_loader_delta, valid_loader_delta, test_loader_delta = gen_dataloader_delta(
         #     edge_index_evolved, train_idx, val_idx, test_idx, features, labels, num_nghs,
@@ -249,25 +280,36 @@ def main(args):
             print('{:d}\t{:.2f}  {:.2f}  {:.2f}'.format(i, accuracy[i][1], accuracy[i][2],
                                                         accuracy[i][3]))
         else:
-            print('{:d}\t{:.2f}  {:.2f}  {:.2f}  aggr: {:.2f}%  comb: {:.2f}%'.format(
-                i, accuracy[i][1], accuracy[i][2], accuracy[i][3], aggr_reduct_list[i - 1],
-                comb_reduct_list[i - 1]))
+            # print('{:d}\t{:.2f}  {:.2f}  {:.2f}  aggr: {:.2f}%  comb: {:.2f}%'.format(
+            #     i, accuracy[i][1], accuracy[i][2], accuracy[i][3], aggr_reduct_list[i - 1],
+            #     comb_reduct_list[i - 1]))
+            print(
+                '{:d}\t{:.2f}  {:.2f}  {:.2f}  access: {:.2f}%  comp: {:.2f}%  sen:{:.2f}%'.format(
+                    i, accuracy[i][1], accuracy[i][2], accuracy[i][3], access_reduct_list[i - 1],
+                    comp_reduct_list[i - 1], sensitive_ratio[i - 1]))
 
-    aggr_reduct_avg = aggr_reduct_list[-1]
-    comb_reduct_avg = comb_reduct_list[-1]
-    print('Aggr_reduct_avg: {:.2f}%, Comb_reduct_avg: {:.2f}%'.format(aggr_reduct_avg,
-                                                                      comb_reduct_avg))
+    # aggr_reduct_avg = aggr_reduct_list[-1]
+    # comb_reduct_avg = comb_reduct_list[-1]
+    access_reduct_avg = access_reduct_list[-1]
+    comp_reduct_avg = comp_reduct_list[-1]
+    # print('Aggr_reduct_avg: {:.2f}%, Comb_reduct_avg: {:.2f}%'.format(aggr_reduct_avg,
+    #                                                                   comb_reduct_avg))
+    print('Aggr_reduct_avg: {:.2f}%, Comb_reduct_avg: {:.2f}%'.format(access_reduct_avg,
+                                                                      comp_reduct_avg))
 
     print('\n>> Task {:s} execution time: {}'.format(
         args.dataset, util.time_format(time.perf_counter() - Task_time_start)))
 
     acc_dump = [accuracy[i][1:] for i in range(len(accuracy))]
+    acc_dump = [acc_dump[i] + [sensitive_ratio[i]] for i in range(len(acc_dump))]
     np.savetxt('./results/' + args.dataset + '_' + args.model + '_th' + str(args.threshold) +
                '_acc.txt',
                acc_dump,
-               fmt='%.2f, %.2f, %.2f')
+               fmt='%.2f, %.2f, %.2f, %.2f')
 
-    reduction = [[aggr_reduct_list[i], comb_reduct_list[i]] for i in range(len(aggr_reduct_list))]
+    # reduction = [[aggr_reduct_list[i], comb_reduct_list[i]] for i in range(len(aggr_reduct_list))]
+    reduction = [[access_reduct_list[i], comp_reduct_list[i]]
+                 for i in range(len(access_reduct_list))]
     np.savetxt('./results/' + args.dataset + '_' + args.model + '_th' + str(args.threshold) +
                '_reduction.txt',
                reduction,
@@ -335,9 +377,26 @@ def train(args, model, train_loader, valid_loader, device, checkpt_file, lr, wei
     print("--------------------------")
     print("Training...")
     for epoch in range(args.epochs):
-        loss_tra, train_ep = gcn.train(model, device, train_loader, lr, weight_decay)
+        if args.model == 'gcn':
+            loss_tra, train_ep = gcn.train(model, device, train_loader, lr, weight_decay)
+        elif args.model == 'graphsage':
+            loss_tra, train_ep = graphsage.train(model, device, train_loader, lr, weight_decay)
+        elif args.model == 'gat':
+            loss_tra, train_ep = gat.train(model, device, train_loader, lr, weight_decay)
+        elif args.model == 'gin':
+            loss_tra, train_ep = gin.train(model, device, train_loader, lr, weight_decay)
+
         t_st = time.time()
-        f1_val = gcn.validate(model, device, valid_loader)
+
+        if args.model == 'gcn':
+            f1_val = gcn.validate(model, device, valid_loader)
+        elif args.model == 'graphsage':
+            f1_val = graphsage.validate(model, device, valid_loader)
+        elif args.model == 'gat':
+            f1_val = gat.validate(model, device, valid_loader)
+        elif args.model == 'gin':
+            f1_val = gin.validate(model, device, valid_loader)
+
         train_time += train_ep
         if (epoch + 1) % 20 == 0:
             print('Epoch:{:02d}, Train_loss:{:.3f}, Valid_acc:{:.2f}%, Time_cost:{:.3f}/{:.3f}'.
@@ -359,7 +418,14 @@ def train(args, model, train_loader, valid_loader, device, checkpt_file, lr, wei
 
 
 def test(model, test_loader, device, checkpt_file):
-    test_acc = gcn.test(model, device, test_loader, checkpt_file)
+    if args.model == 'gcn':
+        test_acc = gcn.test(model, device, test_loader, checkpt_file)
+    elif args.model == 'graphsage':
+        test_acc = graphsage.test(model, device, test_loader, checkpt_file)
+    elif args.model == 'gat':
+        test_acc = gat.test(model, device, test_loader, checkpt_file)
+    elif args.model == 'gin':
+        test_acc = gin.test(model, device, test_loader, checkpt_file)
     print('Test accuracy:{:.2f}%'.format(100 * test_acc))
     return test_acc
 
@@ -382,10 +448,30 @@ def train_delta(args,
     print("--------------------------")
     print("Training...")
     for epoch in range(args.epochs):
-        loss_tra, train_ep = gcn.train_delta(model, device, train_loader, lr, weight_decay, v_sen,
-                                             v_insen)
+        if args.model == 'gcn':
+            loss_tra, train_ep = gcn.train_delta(model, device, train_loader, lr, weight_decay,
+                                                 v_sen, v_insen)
+        elif args.model == 'graphsage':
+            loss_tra, train_ep = graphsage.train_delta(model, device, train_loader, lr,
+                                                       weight_decay, v_sen, v_insen)
+        elif args.model == 'gat':
+            loss_tra, train_ep = gat.train_delta(model, device, train_loader, lr, weight_decay,
+                                                 v_sen, v_insen)
+        elif args.model == 'gin':
+            loss_tra, train_ep = gin.train_delta(model, device, train_loader, lr, weight_decay,
+                                                 v_sen, v_insen)
+
         t_st = time.time()
-        f1_val = gcn.validate_delta(model, device, valid_loader, v_sen, v_insen)
+
+        if args.model == 'gcn':
+            f1_val = gcn.validate_delta(model, device, valid_loader, v_sen, v_insen)
+        elif args.model == 'graphsage':
+            f1_val = graphsage.validate_delta(model, device, valid_loader, v_sen, v_insen)
+        elif args.model == 'gat':
+            f1_val = gat.validate_delta(model, device, valid_loader, v_sen, v_insen)
+        elif args.model == 'gin':
+            f1_val = gin.validate_delta(model, device, valid_loader, v_sen, v_insen)
+
         train_time += train_ep
         if (epoch + 1) % 20 == 0:
             print('Epoch:{:02d}, Train_loss:{:.3f}, Valid_acc:{:.2f}%, Time_cost:{:.3f}/{:.3f}'.
@@ -407,7 +493,14 @@ def train_delta(args,
 
 
 def test_delta(model, test_loader, device, checkpt_file, v_sen=None, v_insen=None):
-    test_acc = gcn.test_delta(model, device, test_loader, checkpt_file, v_sen, v_insen)
+    if args.model == 'gcn':
+        test_acc = gcn.test_delta(model, device, test_loader, checkpt_file, v_sen, v_insen)
+    elif args.model == 'graphsage':
+        test_acc = graphsage.test_delta(model, device, test_loader, checkpt_file, v_sen, v_insen)
+    elif args.model == 'gat':
+        test_acc = gat.test_delta(model, device, test_loader, checkpt_file, v_sen, v_insen)
+    elif args.model == 'gin':
+        test_acc = gin.test_delta(model, device, test_loader, checkpt_file, v_sen, v_insen)
     print('Test accuracy:{:.2f}%'.format(100 * test_acc))
     return test_acc
 
@@ -439,18 +532,18 @@ if __name__ == '__main__':
     parser.add_argument('--gpu', type=int, default=-1, help='gpu')
     args = parser.parse_args()
 
-    args.model = 'gcn'
+    # args.model = 'gcn'
     # args.model = 'graphsage'
     # args.model = 'gat'
     # args.model = 'gin'
 
-    args.dataset = 'Cora'
+    # args.dataset = 'Cora'
     # args.dataset = 'CiteSeer'
     # args.dataset = 'PubMed'
     # args.dataset = 'arxiv'
     # args.dataset = 'products'
 
-    args.threshold = 10
+    # args.threshold = 5
 
     # args.layer = 2
     # args.hidden = 128
@@ -458,10 +551,12 @@ if __name__ == '__main__':
     # args.weight_decay = 0
     # args.dropout = 0.5
     # args.epochs = 1
-    args.gpu = 0
-    args.batch_size = pow(2, 13)
+    args.gpu = 1
+    # args.batch_size = pow(2, 13)
+    args.batch_size = pow(2, 8)
 
     print('\n************ {:s} ************'.format(args.dataset))
-    print(args)
+    print('>> Task start time: ', time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()))
+    # print(args)
 
     main(args)
