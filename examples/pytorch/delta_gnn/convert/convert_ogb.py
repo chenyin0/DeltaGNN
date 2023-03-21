@@ -106,10 +106,23 @@ def gen_dataset_snapshot(dataset_name, num_snap):
                  n_classes=n_classes)
 
         data.edge_index = to_undirected(data.edge_index, data.num_nodes)
+        # data.edge_index, drop_edge_index, _ = dropout_adj(data.edge_index,
+        #                                                   train_idx,
+        #                                                   num_nodes=data.num_nodes)
+
+        # test_num = len(test_idx)
+        drop_idx = np.append(train_idx, val_idx)
+        # drop_idx = np.append(drop_idx, test_idx)
         data.edge_index, drop_edge_index, _ = dropout_adj(data.edge_index,
-                                                          train_idx,
+                                                          drop_idx,
                                                           num_nodes=data.num_nodes)
+
         data.edge_index = to_undirected(data.edge_index, data.num_nodes)
+
+        # r_indexes = np.arange(len(drop_edge_index[0]))
+        # np.random.shuffle(r_indexes)
+        # drop_edge_index[0] = drop_edge_index[0][r_indexes]
+        # drop_edge_index[1] = drop_edge_index[1][r_indexes]
 
         row_drop, col_drop = np.array(drop_edge_index)
 
@@ -549,9 +562,9 @@ if __name__ == "__main__":
     # products()
     # arxiv()
 
-    # gen_dataset_snapshot('Cora', 16)
-    # gen_dataset_snapshot('CiteSeer', 16)
-    gen_dataset_snapshot('PubMed', 16)
+    # gen_dataset_snapshot('Cora', 10)
+    # gen_dataset_snapshot('CiteSeer', 10)
+    # gen_dataset_snapshot('PubMed', 10)
     # gen_dataset_snapshot('arxiv', 16)
-    # gen_dataset_snapshot('products', 15)
+    gen_dataset_snapshot('products', 16)
     # gen_dataset_snapshot('papers100M', 20)
