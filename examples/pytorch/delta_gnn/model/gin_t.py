@@ -242,11 +242,12 @@ def train_delta(model, device, train_loader, lr, weight_decay, v_sen=None, v_ins
         out = model(x, edge_index)
         if y.shape[-1] > 1:
             y, ind = torch.split(y, 1, dim=1)
-            if v_sen is not None or v_insen is not None:
-                out, embedding = combine_embedding(model.embedding, out, ind, v_sen, v_insen)
+            # if v_sen is not None or v_insen is not None:
+            #     out, embedding = combine_embedding(model.embedding, out, ind, v_sen, v_insen)
                 # Update embedding
                 # model.embedding = torch.nn.Parameter(embedding)
                 # model.embedding = store_embedding(model.embedding, out, ind)
+            model.embedding = store_embedding(model.embedding, out, ind)
         # loss = F.cross_entropy(out, y.squeeze(1))
         loss = F.nll_loss(out, y.squeeze(1))
         loss.backward()
