@@ -200,13 +200,13 @@ def combine_embedding(embedding_entire, feat, ind, v_sen, v_insen):
     ind_sen = ind[sen_mask]
     ind_insen = ind[insen_mask]
 
-    feat_index_sen = [[ind_sen[row]] * embedding_entire.shape[1]
-                      for row in range(sen_feat.shape[0])]
-    feat_index_insen = [[ind_insen[row]] * embedding_entire.shape[1]
-                        for row in range(insen_feat.shape[0])]
+    feat_index_sen = np.array([[ind_sen[row]] * embedding_entire.shape[1]
+                      for row in range(sen_feat.shape[0])])
+    feat_index_insen = np.array([[ind_insen[row]] * embedding_entire.shape[1]
+                        for row in range(insen_feat.shape[0])])
 
-    feat_index_sen = th.tensor(feat_index_sen)
-    feat_index_insen = th.tensor(feat_index_insen)
+    feat_index_sen = th.from_numpy(feat_index_sen)
+    feat_index_insen = th.from_numpy(feat_index_insen)
 
     embedding_entire_tmp = embedding_entire.scatter(0, feat_index_sen, sen_feat)
     # embedding_entire_2 = embedding_entire_1.scatter_add(0, feat_index_insen, insen_feat)
@@ -224,8 +224,8 @@ def store_embedding(embedding, feat, ind):
     feat = feat.cpu()
     embedding = embedding.cpu()
 
-    feat_index = [[ind[row] for col in range(embedding.shape[1])] for row in range(feat.shape[0])]
-    feat_index = th.tensor(feat_index)
+    feat_index = np.array([[ind[row]] * embedding.shape[1] for row in range(feat.shape[0])])
+    feat_index = th.from_numpy(feat_index)
     embedding = embedding.scatter(0, feat_index, feat)
 
     return embedding.to(device)

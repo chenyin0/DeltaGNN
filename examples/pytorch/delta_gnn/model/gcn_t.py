@@ -219,13 +219,13 @@ def combine_embedding(embedding_entire, feat, ind, v_sen, v_insen):
     #                   for row in range(sen_feat.shape[0])]
     # feat_index_insen = [[ind_insen[row] for col in range(embedding_entire.shape[1])]
     #                     for row in range(insen_feat.shape[0])]
-    feat_index_sen = [[ind_sen[row]] * embedding_entire.shape[1]
-                      for row in range(sen_feat.shape[0])]
-    feat_index_insen = [[ind_insen[row]] * embedding_entire.shape[1]
-                        for row in range(insen_feat.shape[0])]
+    feat_index_sen = np.array([[ind_sen[row]] * embedding_entire.shape[1]
+                      for row in range(sen_feat.shape[0])])
+    feat_index_insen = np.array([[ind_insen[row]] * embedding_entire.shape[1]
+                        for row in range(insen_feat.shape[0])])
 
-    feat_index_sen = th.tensor(feat_index_sen)
-    feat_index_insen = th.tensor(feat_index_insen)
+    feat_index_sen = th.from_numpy(feat_index_sen)
+    feat_index_insen = th.from_numpy(feat_index_insen)
 
     embedding_entire_tmp = embedding_entire.scatter(0, feat_index_sen, sen_feat)
     # embedding_entire_2 = embedding_entire_1.scatter_add(0, feat_index_insen, insen_feat)
@@ -243,20 +243,16 @@ def store_embedding(embedding, feat, ind):
     feat = feat.cpu()
     embedding = embedding.cpu()
 
-    print('Start to store embedding in delta training')
-
     # feat_index = [ind[row] for col in range(embedding.shape[1])] for row in range(feat.shape[0])]
-    feat_index = [[ind[row]] * embedding.shape[1] for row in range(feat.shape[0])]
-    feat_index = th.tensor(feat_index)
+    feat_index = np.array([[ind[row]] * embedding.shape[1] for row in range(feat.shape[0])])
+    feat_index = th.from_numpy(feat_index)
     embedding = embedding.scatter(0, feat_index, feat)
-
-    print('Finish store embedding in delta training')
 
     return embedding.to(device)
 
 
 def train_delta(model, device, train_loader, lr, weight_decay, v_sen=None, v_insen=None):
-    # print('>> Start training')
+    print('>> Start delta train')
     model.train()
     optimizer = Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
 
@@ -288,6 +284,7 @@ def train_delta(model, device, train_loader, lr, weight_decay, v_sen=None, v_ins
         # pbar.update(batch.batch_size)
         batch_base += batch.batch_size
 
+    print('>> Finish delta train')
     return np.mean(loss_list), time_epoch
 
 
