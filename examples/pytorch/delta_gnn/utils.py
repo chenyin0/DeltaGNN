@@ -8,6 +8,7 @@ import pdb
 import struct
 from torch_sparse import SparseTensor
 import copy as cp
+from collections import Counter
 
 
 def load_aminer_init(datastr, rmax, alpha):
@@ -184,21 +185,33 @@ def insert_edges_delta(edge_index_evo_delta, edge_dict, edge_index_inserted, thr
     v_deg_total = 0
     v_deg_delta = 0
 
+    # Access reduction
+    access_total = set()
+    access_delta = set()
+
+    # Computation reduction
+    comp_total = 0
+    comp_delta = 0
+
     for i in range(edge_index_inserted.shape[-1]):
         edge_src = edge_index_inserted[0][i].item()
         edge_dst = edge_index_inserted[1][i].item()
         if edge_dst in edge_dict:
             deg_v = len(edge_dict[edge_dst])
-            v_deg_total += deg_v
+            # v_deg_total += deg_v
             v_total.add(edge_dst)
             if deg_v > threshold:
                 v_sen.add(edge_dst)
                 v_deg_delta += deg_v
+                comp_delta += deg_v
+                access_delta.update(edge_dict[edge_dst])
             else:
                 v_insen.add(edge_dst)
                 edge_src_insen.append(edge_src)
                 edge_dst_insen.append(edge_dst)
                 v_deg_delta += 1
+                comp_delta += 1
+                access_delta.add(edge_dst)
 
     # Update edge_dict
     edge_dict = insert_edge_dict(edge_dict, edge_index_inserted)
@@ -214,6 +227,8 @@ def insert_edges_delta(edge_index_evo_delta, edge_dict, edge_index_inserted, thr
             dst_v = [node for i in range(len(nghs))]
             edge_src_sen.extend(src_v)
             edge_dst_sen.extend(dst_v)
+            # comp_delta += len(nghs)
+            # access_delta.update(nghs)
         nodes_q = cp.deepcopy(ngh_per_layer)
         ngh_per_layer.clear()
 
@@ -226,6 +241,9 @@ def insert_edges_delta(edge_index_evo_delta, edge_dict, edge_index_inserted, thr
             nghs = edge_dict[node]  # For graph is undirected, we can obtain src_v by dst_v
             ngh_per_layer.update(nghs)
             e_num_total += len(nghs)
+            v_deg_total += len(nghs)
+            comp_total += len(nghs)
+            access_total.update(nghs)
         nodes_q = cp.deepcopy(ngh_per_layer)
         ngh_per_layer.clear()
 
@@ -236,7 +254,9 @@ def insert_edges_delta(edge_index_evo_delta, edge_dict, edge_index_inserted, thr
 
     e_num_delta = edge_index_delta.shape[-1]
 
-    return edge_dict, edge_index_evo_delta, v_sen, v_insen, v_deg_total, v_deg_delta, e_num_total, e_num_delta
+    # return edge_dict, edge_index_evo_delta, v_sen, v_insen, v_deg_total, v_deg_delta, e_num_total, e_num_delta
+    return edge_dict, edge_index_evo_delta, v_sen, v_insen, comp_total, comp_delta, len(
+        access_total), len(access_delta)
 
 
 def load_sbm_init(datastr, rmax, alpha):
@@ -362,3 +382,22 @@ def read_packed_edges(f_path, pack_fmt):
             edge_src.append(src)
             edge_dst.append(dst)
         return edge_src, edge_dst
+
+
+def msg_count(inserted_edges, edge_dict, n_layers, threshold):
+    dst_v = inserted_edges[1]
+    dst_v = dst_v.tolist()
+
+    nodes_q = cp.deepcopy(dst_v)
+    ngh_per_layer = set()
+    # Traverse L-hops nghs of inserted nodes
+    for i in range(n_layers - 1):
+        for node in nodes_q:
+            nghs = edge_dict[node]  # For graph is undirected, we can obtain src_v by dst_v
+            dst_v.extend(nghs)
+            ngh_per_layer.update(nghs)
+        nodes_q = cp.deepcopy(ngh_per_layer)
+        ngh_per_layer.clear()
+
+    msg_count = Counter(dst_v)
+    return msg_count
