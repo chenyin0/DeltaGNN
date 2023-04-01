@@ -1,4 +1,5 @@
 import torch as th
+import torch
 import torch.nn as nn
 import torch.functional as F
 import torchmetrics.functional as MF
@@ -40,6 +41,15 @@ class SAGE(nn.Module):
             if l != len(self.layers) - 1:
                 h = self.activation(h)
                 h = self.dropout(h)
+
+            sign_a = torch.sign(h).int()
+            non_zero_a = torch.count_nonzero(sign_a, dim=1).reshape(1, -1).squeeze()
+            # print(non_zero_a.tolist())
+            non_zero_sum = sum(non_zero_a.tolist())
+            h_size = h.numel()
+            zero_num = h_size - non_zero_sum
+            print('Feat Sparsity: ', zero_num, h_size, round(zero_num / h_size, 3))
+
         return h
 
     def inference(self, g, device, batch_size):
@@ -69,7 +79,17 @@ class SAGE(nn.Module):
                 h = layer(blocks[0], x)  # len(blocks) = 1
                 if l != len(self.layers) - 1:
                     h = th.nn.functional.relu(h)
+
+                    sign_a = torch.sign(h).int()
+                    non_zero_a = torch.count_nonzero(sign_a, dim=1).reshape(1, -1).squeeze()
+                    # print(non_zero_a.tolist())
+                    non_zero_sum = sum(non_zero_a.tolist())
+                    h_size = h.numel()
+                    zero_num = h_size - non_zero_sum
+                    print('Feat Sparsity: ', zero_num, h_size, round(zero_num / h_size, 3))
+
                     h = self.dropout(h)
+
                 # by design, our output nodes are contiguous
                 y[output_nodes[0]:output_nodes[-1] + 1] = h.to(buffer_device)
             feat = y
@@ -123,8 +143,8 @@ def train(args, model, device, fanout, batch_size, lr, weight_decay):
             optimizer.step()
             total_loss += loss.item()
         acc = evaluate_with_sample(model, g, val_dataloader)
-        print("Epoch {:05d} | Loss {:.4f} | Accuracy {:.4f} ".format(epoch, total_loss / (it + 1),
-                                                                     acc.item()))
+        # print("Epoch {:05d} | Loss {:.4f} | Accuracy {:.4f} ".format(epoch, total_loss / (it + 1),
+        #                                                              acc.item()))
 
 
 def evaluate_with_sample(model, g, dataloader):

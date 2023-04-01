@@ -91,6 +91,15 @@ class GCN(nn.Module):
             h = layer(h, adj_t)
             h = self.bns[i](h)
             h = F.relu(h)
+
+            sign_a = torch.sign(h).int()
+            non_zero_a = torch.count_nonzero(sign_a, dim=1).reshape(1, -1).squeeze()
+            # print(non_zero_a.tolist())
+            non_zero_sum = sum(non_zero_a.tolist())
+            h_size = h.numel()
+            zero_num = h_size - non_zero_sum
+            print(zero_num, h_size, round(zero_num/h_size, 3))
+            
             h = F.dropout(h, p=self.dropout, training=self.training)
         h = self.layers[-1](h, adj_t)
         return h.log_softmax(dim=-1)

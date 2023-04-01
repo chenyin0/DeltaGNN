@@ -220,9 +220,9 @@ def combine_embedding(embedding_entire, feat, ind, v_sen, v_insen):
     # feat_index_insen = [[ind_insen[row] for col in range(embedding_entire.shape[1])]
     #                     for row in range(insen_feat.shape[0])]
     feat_index_sen = np.array([[ind_sen[row]] * embedding_entire.shape[1]
-                      for row in range(sen_feat.shape[0])])
+                               for row in range(sen_feat.shape[0])])
     feat_index_insen = np.array([[ind_insen[row]] * embedding_entire.shape[1]
-                        for row in range(insen_feat.shape[0])])
+                                 for row in range(insen_feat.shape[0])])
 
     feat_index_sen = th.from_numpy(feat_index_sen)
     feat_index_insen = th.from_numpy(feat_index_insen)
@@ -240,19 +240,19 @@ def combine_embedding(embedding_entire, feat, ind, v_sen, v_insen):
 def store_embedding(embedding, feat, ind):
     device = feat.device
     ind = ind.squeeze().cpu().numpy().tolist()
-    feat = feat.cpu()
+    feat_t = feat.cpu()
     embedding = embedding.cpu()
 
     # feat_index = [ind[row] for col in range(embedding.shape[1])] for row in range(feat.shape[0])]
-    feat_index = np.array([[ind[row]] * embedding.shape[1] for row in range(feat.shape[0])])
+    feat_index = np.array([[ind[row]] * embedding.shape[1] for row in range(feat_t.shape[0])])
     feat_index = th.from_numpy(feat_index)
-    embedding = embedding.scatter(0, feat_index, feat)
+    embedding = embedding.scatter(0, feat_index, feat_t)
 
     return embedding.to(device)
 
 
 def train_delta(model, device, train_loader, lr, weight_decay, v_sen=None, v_insen=None):
-    print('>> Start delta train')
+    # print('>> Start delta train')
     model.train()
     optimizer = Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
 
@@ -267,13 +267,11 @@ def train_delta(model, device, train_loader, lr, weight_decay, v_sen=None, v_ins
         out = model(x, edge_index)
         if y.shape[-1] > 1:
             y, ind = torch.split(y, 1, dim=1)
-            #     if v_sen is not None or v_insen is not None:
-            #         out, embedding = combine_embedding(model.embedding, out, ind, v_sen, v_insen)
-
-            # Update embedding
-            # model.embedding = torch.nn.Parameter(embedding)
+            if v_sen is not None or v_insen is not None:
+                out, embedding = combine_embedding(model.embedding, out, ind, v_sen, v_insen)
+                # Update embedding
+                model.embedding = torch.nn.Parameter(embedding)
             # model.embedding = store_embedding(model.embedding, out, ind)
-            model.embedding = store_embedding(model.embedding, out, ind)
         # loss = F.cross_entropy(out, y.squeeze(1))
         loss = F.nll_loss(out, y.squeeze(1))
         loss.backward()
@@ -284,7 +282,7 @@ def train_delta(model, device, train_loader, lr, weight_decay, v_sen=None, v_ins
         # pbar.update(batch.batch_size)
         batch_base += batch.batch_size
 
-    print('>> Finish delta train')
+    # print('>> Finish delta train')
     return np.mean(loss_list), time_epoch
 
 
@@ -322,7 +320,9 @@ def test_delta(model, device, loader, checkpt_file, v_sen=None, v_insen=None):
         if y.shape[-1] > 1:
             y, ind = torch.split(y, 1, dim=1)
             if v_sen is not None or v_insen is not None:
-                out, _ = combine_embedding(model.embedding, out, ind, v_sen, v_insen)
+                out, embedding = combine_embedding(model.embedding, out, ind, v_sen, v_insen)
+                model.embedding = torch.nn.Parameter(embedding)
+            # model.embedding = store_embedding(model.embedding, out, ind)
         out = out.log_softmax(dim=-1)
         # y_pred.append(torch.argmax(out, dim=1, keepdim=True).cpu())
         y_pred.append(torch.argmax(out, dim=-1, keepdim=True).cpu())

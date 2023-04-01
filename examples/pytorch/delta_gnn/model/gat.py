@@ -12,7 +12,7 @@ class GAT(nn.Module):
     def __init__(self, g, in_feats, n_hidden, n_classes, n_layers, activation, feat_drop, attn_drop,
                  heads):
         super().__init__()
-        # self.g = g
+        self.g = g
         self.layers = nn.ModuleList()
 
         if n_layers != len(heads):
@@ -72,6 +72,15 @@ class GAT(nn.Module):
                 h = h.mean(1)
             else:  # other layer(s)
                 h = h.flatten(1)
+            
+            sign_a = torch.sign(h).int()
+            non_zero_a = torch.count_nonzero(sign_a, dim=1).reshape(1, -1).squeeze()
+            # print(non_zero_a.tolist())
+            non_zero_sum = sum(non_zero_a.tolist())
+            h_size = h.numel()
+            zero_num = h_size - non_zero_sum
+            print('Feat Sparsity: ', zero_num, h_size, round(zero_num / h_size, 3))
+            
         return h
 
 
