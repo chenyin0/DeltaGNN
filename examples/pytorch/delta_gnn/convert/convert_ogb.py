@@ -8,7 +8,9 @@ import torch.nn.functional as F
 from torch_sparse import SparseTensor
 from torch_geometric.utils import to_undirected
 from ogb.nodeproppred import PygNodePropPredDataset
+from ogb.nodeproppred import DglNodePropPredDataset
 from torch_geometric.datasets import Planetoid
+from torch_geometric.datasets import Reddit
 import sklearn.preprocessing
 import tracemalloc
 import gc
@@ -52,7 +54,7 @@ def dropout_adj(edge_index, rmnode_idx, edge_attr=None, force_undirected=True, n
              torch.cat([new_col, new_row], dim=0)], dim=0)
         if edge_attr is not None:
             edge_attr = torch.cat([edge_attr, edge_attr], dim=0)
-        edge_index, edge_attr = coalesce(edge_index, edge_attr, N, N)
+        # edge_index, edge_attr = coalesce(edge_index, edge_attr, N, N)
     else:
         edge_index = torch.stack([new_row, new_col], dim=0)
     drop_edge_index = torch.stack([drop_row, drop_col], dim=0)  ### only u->v (no v->u)
@@ -66,121 +68,242 @@ def filter_adj(row, col, edge_attr, mask):
 
 def gen_dataset_snapshot(dataset_name, num_snap):
     if dataset_name == 'Cora' or dataset_name == 'CiteSeer' or dataset_name == 'PubMed':
-        dataset = Planetoid(name=dataset_name, root='../dataset/')
-        data = dataset[0]
-        n_classes = np.array(dataset.num_classes, dtype=np.int32)
-        train_idx = torch.nonzero(data.train_mask).squeeze()
-        val_idx = torch.nonzero(data.val_mask).squeeze()
-        test_idx = torch.nonzero(data.test_mask).squeeze()
-        # all_idx = torch.cat([train_idx, val_idx, test_idx])
-
-        base_path = '../data/' + dataset_name + '/' + dataset_name
-        # Feature normalization
-        feat = data.x.numpy()
-        feat = np.array(feat, dtype=np.float64)
-        scaler = sklearn.preprocessing.StandardScaler()
-        scaler.fit(feat)
-        feat = scaler.transform(feat)
-        np.save(base_path + '_feat.npy', feat)
-
-        #get labels
-        labels = data.y
-        labels = torch.unsqueeze(labels, 1)
-        # train_labels = labels.data[train_idx]
-        # val_labels = labels.data[val_idx]
-        # test_labels = labels.data[test_idx]
-        labels = np.array(labels, dtype=np.int32)
-
-        train_idx = train_idx.numpy()
-        val_idx = val_idx.numpy()
-        test_idx = test_idx.numpy()
-        train_idx = np.array(train_idx, dtype=np.int32)
-        val_idx = np.array(val_idx, dtype=np.int32)
-        test_idx = np.array(test_idx, dtype=np.int32)
-
-        np.savez(base_path + '_labels.npz',
-                 train_idx=train_idx,
-                 val_idx=val_idx,
-                 test_idx=test_idx,
-                 labels=labels,
-                 n_classes=n_classes)
-
-        data.edge_index = to_undirected(data.edge_index, data.num_nodes)
-        # data.edge_index, drop_edge_index, _ = dropout_adj(data.edge_index,
-        #                                                   train_idx,
-        #                                                   num_nodes=data.num_nodes)
-
-        # test_num = len(test_idx)
-        drop_idx = np.append(train_idx, val_idx)
-        # drop_idx = np.append(drop_idx, test_idx)
-        data.edge_index, drop_edge_index, _ = dropout_adj(data.edge_index,
-                                                          drop_idx,
-                                                          num_nodes=data.num_nodes)
-
-        data.edge_index = to_undirected(data.edge_index, data.num_nodes)
-
-        # r_indexes = np.arange(len(drop_edge_index[0]))
-        # np.random.shuffle(r_indexes)
-        # drop_edge_index[0] = drop_edge_index[0][r_indexes]
-        # drop_edge_index[1] = drop_edge_index[1][r_indexes]
-
-        row_drop, col_drop = np.array(drop_edge_index)
-
-        f = open(base_path + '_update_full.txt', 'w+')
-        for k in range(row_drop.shape[0]):
-            v_from = row_drop[k]
-            v_to = col_drop[k]
-            f.write('%d %d\n' % (v_from, v_to))
-            f.write('%d %d\n' % (v_to, v_from))
-        f.close()
-
-        row, col = data.edge_index
-        print(row_drop.shape)
-        row = row.numpy()
-        col = col.numpy()
-
-        # # Write edge_idx (src_edge, dst_edge)
-        # write_packed_edges('../data/arxiv/arxiv_init_src_edge.txt', 'I', row)
-        # write_packed_edges('../data/arxiv/arxiv_init_dst_edge.txt', 'I', col)
-
-        # Write edge_idx (src_edge, dst_edge)
-        write_packed_edges(base_path + '_init_edges.txt', row, col)
-
-        # save_adj(row, col, N=data.num_nodes, dataset_name='arxiv', savename='arxiv_init', snap='init')
-        snapshot = math.floor(row_drop.shape[0] / num_snap)
-        print('num_snap: ', num_snap)
-
-        for sn in range(num_snap):
-            print(sn)
-            row_sn = row_drop[sn * snapshot:(sn + 1) * snapshot]
-            col_sn = col_drop[sn * snapshot:(sn + 1) * snapshot]
-            if sn == 0:
-                row_tmp = row
-                col_tmp = col
-
-            row_tmp = np.concatenate((row_tmp, row_sn))
-            col_tmp = np.concatenate((col_tmp, col_sn))
-            row_tmp = np.concatenate((row_tmp, col_sn))
-            col_tmp = np.concatenate((col_tmp, row_sn))
-            # if (sn + 1) % 20 == 0 or (sn + 1) == num_snap:
-            # save_adj(row_tmp,
-            #         col_tmp,
-            #         N=data.num_nodes,
-            #         dataset_name='arxiv',
-            #         savename='arxiv_snap' + str(sn + 1),
-            #         snap=(sn + 1))
-
-            with open(base_path + '_Edgeupdate_snap' + str(sn + 1) + '.txt', 'w') as f:
-                for i, j in zip(row_sn, col_sn):
-                    f.write("%d %d\n" % (i, j))
-                    f.write("%d %d\n" % (j, i))
-        print(dataset_name + ' -- save snapshots finish')
+        planetoid(dataset_name, num_snap)
+    elif dataset_name == 'reddit':
+        reddit(num_snap)
     elif dataset_name == 'arxiv':
         arxiv(num_snap)
+    elif dataset_name == 'mag':
+        mag(num_snap)
     elif dataset_name == 'products':
         products(num_snap)
     elif dataset_name == 'arpapers100Mxiv':
         papers100M(num_snap)
+
+
+def planetoid(dataset_name, num_snap):
+    dataset = Planetoid(name=dataset_name, root='../dataset/')
+    data = dataset[0]
+    n_classes = np.array(dataset.num_classes, dtype=np.int32)
+    train_idx = torch.nonzero(data.train_mask).squeeze()
+    val_idx = torch.nonzero(data.val_mask).squeeze()
+    test_idx = torch.nonzero(data.test_mask).squeeze()
+    # all_idx = torch.cat([train_idx, val_idx, test_idx])
+
+    base_path = '../data/' + dataset_name + '/' + dataset_name
+    # Feature normalization
+    feat = data.x.numpy()
+    feat = np.array(feat, dtype=np.float64)
+    scaler = sklearn.preprocessing.StandardScaler()
+    scaler.fit(feat)
+    feat = scaler.transform(feat)
+    np.save(base_path + '_feat.npy', feat)
+
+    #get labels
+    labels = data.y
+    labels = torch.unsqueeze(labels, 1)
+    # train_labels = labels.data[train_idx]
+    # val_labels = labels.data[val_idx]
+    # test_labels = labels.data[test_idx]
+    labels = np.array(labels, dtype=np.int32)
+
+    train_idx = train_idx.numpy()
+    val_idx = val_idx.numpy()
+    test_idx = test_idx.numpy()
+    train_idx = np.array(train_idx, dtype=np.int32)
+    val_idx = np.array(val_idx, dtype=np.int32)
+    test_idx = np.array(test_idx, dtype=np.int32)
+
+    np.savez(base_path + '_labels.npz',
+             train_idx=train_idx,
+             val_idx=val_idx,
+             test_idx=test_idx,
+             labels=labels,
+             n_classes=n_classes)
+
+    data.edge_index = to_undirected(data.edge_index, data.num_nodes)
+    # data.edge_index, drop_edge_index, _ = dropout_adj(data.edge_index,
+    #                                                   train_idx,
+    #                                                   num_nodes=data.num_nodes)
+
+    # test_num = len(test_idx)
+    drop_idx = np.append(train_idx, val_idx)
+    # drop_idx = np.append(drop_idx, test_idx)
+    data.edge_index, drop_edge_index, _ = dropout_adj(data.edge_index,
+                                                      drop_idx,
+                                                      num_nodes=data.num_nodes)
+
+    data.edge_index = to_undirected(data.edge_index, data.num_nodes)
+
+    # r_indexes = np.arange(len(drop_edge_index[0]))
+    # np.random.shuffle(r_indexes)
+    # drop_edge_index[0] = drop_edge_index[0][r_indexes]
+    # drop_edge_index[1] = drop_edge_index[1][r_indexes]
+
+    row_drop, col_drop = np.array(drop_edge_index)
+
+    f = open(base_path + '_update_full.txt', 'w+')
+    for k in range(row_drop.shape[0]):
+        v_from = row_drop[k]
+        v_to = col_drop[k]
+        f.write('%d %d\n' % (v_from, v_to))
+        f.write('%d %d\n' % (v_to, v_from))
+    f.close()
+
+    row, col = data.edge_index
+    print(row_drop.shape)
+    row = row.numpy()
+    col = col.numpy()
+
+    # # Write edge_idx (src_edge, dst_edge)
+    # write_packed_edges('../data/arxiv/arxiv_init_src_edge.txt', 'I', row)
+    # write_packed_edges('../data/arxiv/arxiv_init_dst_edge.txt', 'I', col)
+
+    # Write edge_idx (src_edge, dst_edge)
+    write_packed_edges(base_path + '_init_edges.txt', row, col)
+
+    # save_adj(row, col, N=data.num_nodes, dataset_name='arxiv', savename='arxiv_init', snap='init')
+    snapshot = math.floor(row_drop.shape[0] / num_snap)
+    print('num_snap: ', num_snap)
+
+    for sn in range(num_snap):
+        print(sn)
+        row_sn = row_drop[sn * snapshot:(sn + 1) * snapshot]
+        col_sn = col_drop[sn * snapshot:(sn + 1) * snapshot]
+        if sn == 0:
+            row_tmp = row
+            col_tmp = col
+
+        row_tmp = np.concatenate((row_tmp, row_sn))
+        col_tmp = np.concatenate((col_tmp, col_sn))
+        row_tmp = np.concatenate((row_tmp, col_sn))
+        col_tmp = np.concatenate((col_tmp, row_sn))
+        # if (sn + 1) % 20 == 0 or (sn + 1) == num_snap:
+        # save_adj(row_tmp,
+        #         col_tmp,
+        #         N=data.num_nodes,
+        #         dataset_name='arxiv',
+        #         savename='arxiv_snap' + str(sn + 1),
+        #         snap=(sn + 1))
+
+        with open(base_path + '_Edgeupdate_snap' + str(sn + 1) + '.txt', 'w') as f:
+            for i, j in zip(row_sn, col_sn):
+                f.write("%d %d\n" % (i, j))
+                f.write("%d %d\n" % (j, i))
+    print(dataset_name + ' -- save snapshots finish')
+
+
+def reddit(num_snap):
+    dataset_name = 'reddit'
+    dataset = Reddit('../dataset')
+    data = dataset[0]
+    n_classes = np.array(dataset.num_classes, dtype=np.int32)
+    train_idx = torch.nonzero(data.train_mask).squeeze()
+    val_idx = torch.nonzero(data.val_mask).squeeze()
+    test_idx = torch.nonzero(data.test_mask).squeeze()
+    # all_idx = torch.cat([train_idx, val_idx, test_idx])
+
+    base_path = '../data/' + dataset_name + '/' + dataset_name
+    # Feature normalization
+    feat = data.x.numpy()
+    feat = np.array(feat, dtype=np.float64)
+    scaler = sklearn.preprocessing.StandardScaler()
+    scaler.fit(feat)
+    feat = scaler.transform(feat)
+    np.save(base_path + '_feat.npy', feat)
+
+    #get labels
+    labels = data.y
+    labels = torch.unsqueeze(labels, 1)
+    # train_labels = labels.data[train_idx]
+    # val_labels = labels.data[val_idx]
+    # test_labels = labels.data[test_idx]
+    labels = np.array(labels, dtype=np.int32)
+
+    train_idx = train_idx.numpy()
+    val_idx = val_idx.numpy()
+    test_idx = test_idx.numpy()
+    train_idx = np.array(train_idx, dtype=np.int32)
+    val_idx = np.array(val_idx, dtype=np.int32)
+    test_idx = np.array(test_idx, dtype=np.int32)
+
+    np.savez(base_path + '_labels.npz',
+             train_idx=train_idx,
+             val_idx=val_idx,
+             test_idx=test_idx,
+             labels=labels,
+             n_classes=n_classes)
+
+    data.edge_index = to_undirected(data.edge_index, data.num_nodes)
+    # data.edge_index, drop_edge_index, _ = dropout_adj(data.edge_index,
+    #                                                   train_idx,
+    #                                                   num_nodes=data.num_nodes)
+
+    # test_num = len(test_idx)
+    drop_idx = train_idx
+    # drop_idx = np.append(drop_idx, test_idx)
+    data.edge_index, drop_edge_index, _ = dropout_adj(data.edge_index,
+                                                      drop_idx,
+                                                      num_nodes=data.num_nodes)
+
+    data.edge_index = to_undirected(data.edge_index, data.num_nodes)
+
+    # r_indexes = np.arange(len(drop_edge_index[0]))
+    # np.random.shuffle(r_indexes)
+    # drop_edge_index[0] = drop_edge_index[0][r_indexes]
+    # drop_edge_index[1] = drop_edge_index[1][r_indexes]
+
+    row_drop, col_drop = np.array(drop_edge_index)
+
+    f = open(base_path + '_update_full.txt', 'w+')
+    for k in range(row_drop.shape[0]):
+        v_from = row_drop[k]
+        v_to = col_drop[k]
+        f.write('%d %d\n' % (v_from, v_to))
+        f.write('%d %d\n' % (v_to, v_from))
+    f.close()
+
+    row, col = data.edge_index
+    print(row_drop.shape)
+    row = row.numpy()
+    col = col.numpy()
+
+    # # Write edge_idx (src_edge, dst_edge)
+    # write_packed_edges('../data/arxiv/arxiv_init_src_edge.txt', 'I', row)
+    # write_packed_edges('../data/arxiv/arxiv_init_dst_edge.txt', 'I', col)
+
+    # Write edge_idx (src_edge, dst_edge)
+    write_packed_edges(base_path + '_init_edges.txt', row, col)
+
+    # save_adj(row, col, N=data.num_nodes, dataset_name='arxiv', savename='arxiv_init', snap='init')
+    snapshot = math.floor(row_drop.shape[0] / num_snap)
+    print('num_snap: ', num_snap)
+
+    for sn in range(num_snap):
+        print(sn)
+        row_sn = row_drop[sn * snapshot:(sn + 1) * snapshot]
+        col_sn = col_drop[sn * snapshot:(sn + 1) * snapshot]
+        if sn == 0:
+            row_tmp = row
+            col_tmp = col
+
+        row_tmp = np.concatenate((row_tmp, row_sn))
+        col_tmp = np.concatenate((col_tmp, col_sn))
+        row_tmp = np.concatenate((row_tmp, col_sn))
+        col_tmp = np.concatenate((col_tmp, row_sn))
+        # if (sn + 1) % 20 == 0 or (sn + 1) == num_snap:
+        # save_adj(row_tmp,
+        #         col_tmp,
+        #         N=data.num_nodes,
+        #         dataset_name='arxiv',
+        #         savename='arxiv_snap' + str(sn + 1),
+        #         snap=(sn + 1))
+
+        with open(base_path + '_Edgeupdate_snap' + str(sn + 1) + '.txt', 'w') as f:
+            for i, j in zip(row_sn, col_sn):
+                f.write("%d %d\n" % (i, j))
+                f.write("%d %d\n" % (j, i))
+    print(dataset_name + ' -- save snapshots finish')
 
 
 def arxiv(num_snap):
@@ -278,6 +401,108 @@ def arxiv(num_snap):
                 f.write("%d %d\n" % (i, j))
                 f.write("%d %d\n" % (j, i))
     print('Arxiv -- save snapshots finish')
+
+
+def mag(num_snap):
+    """
+    Error tokenizing data.
+    Move the dataset generation of Mag to train_evo.py
+    """
+
+    dataset = DglNodePropPredDataset(name='ogbn-mag', root='../dataset/')
+    data = dataset[0]
+    n_classes = np.array(dataset.meta_info['num classes'], dtype=np.int32)
+    split_idx = dataset.get_idx_split()
+    train_idx, val_idx, test_idx = split_idx['train'], split_idx['valid'], split_idx['test']
+    all_idx = torch.cat([train_idx, val_idx, test_idx])
+
+    # Feature normalization
+    feat = data.x.numpy()
+    feat = np.array(feat, dtype=np.float64)
+    scaler = sklearn.preprocessing.StandardScaler()
+    scaler.fit(feat)
+    feat = scaler.transform(feat)
+    np.save('../data/mag/mag_feat.npy', feat)
+
+    #get labels
+    labels = data.y
+    train_labels = labels.data[train_idx]
+    val_labels = labels.data[val_idx]
+    test_labels = labels.data[test_idx]
+    labels = np.array(labels, dtype=np.int32)
+
+    train_idx = train_idx.numpy()
+    val_idx = val_idx.numpy()
+    test_idx = test_idx.numpy()
+    train_idx = np.array(train_idx, dtype=np.int32)
+    val_idx = np.array(val_idx, dtype=np.int32)
+    test_idx = np.array(test_idx, dtype=np.int32)
+
+    np.savez('../data/mag/mag_labels.npz',
+             train_idx=train_idx,
+             val_idx=val_idx,
+             test_idx=test_idx,
+             labels=labels,
+             n_classes=n_classes)
+
+    data.edge_index = to_undirected(data.edge_index, data.num_nodes)
+    data.edge_index, drop_edge_index, _ = dropout_adj(data.edge_index,
+                                                      train_idx,
+                                                      num_nodes=data.num_nodes)
+    data.edge_index = to_undirected(data.edge_index, data.num_nodes)
+
+    row_drop, col_drop = np.array(drop_edge_index)
+
+    f = open('../data/mag/ogbn-mag_update_full.txt', 'w+')
+    for k in range(row_drop.shape[0]):
+        v_from = row_drop[k]
+        v_to = col_drop[k]
+        f.write('%d %d\n' % (v_from, v_to))
+        f.write('%d %d\n' % (v_to, v_from))
+    f.close()
+
+    row, col = data.edge_index
+    print(row_drop.shape)
+    row = row.numpy()
+    col = col.numpy()
+
+    # # Write edge_idx (src_edge, dst_edge)
+    # write_packed_edges('../data/arxiv/arxiv_init_src_edge.txt', 'I', row)
+    # write_packed_edges('../data/arxiv/arxiv_init_dst_edge.txt', 'I', col)
+
+    # Write edge_idx (src_edge, dst_edge)
+    write_packed_edges('../data/mag/mag_init_edges.txt', row, col)
+
+    # save_adj(row, col, N=data.num_nodes, dataset_name='arxiv', savename='arxiv_init', snap='init')
+    # num_snap = 16
+    snapshot = math.floor(row_drop.shape[0] / num_snap)
+    print('num_snap: ', num_snap)
+
+    for sn in range(num_snap):
+        print(sn)
+        row_sn = row_drop[sn * snapshot:(sn + 1) * snapshot]
+        col_sn = col_drop[sn * snapshot:(sn + 1) * snapshot]
+        if sn == 0:
+            row_tmp = row
+            col_tmp = col
+
+        row_tmp = np.concatenate((row_tmp, row_sn))
+        col_tmp = np.concatenate((col_tmp, col_sn))
+        row_tmp = np.concatenate((row_tmp, col_sn))
+        col_tmp = np.concatenate((col_tmp, row_sn))
+        # if (sn + 1) % 20 == 0 or (sn + 1) == num_snap:
+        # save_adj(row_tmp,
+        #          col_tmp,
+        #          N=data.num_nodes,
+        #          dataset_name='arxiv',
+        #          savename='arxiv_snap' + str(sn + 1),
+        #          snap=(sn + 1))
+
+        with open('../data/mag/mag_Edgeupdate_snap' + str(sn + 1) + '.txt', 'w') as f:
+            for i, j in zip(row_sn, col_sn):
+                f.write("%d %d\n" % (i, j))
+                f.write("%d %d\n" % (j, i))
+    print('Mag -- save snapshots finish')
 
 
 def products(num_snap):
@@ -562,9 +787,11 @@ if __name__ == "__main__":
     # products()
     # arxiv()
 
-    # gen_dataset_snapshot('Cora', 10)
+    gen_dataset_snapshot('Cora', 10)
     # gen_dataset_snapshot('CiteSeer', 10)
     # gen_dataset_snapshot('PubMed', 10)
     # gen_dataset_snapshot('arxiv', 16)
-    gen_dataset_snapshot('products', 16)
+    # gen_dataset_snapshot('reddit', 16)
+    # gen_dataset_snapshot('products', 16)
+    # gen_dataset_snapshot('mag', 16)
     # gen_dataset_snapshot('papers100M', 20)
