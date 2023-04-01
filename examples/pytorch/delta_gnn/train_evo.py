@@ -15,6 +15,7 @@ import preprocess
 from ogb.nodeproppred import PygNodePropPredDataset
 
 import util
+import utils
 import g_update
 import random
 
@@ -122,6 +123,7 @@ def main(args):
 
     if args.dataset == 'ogbn-mag':
         g = preprocess.ogbn_mag_preprocess(dataset)
+        utils.mag(dataset, 16) 
     else:
         g = dataset[0]
 
@@ -717,21 +719,21 @@ if __name__ == '__main__':
                         help="degree threshold of neighbors nodes")
     args = parser.parse_args()
 
-    args.model = 'gcn'
+    # args.model = 'gcn'
     # args.model = 'graphsage'
-    # args.model = 'gat'
+    args.model = 'gat'
     # args.model = 'gin'
 
-    args.dataset = 'cora'
+    # args.dataset = 'cora'
     # args.dataset = 'citeseer'
     # args.dataset = 'pubmed'
     # args.dataset = 'reddit'
     # args.dataset = 'ogbn-arxiv'
     # args.dataset = 'ogbn-products'
-    # args.dataset = 'ogbn-mag'
+    args.dataset = 'ogbn-mag'
 
     args.n_epochs = 100
-    args.gpu = 1
+    args.gpu = 0
     # args.mode = 'mixed'
 
     dump_accuracy_flag = 1
