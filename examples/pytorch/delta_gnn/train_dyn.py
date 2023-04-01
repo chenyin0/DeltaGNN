@@ -294,8 +294,8 @@ def main(args):
     comp_reduct_avg = comp_reduct_list[-1]
     # print('Aggr_reduct_avg: {:.2f}%, Comb_reduct_avg: {:.2f}%'.format(aggr_reduct_avg,
     #                                                                   comb_reduct_avg))
-    print('Aggr_reduct_avg: {:.2f}%, Comb_reduct_avg: {:.2f}%'.format(access_reduct_avg,
-                                                                      comp_reduct_avg))
+    print('Access_reduct_avg: {:.2f}%, Comp_reduct_avg: {:.2f}%'.format(
+        access_reduct_avg, comp_reduct_avg))
 
     print('\n>> Task {:s} execution time: {}'.format(
         args.dataset, util.time_format(time.perf_counter() - Task_time_start)))
@@ -532,18 +532,18 @@ if __name__ == '__main__':
     parser.add_argument('--gpu', type=int, default=-1, help='gpu')
     args = parser.parse_args()
 
-    # args.model = 'gcn'
+    args.model = 'gcn'
     # args.model = 'graphsage'
     # args.model = 'gat'
     # args.model = 'gin'
 
-    # args.dataset = 'Cora'
+    args.dataset = 'Cora'
     # args.dataset = 'CiteSeer'
     # args.dataset = 'PubMed'
     # args.dataset = 'arxiv'
     # args.dataset = 'products'
 
-    # args.threshold = 5
+    args.threshold = 10
 
     # args.layer = 2
     # args.hidden = 128
@@ -551,9 +551,9 @@ if __name__ == '__main__':
     # args.weight_decay = 0
     # args.dropout = 0.5
     # args.epochs = 1
-    args.gpu = 1
-    # args.batch_size = pow(2, 13)
-    args.batch_size = pow(2, 8)
+    args.gpu = 0
+    args.batch_size = pow(2, 13)
+    # args.batch_size = pow(2, 8)
 
     print('\n************ {:s} ************'.format(args.dataset))
     print('>> Task start time: ', time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()))
