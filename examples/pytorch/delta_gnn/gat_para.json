@@ -1,14 +1,41 @@
 {
   "Cora": {
-    "--n-hidden": 8,
-    "--n-layers": 2,
-    "--weight-decay": 0.005,
-    "--lr": 0.005,
+    "--n-hidden": 250,
+    "--n-layers": 3,
+    "--weight-decay": 0,
+    "--lr": 0.002,
     "--feat-drop": 0.5,
-    "--attn-drop": 0.6,
-    "--heads": "8,1"
+    "--attn-drop": 0,
+    "--heads": "3,3,1"
   },
   "CiteSeer": {
+    "--n-hidden": 250,
+    "--n-layers": 3,
+    "--weight-decay": 0,
+    "--lr": 0.002,
+    "--feat-drop": 0.5,
+    "--attn-drop": 0,
+    "--heads": "3,3,1"
+  },
+  "PubMed": {
+    "--n-hidden": 250,
+    "--n-layers": 3,
+    "--weight-decay": 0,
+    "--lr": 0.002,
+    "--feat-drop": 0.5,
+    "--attn-drop": 0,
+    "--heads": "3,3,1"
+  },
+  "cora": {
+    "--n-hidden": 8,
+    "--n-layers": 6,
+    "--weight-decay": 0.005,
+    "--lr": 0.005,
+    "--feat-drop": 0.5,
+    "--attn-drop": 0.6,
+    "--heads": "8,1,1,1,1,1"
+  },
+  "citeseer": {
     "--n-hidden": 8,
     "--n-layers": 2,
     "--weight-decay": 0.005,
@@ -17,7 +44,7 @@
     "--attn-drop": 0.6,
     "--heads": "8,1"
   },
-  "PubMed": {
+  "pubmed": {
     "--n-hidden": 8,
     "--n-layers": 2,
     "--weight-decay": 0.005,
@@ -27,6 +54,33 @@
     "--heads": "8,1"
   },
   "reddit": {
+    "--n-hidden": 250,
+    "--n-layers": 3,
+    "--weight-decay": 0,
+    "--lr": 0.002,
+    "--feat-drop": 0.5,
+    "--attn-drop": 0,
+    "--heads": "3,3,1"
+  },
+  "arxiv": {
+    "--n-hidden": 250,
+    "--n-layers": 3,
+    "--weight-decay": 0,
+    "--lr": 0.002,
+    "--feat-drop": 0.5,
+    "--attn-drop": 0,
+    "--heads": "3,3,1"
+  },
+  "mag": {
+    "--n-hidden": 250,
+    "--n-layers": 3,
+    "--weight-decay": 0,
+    "--lr": 0.002,
+    "--feat-drop": 0.5,
+    "--attn-drop": 0,
+    "--heads": "3,3,1"
+  },
+  "ogbn-mag": {
     "--n-hidden": 8,
     "--n-layers": 2,
     "--weight-decay": 0.0005,
@@ -35,16 +89,7 @@
     "--attn-drop": 0.6,
     "--heads": "8,1"
   },
-  "arxiv": {
-    "--n-hidden": 8,
-    "--n-layers": 2,
-    "--weight-decay": 0,
-    "--lr": 0.005,
-    "--feat-drop": 0.5,
-    "--attn-drop": 0.6,
-    "--heads": "8,1"
-  },
-  "ogbn-mag": {
+  "products": {
     "--n-hidden": 8,
     "--n-layers": 2,
     "--weight-decay": 0.0005,

@@ -6,6 +6,13 @@
     "--lr": 0.01,
     "--dropout": 0.5
   },
+  "cora": {
+    "--n-hidden": 128,
+    "--n-layers": 6,
+    "--weight-decay": 0.0005,
+    "--lr": 0.01,
+    "--dropout": 0.5
+  },
   "CiteSeer": {
     "--n-hidden": 128,
     "--n-layers": 2,
@@ -13,9 +20,23 @@
     "--lr": 0.01,
     "--dropout": 0.5
   },
+  "citeseer": {
+    "--n-hidden": 128,
+    "--n-layers": 6,
+    "--weight-decay": 0.0005,
+    "--lr": 0.01,
+    "--dropout": 0.5
+  },
   "PubMed": {
     "--n-hidden": 128,
     "--n-layers": 2,
+    "--weight-decay": 0.0005,
+    "--lr": 0.01,
+    "--dropout": 0.5
+  },
+  "pubmed": {
+    "--n-hidden": 128,
+    "--n-layers": 6,
     "--weight-decay": 0.0005,
     "--lr": 0.01,
     "--dropout": 0.5
@@ -30,6 +51,27 @@
   "arxiv": {
     "--n-hidden": 128,
     "--n-layers": 2,
+    "--weight-decay": 0.0005,
+    "--lr": 0.01,
+    "--dropout": 0.5
+  },
+  "mag": {
+    "--n-hidden": 128,
+    "--n-layers": 2,
+    "--weight-decay": 0.0005,
+    "--lr": 0.01,
+    "--dropout": 0.5
+  },
+  "products": {
+    "--n-hidden": 128,
+    "--n-layers": 2,
+    "--weight-decay": 0.0005,
+    "--lr": 0.01,
+    "--dropout": 0.5
+  },
+  "ogbn-arxiv": {
+    "--n-hidden": 128,
+    "--n-layers": 6,
     "--weight-decay": 0,
     "--lr": 0.01,
     "--dropout": 0.5

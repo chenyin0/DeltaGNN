@@ -26,6 +26,33 @@
     "--lr": 0.001,
     "--dropout": 0.5
   },
+  "cora": {
+    "--n-hidden": 32,
+    "--n-layers": 3,
+    "--fan-out": "10,25",
+    "--batch-size": 1024,
+    "--weight-decay": 0.0005,
+    "--lr": 0.001,
+    "--dropout": 0.5
+  },
+  "citeseer": {
+    "--n-hidden": 32,
+    "--n-layers": 3,
+    "--fan-out": "10,25",
+    "--batch-size": 1024,
+    "--weight-decay": 0.0005,
+    "--lr": 0.001,
+    "--dropout": 0.5
+  },
+  "pubmed": {
+    "--n-hidden": 32,
+    "--n-layers": 3,
+    "--fan-out": "10,25",
+    "--batch-size": 1024,
+    "--weight-decay": 0.0005,
+    "--lr": 0.001,
+    "--dropout": 0.5
+  },
   "reddit": {
     "--n-hidden": 32,
     "--n-layers": 2,
@@ -36,6 +63,33 @@
     "--dropout": 0.5
   },
   "arxiv": {
+    "--n-hidden": 32,
+    "--n-layers": 2,
+    "--fan-out": "10,25",
+    "--batch-size": 1024,
+    "--weight-decay": 0,
+    "--lr": 0.01,
+    "--dropout": 0.5
+  },
+  "mag": {
+    "--n-hidden": 32,
+    "--n-layers": 2,
+    "--fan-out": "10,25",
+    "--batch-size": 1024,
+    "--weight-decay": 0,
+    "--lr": 0.01,
+    "--dropout": 0.5
+  },
+  "products": {
+    "--n-hidden": 32,
+    "--n-layers": 2,
+    "--fan-out": "10,25",
+    "--batch-size": 1024,
+    "--weight-decay": 0,
+    "--lr": 0.001,
+    "--dropout": 0.5
+  },
+  "ogbn-arxiv": {
     "--n-hidden": 32,
     "--n-layers": 2,
     "--fan-out": "10,25",
