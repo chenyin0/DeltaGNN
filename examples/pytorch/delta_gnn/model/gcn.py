@@ -8,9 +8,9 @@ References:
 import torch
 import torch as th
 import torch.nn as nn
-from dgl.nn.pytorch import GraphConv
+# from dgl.nn.pytorch import GraphConv
 from torch_geometric.nn import GCNConv
-from .graphconv_delta import GraphConv_delta
+# from .graphconv_delta import GraphConv_delta
 import torch.nn.functional as F
 from torch.optim import Adam
 # from ogb.nodeproppred import Evaluator, PygNodePropPredDataset
