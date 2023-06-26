@@ -8,9 +8,9 @@ References:
 import torch
 import torch as th
 import torch.nn as nn
-from dgl.nn.pytorch import GraphConv
+# from dgl.nn.pytorch import GraphConv
 from torch_geometric.nn import GCNConv
-from .graphconv_delta import GraphConv_delta
+# from .graphconv_delta import GraphConv_delta
 import torch.nn.functional as F
 from torch.optim import Adam
 # from ogb.nodeproppred import Evaluator, PygNodePropPredDataset
@@ -39,7 +39,9 @@ class GCN(nn.Module):
 
     def reset_parameters(self):
         for layer in self.layers:
+            # print(layer.lin.weight)
             layer.reset_parameters()
+            # print(layer.lin.weight)
         for bn in self.bns:
             bn.reset_parameters()
 
@@ -50,7 +52,8 @@ class GCN(nn.Module):
             h = F.relu(h)
             h = F.dropout(h, p=self.dropout, training=self.training)
         h = self.layers[-1](h, edge_index)
-        return h.log_softmax(dim=-1)
+        # return h.log_softmax(dim=-1)
+        return h
 
 
 def train(model, device, train_loader, lr, weight_decay):
@@ -65,7 +68,8 @@ def train(model, device, train_loader, lr, weight_decay):
         x, edge_index, y = batch.x.to(device), batch.edge_index.to(device), batch.y.to(device)
         optimizer.zero_grad()
         out = model(x, edge_index)
-        loss = F.nll_loss(out, y.squeeze(1))
+        # loss = F.nll_loss(out, y.squeeze(1))
+        loss = F.cross_entropy(out, y.squeeze(1))
         loss.backward()
         optimizer.step()
         time_epoch += (time.time() - t_st)
@@ -159,8 +163,9 @@ class GCN_delta(nn.Module):
             h = F.relu(h)
             h = F.dropout(h, p=self.dropout, training=self.training)
         h = self.layers[-1](h, edge_index)
-        return h.log_softmax(dim=-1)
-
+        # return h.log_softmax(dim=-1)
+        return h
+    
 
 def combine_embedding(embedding_entire, feat, ind, v_sen, v_insen):
     """
@@ -258,7 +263,7 @@ def train_delta(model, device, train_loader, lr, weight_decay, v_sen=None, v_ins
 
     time_epoch = 0
     loss_list = []
-    batch_base = 0
+    # batch_base = 0
     for step, batch in enumerate(train_loader):
         t_st = time.time()
         x, edge_index, y = batch.x.to(device), batch.edge_index.to(device), batch.y.to(device)
@@ -272,15 +277,15 @@ def train_delta(model, device, train_loader, lr, weight_decay, v_sen=None, v_ins
                 # Update embedding
                 model.embedding = torch.nn.Parameter(embedding)
             # model.embedding = store_embedding(model.embedding, out, ind)
-        # loss = F.cross_entropy(out, y.squeeze(1))
-        loss = F.nll_loss(out, y.squeeze(1))
+        loss = F.cross_entropy(out, y.squeeze(1))
+        # loss = F.nll_loss(out, y.squeeze(1))
         loss.backward()
         optimizer.step()
         time_epoch += (time.time() - t_st)
         loss_list.append(loss.item())
         # print(loss.item())
         # pbar.update(batch.batch_size)
-        batch_base += batch.batch_size
+        # batch_base += batch.batch_size
 
     # print('>> Finish delta train')
     return np.mean(loss_list), time_epoch
@@ -320,7 +325,7 @@ def test_delta(model, device, loader, checkpt_file, v_sen=None, v_insen=None):
         if y.shape[-1] > 1:
             y, ind = torch.split(y, 1, dim=1)
             if v_sen is not None or v_insen is not None:
-                out, embedding = combine_embedding(model.embedding, out, ind, v_sen, v_insen)
+                out, embedding = combine_embedding(model.embedding, out, ind, v_sen, v_insen)         
                 model.embedding = torch.nn.Parameter(embedding)
             # model.embedding = store_embedding(model.embedding, out, ind)
         out = out.log_softmax(dim=-1)
