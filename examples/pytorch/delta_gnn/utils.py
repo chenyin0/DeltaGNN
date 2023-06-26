@@ -207,8 +207,8 @@ def insert_edges_delta(edge_index_evo_delta, edge_dict, edge_index_inserted, thr
                 v_sen.add(edge_dst)
                 v_deg_delta += deg_v
                 if edge_dst not in has_visited:
-                    comp_delta += deg_v
-                    access_delta.update(edge_dict[edge_dst])
+                    # comp_delta += deg_v
+                    # access_delta.update(edge_dict[edge_dst])
                     has_visited.add(edge_dst)
             else:
                 v_insen.add(edge_dst)
@@ -225,17 +225,21 @@ def insert_edges_delta(edge_index_evo_delta, edge_dict, edge_index_inserted, thr
     # Gen edge_index_delta
     nodes_q = cp.deepcopy(v_sen)
     ngh_per_layer = set()
-    # Traverse L-hops nghs of inserted nodes
+    # Traverse L-hops nghs of sensitive nodes
     for i in range(layer_num):
         for node in nodes_q:
             nghs = edge_dict[node]  # For graph is undirected, we can obtain src_v by dst_v
-            ngh_per_layer.update(nghs)
+            for ngh in nghs:
+                deg_v = len(edge_dict[ngh])
+                if deg_v > threshold:
+                    ngh_per_layer.add(ngh)
+            # ngh_per_layer.update(nghs)
             src_v = list(nghs)
             dst_v = [node for i in range(len(nghs))]
             edge_src_sen.extend(src_v)
             edge_dst_sen.extend(dst_v)
-            # comp_delta += len(nghs)
-            # access_delta.update(nghs)
+            comp_delta += len(nghs)
+            access_delta.update(nghs)
         nodes_q = cp.deepcopy(ngh_per_layer)
         ngh_per_layer.clear()
 
