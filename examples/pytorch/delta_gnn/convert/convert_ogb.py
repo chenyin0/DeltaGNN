@@ -19,11 +19,12 @@ from torch_sparse import coalesce
 import math
 import pdb
 import time
+import pathlib
+import util
 
 np.random.seed(0)
 random.seed(0)
 torch.manual_seed(0)
-
 
 def dropout_adj(edge_index, rmnode_idx, edge_attr=None, force_undirected=True, num_nodes=None):
 
@@ -107,9 +108,9 @@ def planetoid(dataset_name, num_snap):
     # test_labels = labels.data[test_idx]
     labels = np.array(labels, dtype=np.int32)
 
-    train_idx = train_idx.numpy()
-    val_idx = val_idx.numpy()
-    test_idx = test_idx.numpy()
+    # train_idx = train_idx.numpy()
+    # val_idx = val_idx.numpy()
+    # test_idx = test_idx.numpy()
     train_idx = np.array(train_idx, dtype=np.int32)
     val_idx = np.array(val_idx, dtype=np.int32)
     test_idx = np.array(test_idx, dtype=np.int32)
@@ -126,9 +127,34 @@ def planetoid(dataset_name, num_snap):
     #                                                   train_idx,
     #                                                   num_nodes=data.num_nodes)
 
-    # test_num = len(test_idx)
-    drop_idx = np.append(train_idx, val_idx)
-    # drop_idx = np.append(drop_idx, test_idx)
+    # # test_num = len(test_idx)
+    # train_idx = train_idx.tolist()
+    # test_idx = test_idx.tolist()
+    # val_idx = val_idx.tolist()
+    # test_train_ratio = round(len(test_idx) / len(train_idx))
+
+    # train_sample_rate = 0.6  #0.3
+    # train_idx = train_idx[:round(len(train_idx) * train_sample_rate)]
+
+    # test_sample_inerval_rate = 0.7
+    # test_sample_interval = round(test_sample_inerval_rate * test_train_ratio)
+    # print('test_sample_interval: ', test_sample_interval)
+    # test_idx = test_idx[::test_sample_interval]
+
+    # drop_idx = train_idx + test_idx + val_idx
+    # random.shuffle(drop_idx)
+    # drop_idx = np.array(drop_idx, dtype=np.int32)
+    # # drop_idx = np.append(train_idx, val_idx)
+    # # drop_idx = np.append(drop_idx, test_idx)
+
+    # Load vertex sorted by timestamp
+    if dataset_name == 'Cora':
+        init_ratio = 0.35
+
+    idx_with_time_seq = np.loadtxt('../dataset/cora_evo_seq.txt', dtype=int).tolist()
+    init_num = round(len(idx_with_time_seq) * init_ratio)
+    drop_idx = idx_with_time_seq[init_num:]
+
     data.edge_index, drop_edge_index, _ = dropout_adj(data.edge_index,
                                                       drop_idx,
                                                       num_nodes=data.num_nodes)
