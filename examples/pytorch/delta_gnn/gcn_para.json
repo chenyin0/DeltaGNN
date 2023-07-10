@@ -1,28 +1,28 @@
 {
   "Cora": {
-    "--n-hidden": 128,
+    "--n-hidden": 32,
     "--n-layers": 2,
     "--weight-decay": 0.0005,
     "--lr": 0.01,
     "--dropout": 0.5
   },
   "cora": {
-    "--n-hidden": 128,
-    "--n-layers": 6,
+    "--n-hidden": 32,
+    "--n-layers": 2,
     "--weight-decay": 0.0005,
     "--lr": 0.01,
     "--dropout": 0.5
   },
   "CiteSeer": {
-    "--n-hidden": 128,
+    "--n-hidden": 16,
     "--n-layers": 2,
     "--weight-decay": 0.0005,
     "--lr": 0.01,
     "--dropout": 0.5
   },
   "citeseer": {
-    "--n-hidden": 128,
-    "--n-layers": 6,
+    "--n-hidden": 16,
+    "--n-layers": 2,
     "--weight-decay": 0.0005,
     "--lr": 0.01,
     "--dropout": 0.5
@@ -49,7 +49,7 @@
     "--dropout": 0.5
   },
   "arxiv": {
-    "--n-hidden": 128,
+    "--n-hidden": 16,
     "--n-layers": 2,
     "--weight-decay": 0.0005,
     "--lr": 0.01,

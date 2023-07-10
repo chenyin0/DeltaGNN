@@ -85,14 +85,6 @@ def load_updated_edges(datastr, snapshot_id):
     return edge_index
 
 
-def insert_edges(edge_index_orig, edge_index_inserted):
-    """
-    orig_edge_index: format (src, dst)
-    inserted _edge_index: format (src, dst)
-    """
-    return torch.cat([edge_index_orig, edge_index_inserted], dim=-1)
-
-
 def gen_edge_dict(edge_index):
     """
     Key, val = edge_src, edge_dst
@@ -163,6 +155,20 @@ def insert_edge_dict(edge_dict, edge_index_inserted):
 #     edge_index_delta = insert_edges(edge_index_sen, edge_index_insen)
 
 #     return edge_dict, edge_index_delta, v_sen, v_insen
+
+def insert_edges(edge_index_orig, edge_index_inserted):
+    """
+    orig_edge_index: format (src, dst)
+    inserted _edge_index: format (src, dst)
+    """
+    return torch.cat([edge_index_orig, edge_index_inserted], dim=-1)
+
+
+def insert_edges_evo(edge_index, edge_dict, edge_index_inserted, threshold, layer_num):
+
+    edge_dict, edge_index, *tmp = insert_edges_delta(edge_index, edge_dict, edge_index_inserted,
+                                               threshold, layer_num)
+    return edge_dict, edge_index
 
 
 def insert_edges_delta(edge_index_evo_delta, edge_dict, edge_index_inserted, threshold, layer_num):
@@ -455,7 +461,6 @@ def mag(dataset, num_snap):
              test_idx=test_idx,
              labels=labels,
              n_classes=n_classes)
-    
 
     sub_g = dgl.edge_type_subgraph(data, [('paper', 'cites', 'paper')])
     h_sub_g = dgl.to_homogeneous(sub_g)
@@ -463,9 +468,7 @@ def mag(dataset, num_snap):
     num_nodes = h_sub_g.number_of_nodes()
 
     edge_index = to_undirected(edge_index, num_nodes)
-    edge_index, drop_edge_index, _ = dropout_adj(edge_index,
-                                                      train_idx,
-                                                      num_nodes=num_nodes)
+    edge_index, drop_edge_index, _ = dropout_adj(edge_index, train_idx, num_nodes=num_nodes)
     edge_index = to_undirected(edge_index, num_nodes)
 
     row_drop, col_drop = np.array(drop_edge_index)

@@ -157,6 +157,7 @@ def main(args):
                                                              batch_size)
     # Gen edge_dict
     edge_dict = gen_edge_dict(edge_index_evo)
+    edge_dict_delta = cp.deepcopy(edge_dict)
 
     # Without retrain
     print('### Model_wo_retrain:')
@@ -177,16 +178,14 @@ def main(args):
     edge_index_evo_delta = edge_index_init.clone().detach()
     train_delta(args, model_delta, train_loader, valid_loader, device, checkpt_file_delta, lr,
                 weight_decay)
+    # train(args, model_delta, train_loader, valid_loader, device, checkpt_file_delta, lr,
+    #             weight_decay)
     acc_delta = test_delta(model_delta, test_loader, device, checkpt_file_delta)
+    # acc_delta = test(model_delta, test_loader, device, checkpt_file_delta)
     # acc_delta = 0
 
     accuracy.append([0, acc_wo_retrain * 100, acc_retrain * 100, acc_delta * 100])
-    v_deg_delta_accumulate = 0
-    v_deg_total_accumulate = 0
-    e_num_delta_accumulate = 0
-    e_num_total_accumulate = 0
-    aggr_reduct_list = []
-    comb_reduct_list = []
+
     access_delta_accumulate = 0
     access_total_accumulate = 0
     comp_delta_accumulate = 0
@@ -203,51 +202,41 @@ def main(args):
         print('Snapshot: {:d}'.format(i + 1))
         # Update edge_index according to inserted edges
         inserted_edge_index = load_updated_edges(args.dataset, i + 1)
-        edge_index_evo = insert_edges(edge_index_evo, inserted_edge_index)
+        # edge_index_evo = insert_edges(edge_index_evo, inserted_edge_index)
+        edge_dict, edge_index_evo = insert_edges_evo(edge_index_evo, edge_dict, inserted_edge_index,
+                                                     0, n_layers)
         train_loader, valid_loader, test_loader = gen_dataloader(edge_index_evo, train_idx, val_idx,
                                                                  test_idx, features, labels,
                                                                  num_nghs, batch_size)
+
         print('### Model_wo_retrain:')
         # edge_index_wo_retrain = insert_edges(edge_index_wo_retrain, inserted_edge_index)
         print('Edges_wo_retrain: ', edge_index_evo.shape)
-        if (i % 1) == 0:
-            train(args, model_wo_retrain, train_loader, valid_loader, device,
-                  checkpt_file_wo_retrain, lr, weight_decay)
+        # if (i % 1) == 0:
+        #     train(args, model_wo_retrain, train_loader, valid_loader, device,
+        #           checkpt_file_wo_retrain, lr, weight_decay)
         acc_wo_retrain = test(model_wo_retrain, test_loader, device, checkpt_file_wo_retrain)
 
         print('### Model_retrain:')
         # edge_index_retrain = insert_edges(edge_index_retrain, inserted_edge_index)
         print('Edges_retrain: ', edge_index_evo.shape)
         if (i % 1) == 0:
+            # train(args, model_retrain, train_loader, valid_loader, device, checkpt_file_retrain, lr,
+            #       weight_decay)
             train(args, model_retrain, train_loader, valid_loader, device, checkpt_file_retrain, lr,
                   weight_decay)
         acc_retrain = test(model_retrain, test_loader, device, checkpt_file_retrain)
 
         print('### Model_delta:')
         threshold = args.threshold
-        # edge_dict, edge_index_evo_delta, v_sen, v_insen, v_deg_total, v_deg_delta, e_num_total, e_num_delta = insert_edges_delta(
+        edge_dict_delta, edge_index_evo_delta, v_sen, v_insen, comp_total, comp_delta, access_total, access_delta = insert_edges_delta(
+            edge_index_evo_delta, edge_dict_delta, inserted_edge_index, threshold, n_layers)
+
+        # edge_dict, edge_index_evo_delta, v_sen, v_insen, comp_total, comp_delta, access_total, access_delta = insert_edges_delta(
         #     edge_index_evo_delta, edge_dict, inserted_edge_index, threshold, n_layers)
-        edge_dict, edge_index_evo_delta, v_sen, v_insen, comp_total, comp_delta, access_total, access_delta = insert_edges_delta(
-            edge_index_evo_delta, edge_dict, inserted_edge_index, threshold, n_layers)
 
         print('Node_num: ', len(v_sen), len(v_insen))
         sensitive_ratio.append(round(len(v_sen) * 100 / (len(v_sen) + len(v_insen)), 2))
-
-        # v_deg_delta_accumulate += v_deg_delta
-        # v_deg_total_accumulate += v_deg_total
-        # # v_deg_total_accumulate += e_num_total
-        # e_num_delta_accumulate += e_num_delta
-        # e_num_total_accumulate += e_num_total
-        # aggr_reduction = round(
-        #     (e_num_total_accumulate - e_num_delta_accumulate) / e_num_total_accumulate * 100, 2)
-        # comb_reduction = round(
-        #     (v_deg_total_accumulate - v_deg_delta_accumulate) / v_deg_total_accumulate * 100, 2)
-        # aggr_reduct_list.append(aggr_reduction)
-        # comb_reduct_list.append(comb_reduction)
-        # print('Aggr reduction: {:d}/{:d} = {:.2f}%'.format(v_deg_delta, v_deg_total,
-        #                                                    aggr_reduction))
-        # print('Comb reduction: {:d}/{:d} = {:.2f}%'.format(e_num_delta, e_num_total,
-        #                                                    comb_reduction))
 
         comp_delta_accumulate += comp_delta
         comp_total_accumulate += comp_total
@@ -264,24 +253,34 @@ def main(args):
         print('Computation reduction: {:d}/{:d} = {:.2f}%'.format(comp_delta, comp_total,
                                                                   comp_reduction))
 
+        # v_sen.update(set(train_idx))
+
         # train_loader_delta, valid_loader_delta, test_loader_delta = gen_dataloader_delta(
         #     edge_index_evolved, train_idx, val_idx, test_idx, features, labels, num_nghs,
         #     batch_size)
-        train_loader_delta, valid_loader_delta, test_loader_delta = gen_dataloader_delta(
+        # train_loader_delta, valid_loader_delta, test_loader_delta = gen_dataloader(
+        #     edge_index_evo_delta, train_idx, val_idx, test_idx, features, labels, num_nghs,
+        #     batch_size)
+        train_loader_delta, valid_loader_delta, test_loader_delta = gen_dataloader(
             edge_index_evo_delta, train_idx, val_idx, test_idx, features, labels, num_nghs,
             batch_size)
         print('Edges_delta: ', edge_index_evo_delta.shape)
         # train_delta(args, model_delta, train_loader_delta, valid_loader_delta, device,
         #                 checkpt_file_delta, lr, weight_decay, v_sen, v_insen)
         if (i % 1) == 0:
+            # train_delta(args, model_delta, train_loader_delta, valid_loader_delta, device,
+            #             checkpt_file_delta, lr, weight_decay, v_sen.union(v_insen), set())
             train_delta(args, model_delta, train_loader_delta, valid_loader_delta, device,
-                        checkpt_file_delta, lr, weight_decay, v_sen.union(v_insen), set())
-            acc_delta = test_delta(model_delta, test_loader_delta, device, checkpt_file_delta,
-                                   v_sen.union(v_insen), set())
+                        checkpt_file_delta, lr, weight_decay, v_sen, v_insen)
+            # train(args, model_delta, train_loader_delta, valid_loader_delta, device,
+            #       checkpt_file_delta, lr, weight_decay)
+            # acc_delta = test_delta(model_delta, test_loader_delta, device, checkpt_file_delta,
+            #                        v_sen.union(v_insen), set())
             # train_delta(args, model_delta, train_loader_delta, valid_loader_delta, device,
             #             checkpt_file_delta, lr, weight_decay, v_sen, v_insen)
-            # acc_delta = test_delta(model_delta, test_loader_delta, device, checkpt_file_delta,
-            #                        v_sen, v_insen)
+            acc_delta = test_delta(model_delta, test_loader_delta, device, checkpt_file_delta,
+                                   v_sen, v_insen)
+            # acc_delta = test(model_delta, test_loader_delta, device, checkpt_file_delta)
         else:
             acc_delta = test_delta(model_delta, test_loader_delta, device, checkpt_file_delta,
                                    v_sen, v_insen)
@@ -289,6 +288,7 @@ def main(args):
 
         accuracy.append([i + 1, acc_wo_retrain * 100, acc_retrain * 100, acc_delta * 100])
 
+    acc_degrad = []
     for i in range(len(accuracy)):
         if i == 0:
             print('{:d}\t{:.2f}  {:.2f}  {:.2f}'.format(i, accuracy[i][1], accuracy[i][2],
@@ -297,10 +297,12 @@ def main(args):
             # print('{:d}\t{:.2f}  {:.2f}  {:.2f}  aggr: {:.2f}%  comb: {:.2f}%'.format(
             #     i, accuracy[i][1], accuracy[i][2], accuracy[i][3], aggr_reduct_list[i - 1],
             #     comb_reduct_list[i - 1]))
-            print(
-                '{:d}\t{:.2f}  {:.2f}  {:.2f}  access: {:.2f}%  comp: {:.2f}%  sen:{:.2f}%'.format(
-                    i, accuracy[i][1], accuracy[i][2], accuracy[i][3], access_reduct_list[i - 1],
-                    comp_reduct_list[i - 1], sensitive_ratio[i - 1]))
+            delta_acc = accuracy[i][2] - accuracy[i][3]
+            print('{:d} {:.2f}  {:.2f}  {:.2f} {:.2f} mem: {:.2f}%  comp: {:.2f}%  sen:{:.2f}%'.
+                  format(i, accuracy[i][1], accuracy[i][2], accuracy[i][3], delta_acc,
+                         access_reduct_list[i - 1], comp_reduct_list[i - 1],
+                         sensitive_ratio[i - 1]))
+            acc_degrad.append(delta_acc)
 
     # aggr_reduct_avg = aggr_reduct_list[-1]
     # comb_reduct_avg = comb_reduct_list[-1]
@@ -308,8 +310,9 @@ def main(args):
     comp_reduct_avg = comp_reduct_list[-1]
     # print('Aggr_reduct_avg: {:.2f}%, Comb_reduct_avg: {:.2f}%'.format(aggr_reduct_avg,
     #                                                                   comb_reduct_avg))
-    print('Access_reduct_avg: {:.2f}%, Comp_reduct_avg: {:.2f}%'.format(
-        access_reduct_avg, comp_reduct_avg))
+    print()
+    print('Avg degrad: Acc: {:.2f}, Mem: {:.1f}%, Comp: {:.1f}%'.format(
+        np.mean(acc_degrad), access_reduct_avg, comp_reduct_avg))
 
     print('\n>> Task {:s} execution time: {}'.format(
         args.dataset, util.time_format(time.perf_counter() - Task_time_start)))
@@ -334,84 +337,26 @@ def gen_dataloader(edge_index, train_idx, val_idx, test_idx, features, labels, n
                    batch_size):
     features = torch.FloatTensor(features)
     data = Data(x=features, edge_index=edge_index, y=labels)
+    data.n_id = torch.arange(data.num_nodes)  # Keep the original vertex ID of global
     del features
     gc.collect()
 
-    # train_loader = NeighborLoader(data,
-    #                               input_nodes=train_idx,
-    #                               num_neighbors=num_nghs,
-    #                               shuffle=False,
-    #                               batch_size=batch_size)
-    # valid_loader = NeighborLoader(data,
-    #                               input_nodes=val_idx,
-    #                               num_neighbors=num_nghs,
-    #                               shuffle=False,
-    #                               batch_size=batch_size)
-    # test_loader = NeighborLoader(data,
-    #                              input_nodes=test_idx,
-    #                              num_neighbors=num_nghs,
-    #                              shuffle=False,
-    #                              batch_size=batch_size)
-
+    vertex_num_total = labels.size()[0]
     train_loader = NeighborLoader(data,
                                   input_nodes=train_idx,
                                   num_neighbors=num_nghs,
                                   shuffle=False,
-                                  batch_size=len(train_idx))
+                                  batch_size=vertex_num_total)
     valid_loader = NeighborLoader(data,
                                   input_nodes=val_idx,
                                   num_neighbors=num_nghs,
                                   shuffle=False,
-                                  batch_size=len(train_idx))
+                                  batch_size=vertex_num_total)
     test_loader = NeighborLoader(data,
                                  input_nodes=test_idx,
                                  num_neighbors=num_nghs,
                                  shuffle=False,
-                                 batch_size=len(train_idx))
-
-    return train_loader, valid_loader, test_loader
-
-
-def gen_dataloader_delta(edge_index, train_idx, val_idx, test_idx, features, labels, num_nghs,
-                         batch_size):
-    features = torch.FloatTensor(features)
-    index = torch.LongTensor([[i] for i in range(labels.shape[0])])
-    labels = torch.cat((labels, index), 1)
-    data = Data(x=features, edge_index=edge_index, y=labels)
-    del features
-    gc.collect()
-
-    # train_loader = NeighborLoader(data,
-    #                               input_nodes=train_idx,
-    #                               num_neighbors=num_nghs,
-    #                               shuffle=False,
-    #                               batch_size=batch_size)
-    # valid_loader = NeighborLoader(data,
-    #                               input_nodes=val_idx,
-    #                               num_neighbors=num_nghs,
-    #                               shuffle=False,
-    #                               batch_size=batch_size)
-    # test_loader = NeighborLoader(data,
-    #                              input_nodes=test_idx,
-    #                              num_neighbors=num_nghs,
-    #                              shuffle=False,
-    #                              batch_size=batch_size)
-
-    train_loader = NeighborLoader(data,
-                                  input_nodes=train_idx,
-                                  num_neighbors=num_nghs,
-                                  shuffle=False,
-                                  batch_size=len(train_idx))
-    valid_loader = NeighborLoader(data,
-                                  input_nodes=val_idx,
-                                  num_neighbors=num_nghs,
-                                  shuffle=False,
-                                  batch_size=len(train_idx))
-    test_loader = NeighborLoader(data,
-                                 input_nodes=test_idx,
-                                 num_neighbors=num_nghs,
-                                 shuffle=False,
-                                 batch_size=len(train_idx))
+                                 batch_size=vertex_num_total)
 
     return train_loader, valid_loader, test_loader
 
@@ -585,13 +530,14 @@ if __name__ == '__main__':
     # args.model = 'gat'
     # args.model = 'gin'
 
-    args.dataset = 'Cora'
-    # args.dataset = 'CiteSeer'
+    # args.dataset = 'Cora'
+    args.dataset = 'CiteSeer'
     # args.dataset = 'PubMed'
     # args.dataset = 'arxiv'
     # args.dataset = 'products'
+    # args.dataset = 'mag'
 
-    args.threshold = 5
+    args.threshold = 2
 
     # args.layer = 2
     # args.hidden = 128
