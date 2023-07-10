@@ -35,6 +35,8 @@ import plt.plt_graph
 import json
 import pathlib
 
+import dgl.sparse as dglsp
+
 
 def main(args):
     import os
@@ -123,7 +125,7 @@ def main(args):
 
     if args.dataset == 'ogbn-mag':
         g = preprocess.ogbn_mag_preprocess(dataset)
-        utils.mag(dataset, 16) 
+        # utils.mag(dataset, 16)
     else:
         g = dataset[0]
 
@@ -172,7 +174,8 @@ def main(args):
 
     ##
 
-    g_csr = g.adj_sparse('csr')
+    # g_csr = g.adj_sparse('csr')
+    g_csr = g.adj_tensors('csr')  # 'adj_sparse() -> adj_tensors() when DGL version > 1.1.x'
     """ Traverse to get graph evolving snapshot """
     node_q = []
     file_ = pathlib.Path('./dataset/' + args.dataset + '_evo_seq.txt')
@@ -184,9 +187,9 @@ def main(args):
             node_q.append(int(line))
     else:
         if args.dataset == 'cora' or args.dataset == 'citeseer' or args.dataset == 'pubmed' or args.dataset == 'reddit' or args.dataset == 'ogbn-products':
-            # root_node_q = util.gen_root_node_queue(g)
-            # node_q = util.bfs_traverse(g_csr, root_node_q)
-            node_q = g.nodes().numpy().tolist()
+            root_node_q = util.gen_root_node_queue(g)
+            node_q = util.bfs_traverse(g_csr, root_node_q)
+            # node_q = g.nodes().numpy().tolist()
         elif args.dataset == 'ogbn-arxiv' or args.dataset == 'ogbn-mag':
             node_q = util.sort_node_by_timestamp('../../../dataset/' + args.dataset +
                                                  '_node_year.csv')
@@ -233,7 +236,7 @@ def main(args):
     # # util.save_txt_2d('./results/mem_trace/' + args.dataset + '_node_deg_trace' + '.txt',
     # #                  deg_node_trace_sorted)
 
-    # # ##
+    # ##
     # """ Plot degree distribution """
     # deg_dist = util.gen_degree_distribution(g_csr)
     # plt.plt_graph.plot_degree_distribution(deg_dist)
@@ -719,9 +722,9 @@ if __name__ == '__main__':
                         help="degree threshold of neighbors nodes")
     args = parser.parse_args()
 
-    # args.model = 'gcn'
+    args.model = 'gcn'
     # args.model = 'graphsage'
-    args.model = 'gat'
+    # args.model = 'gat'
     # args.model = 'gin'
 
     # args.dataset = 'cora'
@@ -732,7 +735,7 @@ if __name__ == '__main__':
     # args.dataset = 'ogbn-products'
     args.dataset = 'ogbn-mag'
 
-    args.n_epochs = 100
+    args.n_epochs = 200
     args.gpu = 0
     # args.mode = 'mixed'
 
