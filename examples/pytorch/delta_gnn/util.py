@@ -13,6 +13,7 @@ import copy as cp
 import time
 import pathlib
 from torch_sparse import SparseTensor
+from scipy import sparse
 
 
 def gen_root_node_queue(g):
@@ -25,6 +26,30 @@ def gen_root_node_queue(g):
     return nodes
 
 
+def gen_root_node_bfs(src_edges):
+    """
+    Gen root node according to in-degree
+    """
+    src_edges = src_edges.cpu().numpy().tolist()
+    nodes = Counter(src_edges).most_common(len(src_edges))
+    nodes = [x[0] for x in nodes]
+    return nodes
+
+
+def gen_adj_csr(edge_index, num_nodes):
+    adj = np.zeros((num_nodes, num_nodes))
+    src_edges = edge_index[0]
+    dst_edges = edge_index[1]
+
+    for i in range(len(src_edges)):
+        adj[src_edges[i], dst_edges[i]] = 1
+        adj[dst_edges[i], src_edges[i]] = 1
+
+    adj_csr = sparse.csr_matrix(adj)
+
+    return adj_csr
+
+
 def bfs_traverse(g_csr, root_node_q):
     """
     Gen node evolve sequence
@@ -32,6 +57,44 @@ def bfs_traverse(g_csr, root_node_q):
     # g_csr = g.adj_sparse('csr')
     indptr = g_csr[0]
     indices = g_csr[1]
+
+    queue = []
+    seen = set()
+    sequence = list()
+    while len(root_node_q) > 0:
+        root = root_node_q.pop(0)
+        queue.append(root)
+        seen.add(root)
+        sequence.append(root)
+        while len(queue) > 0:
+            vetex = queue.pop(0)
+            begin = indptr[vetex]
+            end = indptr[vetex + 1]
+            nodes = indices[begin:end].tolist()
+            # print(nodes)
+            for w in nodes:
+                # print(w)
+                if w not in seen:
+                    queue.append(w)
+                    seen.add(w)
+                    sequence.append(w)
+                # print(len(seen), len(queue))
+
+        # Pop nodes in root_node_q which have been visited
+        while len(root_node_q) > 0 and root_node_q[0] in seen:
+            root_node_q.pop(0)
+        # print('>> seen size: ', len(seen), 'seq size: ', len(sequence))
+
+    return sequence
+
+
+def bfs_sort(csr_matrix, root_node_q):
+    """
+    Gen node evolve sequence
+    """
+    # g_csr = g.adj_sparse('csr')
+    indptr = csr_matrix.indptr
+    indices = csr_matrix.indices
 
     queue = []
     seen = set()
@@ -1406,7 +1469,7 @@ def sort_node_by_timestamp(file_path):
         total += len(i)
         accumulation.append(total)
 
-    np.savetxt('../../../results/graph_struct_evo/graph_structure_evo.txt', accumulation, fmt='%d')
+    # np.savetxt('../../../results/graph_struct_evo/graph_structure_evo.txt', accumulation, fmt='%d')
 
     return node_q_sort_by_time
 
