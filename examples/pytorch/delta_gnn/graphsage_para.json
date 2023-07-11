@@ -1,6 +1,6 @@
 {
   "Cora": {
-    "--n-hidden": 32,
+    "--n-hidden": 16,
     "--n-layers": 2,
     "--fan-out": "10,25",
     "--batch-size": 1024,
@@ -9,7 +9,7 @@
     "--dropout": 0.5
   },
   "CiteSeer": {
-    "--n-hidden": 32,
+    "--n-hidden": 16,
     "--n-layers": 2,
     "--fan-out": "10,25",
     "--batch-size": 1024,
@@ -27,7 +27,7 @@
     "--dropout": 0.5
   },
   "cora": {
-    "--n-hidden": 32,
+    "--n-hidden": 16,
     "--n-layers": 3,
     "--fan-out": "10,25",
     "--batch-size": 1024,
@@ -36,7 +36,7 @@
     "--dropout": 0.5
   },
   "citeseer": {
-    "--n-hidden": 32,
+    "--n-hidden": 16,
     "--n-layers": 3,
     "--fan-out": "10,25",
     "--batch-size": 1024,
