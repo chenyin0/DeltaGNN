@@ -1,6 +1,6 @@
 {
   "Cora": {
-    "--n-hidden": 250,
+    "--n-hidden": 16,
     "--n-layers": 3,
     "--weight-decay": 0,
     "--lr": 0.002,
@@ -9,7 +9,7 @@
     "--heads": "3,3,1"
   },
   "CiteSeer": {
-    "--n-hidden": 250,
+    "--n-hidden": 16,
     "--n-layers": 3,
     "--weight-decay": 0,
     "--lr": 0.002,
@@ -18,7 +18,7 @@
     "--heads": "3,3,1"
   },
   "PubMed": {
-    "--n-hidden": 250,
+    "--n-hidden": 16,
     "--n-layers": 3,
     "--weight-decay": 0,
     "--lr": 0.002,
@@ -36,7 +36,7 @@
     "--heads": "8,1,1,1,1,1"
   },
   "citeseer": {
-    "--n-hidden": 8,
+    "--n-hidden": 16,
     "--n-layers": 2,
     "--weight-decay": 0.005,
     "--lr": 0.005,
