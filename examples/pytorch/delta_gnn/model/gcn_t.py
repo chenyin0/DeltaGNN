@@ -18,6 +18,7 @@ from torch.optim import Adam
 import numpy as np
 import time
 import examples.pytorch.delta_gnn.model.model_utils as model_utils
+import torch_geometric.nn.inits as inits
 
 # from tqdm import tqdm
 
@@ -151,6 +152,8 @@ class GCN_delta(nn.Module):
             layer.reset_parameters()
         for bn in self.bns:
             bn.reset_parameters()
+
+        inits.zeros(self.embedding)
 
     def forward(self, features, edge_index):
         h = features
