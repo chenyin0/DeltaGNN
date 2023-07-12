@@ -22,6 +22,7 @@ from torch_geometric.data import Data
 from torch_geometric.loader import NeighborLoader
 import util
 import json
+import torch as th
 
 import faulthandler
 
@@ -117,15 +118,15 @@ def main(args):
 
     # create GNN model
     if model_name == 'gcn':
-        model_wo_retrain = GCN(in_feats, n_hidden, n_classes, n_layers, dropout).cuda(device)
-        model_retrain = GCN(in_feats, n_hidden, n_classes, n_layers, dropout).cuda(device)
+        model_wo_retrain = GCN(in_feats, n_hidden, n_classes, n_layers, dropout).to(device)
+        model_retrain = GCN(in_feats, n_hidden, n_classes, n_layers, dropout).to(device)
         model_delta = GCN_delta(in_feats, n_hidden, n_classes, n_layers, dropout,
-                                features.shape[0]).cuda(device)
+                                features.shape[0]).to(device)
     elif model_name == 'graphsage':
-        model_wo_retrain = GraphSAGE(in_feats, n_hidden, n_classes, n_layers, dropout).cuda(device)
-        model_retrain = GraphSAGE(in_feats, n_hidden, n_classes, n_layers, dropout).cuda(device)
+        model_wo_retrain = GraphSAGE(in_feats, n_hidden, n_classes, n_layers, dropout).to(device)
+        model_retrain = GraphSAGE(in_feats, n_hidden, n_classes, n_layers, dropout).to(device)
         model_delta = GraphSAGE_delta(in_feats, n_hidden, n_classes, n_layers, dropout,
-                                      features.shape[0]).cuda(device)
+                                      features.shape[0]).to(device)
     elif model_name == 'gat':
         model_wo_retrain = GAT(in_feats, n_hidden, n_classes, n_layers, feat_dropout,
                                heads).to(device)
@@ -369,6 +370,9 @@ def train(args, model, train_loader, valid_loader, device, checkpt_file, lr, wei
     model.reset_parameters()
     print("--------------------------")
     print("Training...")
+
+    args.epochs = 200
+
     for epoch in range(args.epochs):
         if args.model == 'gcn':
             loss_tra, train_ep = gcn.train(model, device, train_loader, lr, weight_decay)
@@ -440,10 +444,19 @@ def train_delta(args,
     model.reset_parameters()
     print("--------------------------")
     print("Training...")
+
+    args.epochs = 1000
+
+    v_sen_feat_loc_train, v_insen_feat_loc_train, v_sen_train, v_insen_train = util.feature_merge_preprocess(
+        train_loader, device, v_sen, v_insen)
+    v_sen_feat_loc_val, v_insen_feat_loc_val, v_sen_val, v_insen_val = util.feature_merge_preprocess(
+        valid_loader, device, v_sen, v_insen)
+
     for epoch in range(args.epochs):
         if args.model == 'gcn':
             loss_tra, train_ep = gcn.train_delta(model, device, train_loader, lr, weight_decay,
-                                                 v_sen, v_insen)
+                                                 v_sen_feat_loc_train, v_insen_feat_loc_train,
+                                                 v_sen_train, v_insen_train)
         elif args.model == 'graphsage':
             loss_tra, train_ep = graphsage.train_delta(model, device, train_loader, lr,
                                                        weight_decay, v_sen, v_insen)
@@ -457,7 +470,8 @@ def train_delta(args,
         t_st = time.time()
 
         if args.model == 'gcn':
-            f1_val = gcn.validate_delta(model, device, valid_loader, v_sen, v_insen)
+            f1_val = gcn.validate_delta(model, device, valid_loader, v_sen_feat_loc_val,
+                                        v_insen_feat_loc_val, v_sen_val, v_insen_val)
         elif args.model == 'graphsage':
             f1_val = graphsage.validate_delta(model, device, valid_loader, v_sen, v_insen)
         elif args.model == 'gat':
@@ -483,6 +497,71 @@ def train_delta(args,
 
     print('Train cost: {:.2f}s'.format(train_time))
     print('The best epoch: {}th'.format(best_epoch))
+
+
+# def train_delta(args,
+#                 model,
+#                 train_loader,
+#                 valid_loader,
+#                 device,
+#                 checkpt_file,
+#                 lr,
+#                 weight_decay,
+#                 v_sen=None,
+#                 v_insen=None):
+#     bad_counter = 0
+#     best = 0
+#     best_epoch = 0
+#     train_time = 0
+#     model.reset_parameters()
+#     print("--------------------------")
+#     print("Training...")
+
+#     args.epochs = 1000
+
+#     for epoch in range(args.epochs):
+#         if args.model == 'gcn':
+#             loss_tra, train_ep = gcn.train_delta(model, device, train_loader, lr, weight_decay,
+#                                                  v_sen, v_insen)
+#         elif args.model == 'graphsage':
+#             loss_tra, train_ep = graphsage.train_delta(model, device, train_loader, lr,
+#                                                        weight_decay, v_sen, v_insen)
+#         elif args.model == 'gat':
+#             loss_tra, train_ep = gat.train_delta(model, device, train_loader, lr, weight_decay,
+#                                                  v_sen, v_insen)
+#         elif args.model == 'gin':
+#             loss_tra, train_ep = gin.train_delta(model, device, train_loader, lr, weight_decay,
+#                                                  v_sen, v_insen)
+
+#         t_st = time.time()
+
+#         if args.model == 'gcn':
+#             f1_val = gcn.validate_delta(model, device, valid_loader, v_sen, v_insen)
+#         elif args.model == 'graphsage':
+#             f1_val = graphsage.validate_delta(model, device, valid_loader, v_sen, v_insen)
+#         elif args.model == 'gat':
+#             f1_val = gat.validate_delta(model, device, valid_loader, v_sen, v_insen)
+#         elif args.model == 'gin':
+#             f1_val = gin.validate_delta(model, device, valid_loader, v_sen, v_insen)
+
+#         train_time += train_ep
+#         if (epoch + 1) % 20 == 0:
+#             print('Epoch:{:02d}, Train_loss:{:.3f}, Valid_acc:{:.2f}%, Time_cost:{:.3f}/{:.3f}'.
+#                   format(epoch + 1, loss_tra, 100 * f1_val, train_ep, train_time))
+#             # print('Remove print')
+#         if f1_val > best:
+#             best = f1_val
+#             best_epoch = epoch + 1
+#             t_st = time.time()
+#             torch.save(model.state_dict(), checkpt_file)
+#             bad_counter = 0
+#         else:
+#             bad_counter += 1
+#         if bad_counter == args.patience:
+#             break
+
+#     print('Train cost: {:.2f}s'.format(train_time))
+#     print('The best epoch: {}th'.format(best_epoch))
 
 
 def test_delta(model, test_loader, device, checkpt_file, v_sen=None, v_insen=None):
@@ -518,7 +597,7 @@ if __name__ == '__main__':
     parser.add_argument('--hidden', type=int, default=2048, help='hidden dimensions.')
     parser.add_argument('--dropout', type=float, default=0.3, help='dropout rate.')
     parser.add_argument('--bias', default='none', help='bias.')
-    parser.add_argument('--epochs', type=int, default=1000, help='number of epochs.')
+    parser.add_argument('--epochs', type=int, default=200, help='number of epochs.')
     parser.add_argument('--batch_size', type=int, default=10000, help='batch size.')
     parser.add_argument('--patience', type=int, default=50, help='patience.')
     parser.add_argument('--threshold', type=int, default=0, help='Sensitivity threshold')
@@ -531,13 +610,14 @@ if __name__ == '__main__':
     # args.model = 'gin'
 
     # args.dataset = 'Cora'
-    args.dataset = 'CiteSeer'
-    # args.dataset = 'PubMed'
-    # args.dataset = 'arxiv'
-    # args.dataset = 'products'
+    # args.dataset = 'CiteSeer'
+    args.dataset = 'arxiv'
     # args.dataset = 'mag'
 
-    args.threshold = 2
+    # args.dataset = 'PubMed'
+    # args.dataset = 'products'
+
+    args.threshold = 5
 
     # args.layer = 2
     # args.hidden = 128
@@ -545,8 +625,8 @@ if __name__ == '__main__':
     # args.weight_decay = 0
     # args.dropout = 0.5
     # args.epochs = 1
-    args.gpu = 0
-    args.batch_size = pow(2, 13)
+    args.gpu = 1
+    # args.batch_size = pow(2, 13)
     # args.batch_size = pow(2, 8)
 
     print('\n************ {:s} ************'.format(args.dataset))

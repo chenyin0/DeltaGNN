@@ -167,7 +167,7 @@ class GCN_delta(nn.Module):
         return h
 
 
-def train_delta(model, device, data_loader, lr, weight_decay, v_sen=None, v_insen=None):
+def train_delta(model, device, data_loader, lr, weight_decay, v_sen_feat_loc, v_insen_feat_loc, v_sen=None, v_insen=None):
     # print('>> Start delta train')
     model.train()
     optimizer = Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
@@ -183,7 +183,7 @@ def train_delta(model, device, data_loader, lr, weight_decay, v_sen=None, v_inse
         optimizer.zero_grad()
         out = model(x, edge_index)
         if v_sen is not None or v_insen is not None:
-            out, embedding = model_utils.feature_merge(model.embedding, out, n_id, v_sen, v_insen)
+            out, embedding = model_utils.feature_merge(model.embedding, out, n_id, v_sen_feat_loc, v_insen_feat_loc, v_sen, v_insen)
             model.embedding = torch.nn.Parameter(embedding)  # Update embedding
         loss = F.cross_entropy(out, y.squeeze(1))
         # loss = F.nll_loss(out, y.squeeze(1))
@@ -200,7 +200,7 @@ def train_delta(model, device, data_loader, lr, weight_decay, v_sen=None, v_inse
 
 
 @torch.no_grad()
-def validate_delta(model, device, loader, v_sen=None, v_insen=None):
+def validate_delta(model, device, loader, v_sen_feat_loc, v_insen_feat_loc, v_sen=None, v_insen=None):
     model.eval()
     y_pred, y_true = [], []
     for step, batch in enumerate(loader):
@@ -208,7 +208,7 @@ def validate_delta(model, device, loader, v_sen=None, v_insen=None):
         n_id = batch.n_id
         out = model(x, edge_index)
         if v_sen is not None or v_insen is not None:
-            out, embedding = model_utils.feature_merge(model.embedding, out, n_id, v_sen, v_insen)
+            out, embedding = model_utils.feature_merge(model.embedding, out, n_id, v_sen_feat_loc, v_insen_feat_loc, v_sen, v_insen)
             # model.embedding = torch.nn.Parameter(embedding)
         out = out.log_softmax(dim=-1)
         y_pred.append(torch.argmax(out, dim=-1, keepdim=True).cpu())
@@ -220,7 +220,7 @@ def validate_delta(model, device, loader, v_sen=None, v_insen=None):
 
 
 @torch.no_grad()
-def test_delta(model, device, data_loader, checkpt_file, v_sen=None, v_insen=None):
+def test_delta(model, device, data_loader, checkpt_file, v_sen_feat_loc, v_insen_feat_loc, v_sen=None, v_insen=None):
     model.load_state_dict(torch.load(checkpt_file))
     model.eval()
     y_pred, y_true = [], []
@@ -229,7 +229,7 @@ def test_delta(model, device, data_loader, checkpt_file, v_sen=None, v_insen=Non
         n_id = batch.n_id
         out = model(x, edge_index)
         if v_sen is not None or v_insen is not None:
-            out, embedding = model_utils.feature_merge(model.embedding, out, n_id, v_sen, v_insen)
+            out, embedding = model_utils.feature_merge(model.embedding, out, n_id, v_sen_feat_loc, v_insen_feat_loc, v_sen, v_insen)
             model.embedding = torch.nn.Parameter(embedding)
         out = out.log_softmax(dim=-1)
         y_pred.append(torch.argmax(out, dim=-1, keepdim=True).cpu())
@@ -238,3 +238,76 @@ def test_delta(model, device, data_loader, checkpt_file, v_sen=None, v_insen=Non
     y_true = torch.cat(y_true, dim=0)
     correct = torch.sum(y_pred == y_true)
     return correct.item() * 1.0 / len(y_true)
+
+
+# def train_delta(model, device, data_loader, lr, weight_decay, v_sen=None, v_insen=None):
+#     # print('>> Start delta train')
+#     model.train()
+#     optimizer = Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
+
+#     time_epoch = 0
+#     loss_list = []
+#     # batch_base = 0
+#     for step, batch in enumerate(data_loader):
+#         t_st = time.time()
+#         x, edge_index, y = batch.x.to(device), batch.edge_index.to(device), batch.y.to(device)
+#         n_id = batch.n_id
+#         # If label (y) has index
+#         optimizer.zero_grad()
+#         out = model(x, edge_index)
+#         if v_sen is not None or v_insen is not None:
+#             out, embedding = model_utils.feature_merge(model.embedding, out, n_id, v_sen, v_insen)
+#             model.embedding = torch.nn.Parameter(embedding)  # Update embedding
+#         loss = F.cross_entropy(out, y.squeeze(1))
+#         # loss = F.nll_loss(out, y.squeeze(1))
+#         loss.backward()
+#         optimizer.step()
+#         time_epoch += (time.time() - t_st)
+#         loss_list.append(loss.item())
+#         # print(loss.item())
+#         # pbar.update(batch.batch_size)
+#         # batch_base += batch.batch_size
+
+#     # print('>> Finish delta train')
+#     return np.mean(loss_list), time_epoch
+
+
+# @torch.no_grad()
+# def validate_delta(model, device, loader, v_sen=None, v_insen=None):
+#     model.eval()
+#     y_pred, y_true = [], []
+#     for step, batch in enumerate(loader):
+#         x, edge_index, y = batch.x.to(device), batch.edge_index.to(device), batch.y
+#         n_id = batch.n_id
+#         out = model(x, edge_index)
+#         if v_sen is not None or v_insen is not None:
+#             out, embedding = model_utils.feature_merge(model.embedding, out, n_id, v_sen, v_insen)
+#             # model.embedding = torch.nn.Parameter(embedding)
+#         out = out.log_softmax(dim=-1)
+#         y_pred.append(torch.argmax(out, dim=-1, keepdim=True).cpu())
+#         y_true.append(y)
+#     y_pred = torch.cat(y_pred, dim=0)
+#     y_true = torch.cat(y_true, dim=0)
+#     correct = torch.sum(y_pred == y_true)
+#     return correct.item() * 1.0 / len(y_true)
+
+
+# @torch.no_grad()
+# def test_delta(model, device, data_loader, checkpt_file, v_sen=None, v_insen=None):
+#     model.load_state_dict(torch.load(checkpt_file))
+#     model.eval()
+#     y_pred, y_true = [], []
+#     for step, batch in enumerate(data_loader):
+#         x, edge_index, y = batch.x.to(device), batch.edge_index.to(device), batch.y
+#         n_id = batch.n_id
+#         out = model(x, edge_index)
+#         if v_sen is not None or v_insen is not None:
+#             out, embedding = model_utils.feature_merge(model.embedding, out, n_id, v_sen, v_insen)
+#             model.embedding = torch.nn.Parameter(embedding)
+#         out = out.log_softmax(dim=-1)
+#         y_pred.append(torch.argmax(out, dim=-1, keepdim=True).cpu())
+#         y_true.append(y)
+#     y_pred = torch.cat(y_pred, dim=0)
+#     y_true = torch.cat(y_true, dim=0)
+#     correct = torch.sum(y_pred == y_true)
+#     return correct.item() * 1.0 / len(y_true)

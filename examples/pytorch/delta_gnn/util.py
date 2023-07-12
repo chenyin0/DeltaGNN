@@ -1543,3 +1543,42 @@ def load_dataset_index(dataset, path):
         test_idx = np.loadtxt(fp_test_idx, dtype=np.uint32)
 
     return train_idx, val_idx, test_idx
+
+
+def feature_merge_preprocess(data_loader, device, v_sen_id, v_insen_id):
+    """
+    Output:
+        v_sen_feat_loc (Tensor): remapped ID (location) of model's output from v_sen_id
+        v_insen_feat_loc (Tensor): remapped ID (location) of model's output from v_insen_id
+    """
+
+    if v_sen_id is not None or v_insen_id is not None:  # Delta updating
+        """
+        # "feat_n_id" record the original ID of the vertex in the "block" of data_loader
+        # There should be only one batch (full-bach) in data_loader. Because we generate this out of the iteration of data_loader
+        """  
+        feat_n_id = next(iter(data_loader)).n_id
+        # v_sen_id = np.array(list(v_sen_id))
+        v_insen_id = np.array(list(v_insen_id))
+        v_sen_id = np.setdiff1d(feat_n_id, v_insen_id)
+        # v_sen_id = np.intersect1d(feat_n_id, v_sen_id)
+        v_insen_id = np.intersect1d(feat_n_id, v_insen_id)
+
+        v_sen_feat_loc = np.zeros_like(v_sen_id)
+        v_insen_feat_loc = np.zeros_like(v_insen_id)
+        for i, v_sen in enumerate(v_sen_id):
+            v_sen_feat_loc[i] = np.where(feat_n_id == v_sen)[0][0]
+        for i, v_insen in enumerate(v_insen_id):
+            v_insen_feat_loc[i] = np.where(feat_n_id == v_insen)[0][0]
+
+        # v_sen_feat_loc = th.Tensor(v_sen_feat_loc).long()
+        # v_insen_feat_loc = th.Tensor(v_insen_feat_loc).long()
+        v_sen_feat_loc = th.Tensor(v_sen_feat_loc).long().to(device)
+        v_insen_feat_loc = th.Tensor(v_insen_feat_loc).long().to(device)
+    else:
+        v_sen_id = None
+        v_insen_id = None
+        v_sen_feat_loc = None
+        v_insen_feat_loc = None
+
+    return v_sen_feat_loc, v_insen_feat_loc, v_sen_id, v_insen_id
