@@ -161,7 +161,8 @@ def train_delta(model, device, train_loader, lr, weight_decay, v_sen=None, v_ins
         # if y.shape[-1] > 1:
         #     y, ind = torch.split(y, 1, dim=1)
         if v_sen is not None or v_insen is not None:
-            out, embedding = model_utils.feature_merge(model.embedding, out, n_id, v_sen, v_insen)
+            out, embedding = model_utils.feature_merge_graphsage(model.embedding, out, n_id, v_sen,
+                                                                 v_insen)
             model.embedding = torch.nn.Parameter(embedding)  # Update embedding
         loss = F.cross_entropy(out, y.squeeze(1))
         # loss = F.nll_loss(out, y.squeeze(1))
@@ -188,7 +189,8 @@ def validate_delta(model, device, loader, v_sen=None, v_insen=None):
         # if y.shape[-1] > 1:
         #     y, ind = torch.split(y, 1, dim=1)
         if v_sen is not None or v_insen is not None:
-            out, embedding = model_utils.feature_merge(model.embedding, out, n_id, v_sen, v_insen)
+            out, embedding = model_utils.feature_merge_graphsage(model.embedding, out, n_id, v_sen,
+                                                                 v_insen)
         out = out.log_softmax(dim=-1)
         y_pred.append(torch.argmax(out, dim=-1, keepdim=True).cpu())
         y_true.append(y)
@@ -210,7 +212,8 @@ def test_delta(model, device, loader, checkpt_file, v_sen=None, v_insen=None):
         # if y.shape[-1] > 1:
         #     y, ind = torch.split(y, 1, dim=1)
         if v_sen is not None or v_insen is not None:
-            out, embedding = model_utils.feature_merge(model.embedding, out, n_id, v_sen, v_insen)
+            out, embedding = model_utils.feature_merge_graphsage(model.embedding, out, n_id, v_sen,
+                                                                 v_insen)
             model.embedding = torch.nn.Parameter(embedding)
         out = out.log_softmax(dim=-1)
         # y_pred.append(torch.argmax(out, dim=1, keepdim=True).cpu())

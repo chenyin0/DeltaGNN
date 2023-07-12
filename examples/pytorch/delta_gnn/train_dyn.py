@@ -610,14 +610,14 @@ if __name__ == '__main__':
     # args.model = 'gin'
 
     # args.dataset = 'Cora'
-    # args.dataset = 'CiteSeer'
-    args.dataset = 'arxiv'
+    args.dataset = 'CiteSeer'
+    # args.dataset = 'arxiv'
     # args.dataset = 'mag'
 
     # args.dataset = 'PubMed'
     # args.dataset = 'products'
 
-    args.threshold = 5
+    args.threshold = 4
 
     # args.layer = 2
     # args.hidden = 128
@@ -625,9 +625,8 @@ if __name__ == '__main__':
     # args.weight_decay = 0
     # args.dropout = 0.5
     # args.epochs = 1
-    args.gpu = 1
+    args.gpu = 0
     # args.batch_size = pow(2, 13)
-    # args.batch_size = pow(2, 8)
 
     print('\n************ {:s} ************'.format(args.dataset))
     print('>> Task start time: ', time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()))
