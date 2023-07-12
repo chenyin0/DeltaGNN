@@ -458,6 +458,7 @@ def train_delta(args,
                                                  v_sen_feat_loc_train, v_insen_feat_loc_train,
                                                  v_sen_train, v_insen_train)
         elif args.model == 'graphsage':
+            # Remapping feat_loc during each iteration of training, due to the random sampling in graphSAGE
             loss_tra, train_ep = graphsage.train_delta(model, device, train_loader, lr,
                                                        weight_decay, v_sen, v_insen)
         elif args.model == 'gat':
@@ -475,6 +476,7 @@ def train_delta(args,
             f1_val = gcn.validate_delta(model, device, valid_loader, v_sen_feat_loc_val,
                                         v_insen_feat_loc_val, v_sen_val, v_insen_val)
         elif args.model == 'graphsage':
+            # Remapping feat_loc during each iteration of training, due to the random sampling in graphSAGE
             f1_val = graphsage.validate_delta(model, device, valid_loader, v_sen, v_insen)
         elif args.model == 'gat':
             f1_val = gat.validate_delta(model, device, valid_loader, v_sen_feat_loc_val,
@@ -501,71 +503,6 @@ def train_delta(args,
 
     print('Train cost: {:.2f}s'.format(train_time))
     print('The best epoch: {}th'.format(best_epoch))
-
-
-# def train_delta(args,
-#                 model,
-#                 train_loader,
-#                 valid_loader,
-#                 device,
-#                 checkpt_file,
-#                 lr,
-#                 weight_decay,
-#                 v_sen=None,
-#                 v_insen=None):
-#     bad_counter = 0
-#     best = 0
-#     best_epoch = 0
-#     train_time = 0
-#     model.reset_parameters()
-#     print("--------------------------")
-#     print("Training...")
-
-#     args.epochs = 1000
-
-#     for epoch in range(args.epochs):
-#         if args.model == 'gcn':
-#             loss_tra, train_ep = gcn.train_delta(model, device, train_loader, lr, weight_decay,
-#                                                  v_sen, v_insen)
-#         elif args.model == 'graphsage':
-#             loss_tra, train_ep = graphsage.train_delta(model, device, train_loader, lr,
-#                                                        weight_decay, v_sen, v_insen)
-#         elif args.model == 'gat':
-#             loss_tra, train_ep = gat.train_delta(model, device, train_loader, lr, weight_decay,
-#                                                  v_sen, v_insen)
-#         elif args.model == 'gin':
-#             loss_tra, train_ep = gin.train_delta(model, device, train_loader, lr, weight_decay,
-#                                                  v_sen, v_insen)
-
-#         t_st = time.time()
-
-#         if args.model == 'gcn':
-#             f1_val = gcn.validate_delta(model, device, valid_loader, v_sen, v_insen)
-#         elif args.model == 'graphsage':
-#             f1_val = graphsage.validate_delta(model, device, valid_loader, v_sen, v_insen)
-#         elif args.model == 'gat':
-#             f1_val = gat.validate_delta(model, device, valid_loader, v_sen, v_insen)
-#         elif args.model == 'gin':
-#             f1_val = gin.validate_delta(model, device, valid_loader, v_sen, v_insen)
-
-#         train_time += train_ep
-#         if (epoch + 1) % 20 == 0:
-#             print('Epoch:{:02d}, Train_loss:{:.3f}, Valid_acc:{:.2f}%, Time_cost:{:.3f}/{:.3f}'.
-#                   format(epoch + 1, loss_tra, 100 * f1_val, train_ep, train_time))
-#             # print('Remove print')
-#         if f1_val > best:
-#             best = f1_val
-#             best_epoch = epoch + 1
-#             t_st = time.time()
-#             torch.save(model.state_dict(), checkpt_file)
-#             bad_counter = 0
-#         else:
-#             bad_counter += 1
-#         if bad_counter == args.patience:
-#             break
-
-#     print('Train cost: {:.2f}s'.format(train_time))
-#     print('The best epoch: {}th'.format(best_epoch))
 
 
 def test_delta(model, test_loader, device, checkpt_file, v_sen=None, v_insen=None):

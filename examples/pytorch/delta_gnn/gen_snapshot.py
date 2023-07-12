@@ -188,7 +188,7 @@ def planetoid(dataset_name, num_snap):
     if dataset_name == 'Cora':
         init_ratio = 0.35
     if dataset_name == 'CiteSeer':
-        init_ratio = 0.45
+        init_ratio = 0.4
 
     init_num = round(len(idx_with_time_seq) * init_ratio)
     drop_idx = idx_with_time_seq[init_num:]
@@ -974,8 +974,8 @@ if __name__ == "__main__":
     # products()
     # arxiv()
 
-    gen_dataset_snapshot('Cora', 10)
-    # gen_dataset_snapshot('CiteSeer', 10)
+    # gen_dataset_snapshot('Cora', 10)
+    gen_dataset_snapshot('CiteSeer', 10)
     # gen_dataset_snapshot('PubMed', 10)
     # gen_dataset_snapshot('arxiv', 16)
     # gen_dataset_snapshot('reddit', 16)

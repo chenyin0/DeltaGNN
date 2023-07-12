@@ -51,12 +51,8 @@ def feature_merge(embedding, feat, feat_n_id, v_sen_feat_loc, v_insen_feat_loc, 
         v_insen (Tensor): vertex ID of insensitive vertices
     """
 
-    # Compulsorily execute in CPU (GPU not suits for scalar execution)
     device = feat.device
     time_start = time.perf_counter()
-
-    # feat = feat.to('cpu')
-    # embedding = embedding.to('cpu')
 
     # load_time = time.perf_counter() - time_start
     # print('>> Load feat: {}'.format(util.time_format(load_time)))
@@ -86,9 +82,6 @@ def feature_merge(embedding, feat, feat_n_id, v_sen_feat_loc, v_insen_feat_loc, 
     else:
         feat_update = feat
 
-    # feat_update = feat_update.to(device)
-    # embedding_update = embedding_update.to(device)
-
     return feat_update, embedding_update
 
 
@@ -102,12 +95,8 @@ def feature_merge_graphsage(embedding, feat, feat_n_id, v_sen_id, v_insen_id):
         v_insen (Tensor): vertex ID of insensitive vertices
     """
 
-    # Compulsorily execute in CPU (GPU not suits for scalar execution)
     device = feat.device
     time_start = time.perf_counter()
-
-    # feat = feat.to('cpu')
-    # embedding = embedding.to('cpu')
 
     # load_time = time.perf_counter() - time_start
     # print('>> Load feat: {}'.format(util.time_format(load_time)))
@@ -152,9 +141,6 @@ def feature_merge_graphsage(embedding, feat, feat_n_id, v_sen_id, v_insen_id):
         feat_update = embedding_update.index_select(0, feat_n_id)
     else:
         feat_update = feat
-
-    # feat_update = feat_update.to(device)
-    # embedding_update = embedding_update.to(device)
 
     return feat_update, embedding_update
 
