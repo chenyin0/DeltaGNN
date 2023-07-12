@@ -462,7 +462,8 @@ def train_delta(args,
                                                        weight_decay, v_sen, v_insen)
         elif args.model == 'gat':
             loss_tra, train_ep = gat.train_delta(model, device, train_loader, lr, weight_decay,
-                                                 v_sen, v_insen)
+                                                 v_sen_feat_loc_train, v_insen_feat_loc_train,
+                                                 v_sen_train, v_insen_train)
         elif args.model == 'gin':
             loss_tra, train_ep = gin.train_delta(model, device, train_loader, lr, weight_decay,
                                                  v_sen, v_insen)
@@ -475,7 +476,8 @@ def train_delta(args,
         elif args.model == 'graphsage':
             f1_val = graphsage.validate_delta(model, device, valid_loader, v_sen, v_insen)
         elif args.model == 'gat':
-            f1_val = gat.validate_delta(model, device, valid_loader, v_sen, v_insen)
+            f1_val = gat.validate_delta(model, device, valid_loader, v_sen_feat_loc_val,
+                                        v_insen_feat_loc_val, v_sen_val, v_insen_val)
         elif args.model == 'gin':
             f1_val = gin.validate_delta(model, device, valid_loader, v_sen, v_insen)
 
@@ -604,13 +606,13 @@ if __name__ == '__main__':
     parser.add_argument('--gpu', type=int, default=-1, help='gpu')
     args = parser.parse_args()
 
-    args.model = 'gcn'
+    # args.model = 'gcn'
     # args.model = 'graphsage'
-    # args.model = 'gat'
+    args.model = 'gat'
     # args.model = 'gin'
 
     # args.dataset = 'Cora'
-    args.dataset = 'CiteSeer'
+    # args.dataset = 'CiteSeer'
     # args.dataset = 'arxiv'
     # args.dataset = 'mag'
 
