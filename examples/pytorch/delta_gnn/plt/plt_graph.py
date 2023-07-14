@@ -44,19 +44,62 @@ from matplotlib.pyplot import MultipleLocator
 #     # igraph.plot(g, layout)
 #     # fig.show()
 
+# def plot_degree_distribution(degree_list):
+#     node_totol_num = 0
+#     degree_list = degree_list[1:]
+#     for i in degree_list:
+#         node_totol_num += i
 
-def plot_degree_distribution(degree_list):
-    node_totol_num = 0
-    degree_list = degree_list[1:]
-    for i in degree_list:
-        node_totol_num += i
+#     x = [i for i in range(len(degree_list))]
+#     y = [round(degree_list[i] * 100 / node_totol_num) for i in range(len(degree_list))]
+#     # y = [degree_list[i] for i in range(len(degree_list))]
+
+#     fig = plt.figure(figsize=(3, 3.3))
+#     bax = brokenaxes(xlims=((0, 22), (165, 170)), hspace=1, despine=False)
+#     bax.bar(x, y)
+
+#     for ax in bax.axs:
+#         # ax.yaxis.set_major_formatter(ticker.PercentFormatter(xmax=1, decimals=0))
+#         ax.xaxis.set_tick_params(labelsize=13)
+#         ax.yaxis.set_tick_params(labelsize=13)
+
+#         # ax.xaxis.set_tick_params(bottom=False)
+#         # ax.yaxis.set_tick_params(bottom=False)
+
+#         ax.xaxis.set_major_locator(MultipleLocator(5))
+
+#     bax.set_xlabel('Vertex degree', labelpad=20, fontsize=16)
+#     bax.set_ylabel('Vertex Distribution (%)', labelpad=25, fontsize=16)
+
+#     plt.savefig('./figure/degree_distribution/deg_dist' + dataset_name + '.pdf',
+#                 dpi=600,
+#                 bbox_inches="tight",
+#                 pad_inches=0)
+
+
+def plot_degree_distribution(vertex_num, degree_list, dataset_name):
+    node_totol_num = vertex_num
 
     x = [i for i in range(len(degree_list))]
-    y = [round(degree_list[i] * 100 / node_totol_num) for i in range(len(degree_list))]
+    y = [round(len(degree_list[i]) * 100 / node_totol_num, 2) for i in range(len(degree_list))]
     # y = [degree_list[i] for i in range(len(degree_list))]
 
+    # Skip deg = 0
+    x = x[1:]
+    y = y[1:]
+
+    deg_broken = 0
+    for i, deg_rate in enumerate(y):
+        if deg_rate < 1:
+            deg_broken = i
+            break
+    deg_broken += 10
+    deg_max = len(degree_list)
+    # deg_interval = round(deg_max / 6)
+
     fig = plt.figure(figsize=(3, 3.3))
-    bax = brokenaxes(xlims=((0, 22), (165, 170)), hspace=1, despine=False)
+    bax = brokenaxes(xlims=((0, deg_broken), (deg_max, deg_max + 5)), hspace=1, despine=False)
+    # bax = brokenaxes(xlims=((0, 50), (3320, 3400)), hspace=1, despine=False)
     bax.bar(x, y)
 
     for ax in bax.axs:
@@ -68,11 +111,13 @@ def plot_degree_distribution(degree_list):
         # ax.yaxis.set_tick_params(bottom=False)
 
         ax.xaxis.set_major_locator(MultipleLocator(5))
+        ax.tick_params('y', labelsize=10)
+        ax.tick_params('x', labelrotation=30, labelsize=10)
 
-    bax.set_xlabel('Vertex degree', labelpad=20, fontsize=16)
-    bax.set_ylabel('Vertex Distribution (%)', labelpad=25, fontsize=16)
+    bax.set_xlabel('Vertex degree', labelpad=20, fontsize=14)
+    bax.set_ylabel('Vertex Distribution (%)', labelpad=25, fontsize=14)
 
-    plt.savefig('../../../figure/degree_distribution.pdf',
+    plt.savefig('./figure/degree_distribution/deg_dist_' + dataset_name + '.pdf',
                 dpi=600,
                 bbox_inches="tight",
                 pad_inches=0)
