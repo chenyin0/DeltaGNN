@@ -6,9 +6,15 @@ deg_interval_cora = [[0, 1], [1, 2], [2, 3], [3, 4], [4, 5], [5, 6], [6, 7], [7,
                      [9, 11], [11, 16], [16, 168]]
 deg_interval_citeseer = [[0, 1], [1, 2], [2, 3], [3, 4], [4, 5], [5, 6], [6, 7], [7, 8], [8, 9],
                          [9, 11], [11, 16], [16, 99]]
+deg_interval_actor = [[0, 1], [1, 2], [2, 3], [3, 4], [4, 5], [5, 6], [6, 7], [7, 8], [8, 9],
+                      [9, 11], [11, 16], [16, 73]]
+deg_interval_wikics = [[0, 10], [10, 20], [20, 30], [30, 40], [40, 50], [50, 60], [60, 70],
+                       [70, 80], [80, 90], [90, 110], [110, 160], [160, 3324]]
 
-dataset_list = ['Cora', 'CiteSeer']
+# dataset_list = ['Cora', 'CiteSeer']
+dataset_list = ['Actor', 'WikiCS']
 degree_type_list = ['outdeg', 'indeg']
+# degree_type_list = ['outdeg']
 
 # noise_intensity = [0.1, 0.5, 1, 2, 5]
 # noise_intensity = [0.1, 0.5, 1]
@@ -37,6 +43,10 @@ for dataset in dataset_list:
         deg_interval = deg_interval_cora
     elif dataset == 'CiteSeer':
         deg_interval = deg_interval_citeseer
+    elif dataset == 'Actor':
+        deg_interval = deg_interval_actor
+    elif dataset == 'WikiCS':
+        deg_interval = deg_interval_wikics
 
     for degree_type in degree_type_list:
         for deg_region in deg_interval:
@@ -54,12 +64,14 @@ for dataset in dataset_list:
                     # intensity = str(intensity)
                     # ratio = str(node_ratio)
 
-                    log_path = './results/sensitivity/' + dataset + '_' + degree_type + '_intense_' + str(intensity) + '_deg_' + str(deg_begin) + '-' + str(deg_end) + '.txt'
+                    log_path = './results/sensitivity/' + dataset + '_' + degree_type + '_intense_' + str(
+                        intensity) + '_deg_' + str(deg_begin) + '-' + str(deg_end) + '.txt'
                     os.system('rm ' + log_path)
 
-                    os.system('/usr/bin/python3.8 ./gcn_sensitive.py --dataset=' + dataset + ' --n-epochs=' +
-                            epoch_str + ' --degree-type='+ degree_type + ' --deg-begin=' + str(deg_begin) + ' --deg-end=' +
-                            str(deg_end) + ' --noise-intensity=' + str(intensity) + ' --node-ratio=' +
-                            str(ratio) + ' | tee -a ' + log_path)
+                    os.system('/usr/bin/python3.8 ./gcn_sensitive.py --dataset=' + dataset +
+                              ' --n-epochs=' + epoch_str + ' --degree-type=' + degree_type +
+                              ' --deg-begin=' + str(deg_begin) + ' --deg-end=' + str(deg_end) +
+                              ' --noise-intensity=' + str(intensity) + ' --node-ratio=' +
+                              str(ratio) + ' | tee -a ' + log_path)
 
 print('\n>> Task execution time: {:.4}s'.format(time.perf_counter() - Task_time_start))
