@@ -1,11 +1,11 @@
 import argparse
-import time
+# import time
 import numpy as np
 import torch
 import torch as th
 import torch.nn.functional as F
-import dgl
-from dgl.data import CoraGraphDataset, CiteseerGraphDataset, PubmedGraphDataset
+# import dgl
+# from dgl.data import CoraGraphDataset, CiteseerGraphDataset, PubmedGraphDataset
 
 # from model.gcn import GCN
 #from gcn_mp import GCN
@@ -13,64 +13,14 @@ from dgl.data import CoraGraphDataset, CiteseerGraphDataset, PubmedGraphDataset
 
 # import plt_graph
 import random
-import math
-import copy
-import util
+# import math
+# import util
 
 from torch_geometric.nn import GCNConv
-from torch_geometric.datasets import Planetoid
+from torch_geometric.datasets import Planetoid, WikiCS, GitHub, FacebookPagePage, Actor
 import copy as cp
 
-# def train(model, features, n_edges, train_mask, val_mask, labels, loss_fcn, optimizer):
-#     # initialize graph
-#     dur = []
-#     for epoch in range(args.n_epochs):
-#         model.train()
-#         if epoch >= 3:
-#             t0 = time.time()
-#         # forward
-#         logits = model(features)
-#         loss = loss_fcn(logits[train_mask], labels[train_mask])
-
-#         optimizer.zero_grad()
-#         loss.backward()
-#         optimizer.step()
-
-#         if epoch >= 3:
-#             dur.append(time.time() - t0)
-
-#         acc = evaluate(model, features, labels, val_mask)
-#         # print("Epoch {:05d} | Time(s) {:.4f} | Loss {:.4f} | Accuracy {:.4f} | "
-#         #       "ETputs(KTEPS) {:.2f}".format(epoch, np.mean(dur), loss.item(),
-#         #                                     acc, n_edges / np.mean(dur) / 1000))
-
-# def evaluate(model, features, labels, mask):
-#     model.eval()
-#     with torch.no_grad():
-#         logits = model(features)
-#         logits = logits[mask]
-#         labels = labels[mask]
-#         _, indices = torch.max(logits, dim=1)
-#         correct = torch.sum(indices == labels)
-#         return correct.item() * 1.0 / len(labels)
-
-# def train(model, data, optimizer):
-#     model.train()
-#     optimizer.zero_grad()
-#     out = model(data.x, data.edge_index, data.edge_attr)
-#     loss = F.cross_entropy(out[data.train_mask], data.y[data.train_mask])
-#     loss.backward()
-#     optimizer.step()
-#     return float(loss)
-
-# def test(model, data):
-#     model.eval()
-#     pred = model(data.x, data.edge_index, data.edge_attr).argmax(dim=-1)
-
-#     accs = []
-#     for mask in [data.train_mask, data.val_mask, data.test_mask]:
-#         accs.append(int((pred[mask] == data.y[mask]).sum()) / int(mask.sum()))
-#     return accs
+import plt.plt_graph as plt_graph
 
 
 class GCN(torch.nn.Module):
@@ -97,7 +47,16 @@ def train(model, data):
                                  lr=args.lr)  # Only perform weight-decay on first convolution.
     optimizer.zero_grad()
     out = model(data.x, data.edge_index, data.edge_attr)
-    loss = F.cross_entropy(out[data.train_mask], data.y[data.train_mask])
+
+    # train_mask_index = th.LongTensor(np.arange(0, out.shape[-1])).to(device)
+    # train_mask = th.index_select(data.train_mask, 1, train_mask_index)
+    dim = data.train_mask.dim()
+    if dim > 1:
+        train_mask = data.train_mask[:, 0]
+    else:
+        train_mask = data.train_mask
+    # train_mask = th.chunk(data.train_mask, data.train_mask.shape[0], dim=dim)
+    loss = F.cross_entropy(out[train_mask], data.y[train_mask])
     loss.backward()
     optimizer.step()
     return float(loss)
@@ -112,15 +71,23 @@ def test(model, data):
     #     accs.append(int((pred[mask] == data.y[mask]).sum()) / int(mask.sum()))
     # return accs
 
-    acc = int((pred[data.test_mask] == data.y[data.test_mask]).sum()) / int(data.test_mask.sum())
+    dim = data.test_mask.dim()
+    if dim > 1:
+        test_mask = data.test_mask[:, 0]
+    else:
+        test_mask = data.test_mask
+
+    acc = int((pred[test_mask] == data.y[test_mask]).sum()) / int(test_mask.sum())
     return acc
 
 
 def count_vertex_indegree(edge_index, vertex_num):
     v_indegree = np.zeros(vertex_num)
     in_degree = edge_index[0].numpy()
-    for v in range(vertex_num):
-        v_indegree[v] = np.sum(in_degree == v)
+    # for v in range(vertex_num):
+    #     v_indegree[v] = np.sum(in_degree == v)
+    for v in in_degree:
+        v_indegree[v] += 1
 
     v_indegree = th.Tensor(v_indegree).long()
     return v_indegree
@@ -143,83 +110,6 @@ def degree_distribute(in_degree):
     return degree_list
 
 
-# def degree_distribute(g):
-#     # Statistic graph typology
-#     in_degree = g.in_degrees()
-#     # print(in_degree.tolist())
-#     # out_degree = g.out_degrees()
-#     # print()
-#     # print(out_degree.tolist())
-#     in_degree_max = torch.max(in_degree, 0)[0]
-#     in_degree_min = torch.min(in_degree, 0)[0]
-
-#     degree_list = [[] for i in range(in_degree_max + 1)]
-#     for node_id in range(len(in_degree)):
-#         degree_list[in_degree[node_id]].append(node_id)
-
-#     return degree_list
-
-# def add_noise_out_deg(g, degree_list, degree_begin, degree_end, intensity, node_ratio):
-#     """
-#     node ratio: the proportion of the total nodes which added noise
-#     intensity: the proportion of the noise amplitude with the original feature value
-#     """
-#     print()
-#     in_feats = g.ndata['feat'].shape[1]
-#     degree_end = min(degree_end, len(degree_list))  # Avoid over boundary
-#     num = round(g.number_of_nodes() * node_ratio)
-#     for degree_val in range(degree_begin, degree_end):
-#         node_list = degree_list[degree_val]
-#         # node_num = len(node_list)
-#         # num = round(node_num * node_ratio)
-#         loc_list = range(len(node_list))
-#         print('>> Deg: ', degree_val, ' Node num: ', len(loc_list), ' Selet node num: ', num)
-
-#         noise = torch.rand(in_feats)
-#         device = g.device
-#         noise = noise.to(device)
-#         noise = th.mul(noise, intensity)
-#         loc = random.sample(loc_list, min(num, len(loc_list)))
-#         # loc = random.sample(loc_list, num)
-#         for i in loc:
-#             node_id = node_list[i]
-#             # Add random noise on node feature
-#             # print(g.ndata['feat'][node_id].tolist())
-
-#             g.ndata['feat'][node_id] = th.add(noise, g.ndata['feat'][node_id])
-
-# def add_noise_in_deg(g, degree_list, degree_begin, degree_end, intensity, node_ratio):
-#     """
-#     node ratio: the proportion of the total nodes which added noise
-#     intensity: the proportion of the noise amplitude with the original feature value
-
-#     Note: intensity should be amortized by degree
-#     """
-#     print()
-#     in_feats = g.ndata['feat'].shape[1]
-#     degree_end = min(degree_end, len(degree_list))  # Avoid over boundary
-#     num = round(g.number_of_nodes() * node_ratio)
-#     for degree_val in range(degree_begin, degree_end):
-#         node_list = degree_list[degree_val]
-#         # node_num = len(node_list)
-#         # num = round(node_num * node_ratio)
-#         loc_list = range(len(node_list))
-#         print('>> Deg: ', degree_val, ' Node num: ', len(loc_list), ' Selet node num: ', num)
-
-#         noise = torch.rand(in_feats)
-#         device = g.device
-#         noise = noise.to(device)
-#         noise = th.mul(noise, intensity / max(degree_val, 1))  # Avoid division by zero (degree = 0)
-#         loc = random.sample(loc_list, min(num, len(loc_list)))
-#         # loc = random.sample(loc_list, num)
-#         for i in loc:
-#             node_id = node_list[i]
-#             # Add random noise on node feature
-#             # print(g.ndata['feat'][node_id].tolist())
-
-#             g.ndata['feat'][node_id] = th.add(noise, g.ndata['feat'][node_id])
-
-
 def add_noise_out_deg(data, degree_list, degree_begin, degree_end, intensity, node_ratio,
                       vertex_num, device):
     """
@@ -236,7 +126,13 @@ def add_noise_out_deg(data, degree_list, degree_begin, degree_end, intensity, no
         # node_num = len(node_list)
         # num = round(node_num * node_ratio)
         loc_list = range(len(node_list))
-        print('>> Deg: ', degree_val, ' Node num: ', len(loc_list), ' Selet node num: ', num, flush=True)
+        print('>> Deg: ',
+              degree_val,
+              ' Node num: ',
+              len(loc_list),
+              ' Selet node num: ',
+              num,
+              flush=True)
 
         noise = torch.rand(in_feats)
         # device = g.device
@@ -271,12 +167,19 @@ def add_noise_in_deg(data, degree_list, degree_begin, degree_end, intensity, nod
         # node_num = len(node_list)
         # num = round(node_num * node_ratio)
         loc_list = range(len(node_list))
-        print('>> Deg: ', degree_val, ' Node num: ', len(loc_list), ' Selet node num: ', num, flush=True)
+        print('>> Deg: ',
+              degree_val,
+              ' Node num: ',
+              len(loc_list),
+              ' Selet node num: ',
+              num,
+              flush=True)
 
         noise = torch.rand(in_feats)
         # device = g.device
         noise = noise.to(device)
-        noise = th.mul(noise, intensity / max(degree_val, 1))  # Avoid division by zero (degree = 0)
+        noise = th.mul(noise,
+                       intensity / max(degree_val, 1))  # Intensity is amortized by the indegree
         loc = random.sample(loc_list, min(num, len(loc_list)))
         # loc = random.sample(loc_list, num)
         for i in loc:
@@ -289,31 +192,19 @@ def add_noise_in_deg(data, degree_list, degree_begin, degree_end, intensity, nod
 
 
 def main(args):
-    # load and preprocess dataset
-    # if args.dataset == 'cora':
-    #     data = CoraGraphDataset(raw_dir='../../../dataset', reverse_edge=False)
-    # elif args.dataset == 'citeseer':
-    #     data = CiteseerGraphDataset(raw_dir='../../../dataset', reverse_edge=False)
-    # elif args.dataset == 'pubmed':
-    #     data = PubmedGraphDataset(raw_dir='../../../dataset', reverse_edge=False)
-    # else:
-    #     raise ValueError('Unknown dataset: {}'.format(args.dataset))
-
     # Load and preprocess dataset
     if args.dataset == 'Cora' or args.dataset == 'CiteSeer':
         dataset = Planetoid('./dataset', args.dataset)
+    if args.dataset == 'WikiCS':
+        dataset = WikiCS('./dataset')
+    if args.dataset == 'GitHub':
+        dataset = GitHub('./dataset' + args.dataset)
+    if args.dataset == 'FacebookPagePage':
+        dataset = FacebookPagePage('./dataset' + args.dataset)
+    if args.dataset == 'Actor':
+        dataset = Actor('./dataset/' + args.dataset)
 
     data = dataset[0]
-
-    # g = data[0]
-    # if args.gpu < 0:
-    #     cuda = False
-    # else:
-    #     cuda = True
-    #     g = g.int().to(args.gpu)
-
-    # g = data[0]
-    # util.save_graph_csr(g, args.dataset)
 
     if args.gpu < 0:
         cuda = False
@@ -328,69 +219,15 @@ def main(args):
     in_degree_max = th.max(in_degree)
     degree_list = degree_distribute(in_degree)
 
+    plt_graph.plot_degree_distribution(vertex_num, degree_list, args.dataset)
+
     task_round = args.n_round
     acc_task = [0] * task_round
     for task_round_id in range(task_round):
 
-        # g = copy.deepcopy(data[0])
-        # if args.gpu < 0:
-        #     cuda = False
-        # else:
-        #     cuda = True
-        #     g = g.int().to(args.gpu)
-
-        # Add noise
-
-        # plt_graph.plot_degree_distribution(degree_list)
-        # add_noise(g, degree_list, 8, 9, 0.1, 33)
-
-        # features = g.ndata['feat']
-        # # torch.set_printoptions(profile="full")
-        # # print(features)
-        # # torch.set_printoptions(profile="default")
-        # labels = g.ndata['label']
-        # train_mask = g.ndata['train_mask']
-        # val_mask = g.ndata['val_mask']
-        # test_mask = g.ndata['test_mask']
-        # in_feats = features.shape[1]
-        # n_classes = data.num_labels
-        # n_edges = g.number_of_edges()
-        # print("""----Data statistics------'
-        # #Edges %d
-        # #Classes %d
-        # #Train samples %d
-        # #Val samples %d
-        # #Test samples %d""" %
-        #       (n_edges, n_classes, train_mask.int().sum().item(),
-        #        val_mask.int().sum().item(), test_mask.int().sum().item()))
-
-        # # add self loop
-        # if args.self_loop:
-        #     g = dgl.remove_self_loop(g)
-        #     g = dgl.add_self_loop(g)
-        # n_edges = g.number_of_edges()
-
-        # # normalization
-        # degs = g.in_degrees().float()
-        # norm = torch.pow(degs, -0.5)
-        # norm[torch.isinf(norm)] = 0
-        # if cuda:
-        #     norm = norm.cuda()
-        # g.ndata['norm'] = norm.unsqueeze(1)
-
-        # create GCN model
-        # model = GCN(g, in_feats, args.n_hidden, n_classes, args.n_layers, F.relu, args.dropout)
-
         data_t = cp.deepcopy(data)
         model = GCN(dataset.num_features, args.n_hidden, dataset.num_classes)
         model, data_t = model.to(device), data_t.to(device)
-
-        # if cuda:
-        #     model.cuda()
-        # loss_fcn = torch.nn.CrossEntropyLoss()
-
-        # train(model, features, model.g.number_of_edges(), train_mask, val_mask, labels, loss_fcn,
-        #       optimizer)
 
         for epoch in range(1, args.n_epochs + 1):
             train(model, data_t)
@@ -400,14 +237,13 @@ def main(args):
         noise_intensity = args.noise_intensity
         node_ratio = args.node_ratio
         if args.degree_type == 'indeg':
-            add_noise_in_deg(data_t, degree_list, deg_begin, deg_end, noise_intensity * 4, node_ratio, vertex_num, device)
+            add_noise_in_deg(data_t, degree_list, deg_begin, deg_end, noise_intensity * 4,
+                             node_ratio, vertex_num, device)
         elif args.degree_type == 'outdeg':
-            add_noise_out_deg(data_t, degree_list, deg_begin, deg_end, noise_intensity, node_ratio,
-                          vertex_num, device)
-        
+            add_noise_out_deg(data_t, degree_list, deg_begin, deg_end, noise_intensity * 2,
+                              node_ratio, vertex_num, device)
 
         print()
-        # acc = evaluate(model, features, labels, test_mask)
         acc = test(model, data_t)
         print("Test accuracy {:.2%}".format(acc))
         acc_task[task_round_id] = acc
@@ -452,20 +288,26 @@ if __name__ == '__main__':
                         default=5,
                         help="output the average accuracy of n-round execution")
     parser.add_argument('--use_gdc', action='store_true', help='Use GDC')
-    parser.add_argument('--degree-type', type=str, default='indeg', help='Indentify indegree or outdegree')
+    parser.add_argument('--degree-type',
+                        type=str,
+                        default='indeg',
+                        help='Indentify indegree or outdegree')
     parser.set_defaults(self_loop=False)
     args = parser.parse_args()
 
-
     # args.dataset = 'Cora'
-    # # args.dataset = 'CiteSeer'
+    # args.dataset = 'CiteSeer'
+    args.dataset = 'WikiCS'
+    # args.dataset = 'Actor'
+    # args.dataset = 'FacebookPagePage'
+    # args.dataset = 'GitHub'
 
-    # args.degree_type = 'indeg'
-    # args.gpu = 0
-    # args.noise_intensity = 0.2
-    # args.node_ratio = 0.6
-    # args.deg_begin = 3
-    # args.deg_end = 4
+    args.degree_type = 'indeg'
+    args.gpu = 1
+    args.noise_intensity = 0.2
+    args.node_ratio = 0.6
+    args.deg_begin = 3
+    args.deg_end = 4
 
     # print(args)
     main(args)
