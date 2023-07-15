@@ -110,8 +110,8 @@ def degree_distribute(in_degree):
     return degree_list
 
 
-def add_noise_out_deg(data, degree_list, degree_begin, degree_end, intensity, node_ratio,
-                      vertex_num, device):
+def add_noise_out_deg(data, degree_list, deg_begin, deg_end, intensity, node_ratio, vertex_num,
+                      device):
     """
     node ratio: the proportion of the total nodes which added noise
     intensity: the proportion of the noise amplitude with the original feature value
@@ -119,37 +119,35 @@ def add_noise_out_deg(data, degree_list, degree_begin, degree_end, intensity, no
     print()
     # in_feats = g.ndata['feat'].shape[1]
     in_feats = data.x.shape[1]
-    degree_end = min(degree_end, len(degree_list))  # Avoid over boundary
+    deg_end = min(deg_end, len(degree_list))  # Avoid over boundary
     num = round(vertex_num * node_ratio)
-    for degree_val in range(degree_begin, degree_end):
-        node_list = degree_list[degree_val]
-        # node_num = len(node_list)
-        # num = round(node_num * node_ratio)
-        loc_list = range(len(node_list))
-        print('>> Deg: ',
-              degree_val,
-              ' Node num: ',
-              len(loc_list),
-              ' Selet node num: ',
-              num,
-              flush=True)
 
-        noise = torch.rand(in_feats)
-        # device = g.device
-        noise = noise.to(device)
-        noise = th.mul(noise, intensity)
-        loc = random.sample(loc_list, min(num, len(loc_list)))
-        # loc = random.sample(loc_list, num)
-        for i in loc:
-            node_id = node_list[i]
-            # Add random noise on node feature
-            # print(g.ndata['feat'][node_id].tolist())
+    node_list = degree_list[deg_begin:deg_end]
+    node_list = [i for bin in node_list for i in bin]
+    loc_list = range(len(node_list))
+    print('>> Deg: [',
+          deg_begin,
+          ',',
+          deg_end,
+          '] ',
+          ' Node num: ',
+          len(loc_list),
+          ' Selet node num: ',
+          num,
+          flush=True)
 
-            # g.ndata['feat'][node_id] = th.add(noise, g.ndata['feat'][node_id])
-            data.x[node_id] = th.add(noise, data.x[node_id])
+    noise = torch.rand(in_feats)
+    # device = g.device
+    noise = noise.to(device)
+    noise = th.mul(noise, intensity)
+    loc = random.sample(loc_list, min(num, len(loc_list)))
+    # loc = random.sample(loc_list, num)
+    for i in loc:
+        node_id = node_list[i]
+        data.x[node_id] = th.add(noise, data.x[node_id])
 
 
-def add_noise_in_deg(data, degree_list, degree_begin, degree_end, intensity, node_ratio, vertex_num,
+def add_noise_in_deg(data, degree_list, deg_begin, deg_end, intensity, node_ratio, vertex_num,
                      device):
     """
     node ratio: the proportion of the total nodes which added noise
@@ -160,35 +158,33 @@ def add_noise_in_deg(data, degree_list, degree_begin, degree_end, intensity, nod
     print()
     # in_feats = g.ndata['feat'].shape[1]
     in_feats = data.x.shape[1]
-    degree_end = min(degree_end, len(degree_list))  # Avoid over boundary
+    deg_end = min(deg_end, len(degree_list))  # Avoid over boundary
     num = round(vertex_num * node_ratio)
-    for degree_val in range(degree_begin, degree_end):
-        node_list = degree_list[degree_val]
-        # node_num = len(node_list)
-        # num = round(node_num * node_ratio)
-        loc_list = range(len(node_list))
-        print('>> Deg: ',
-              degree_val,
-              ' Node num: ',
-              len(loc_list),
-              ' Selet node num: ',
-              num,
-              flush=True)
 
-        noise = torch.rand(in_feats)
-        # device = g.device
-        noise = noise.to(device)
-        noise = th.mul(noise,
-                       intensity / max(degree_val, 1))  # Intensity is amortized by the indegree
-        loc = random.sample(loc_list, min(num, len(loc_list)))
-        # loc = random.sample(loc_list, num)
-        for i in loc:
-            node_id = node_list[i]
-            # Add random noise on node feature
-            # print(g.ndata['feat'][node_id].tolist())
+    node_list = degree_list[deg_begin:deg_end]
+    node_list = [i for bin in node_list for i in bin]
+    loc_list = range(len(node_list))
+    print('>> Deg: [',
+          deg_begin,
+          ',',
+          deg_end,
+          '] ',
+          ' Node num: ',
+          len(loc_list),
+          ' Selet node num: ',
+          num,
+          flush=True)
 
-            # g.ndata['feat'][node_id] = th.add(noise, g.ndata['feat'][node_id])
-            data.x[node_id] = th.add(noise, data.x[node_id])
+    noise = torch.rand(in_feats)
+    # device = g.device
+    noise = noise.to(device)
+    noise = th.mul(noise, intensity / max(round(
+        (deg_begin + deg_end) / 2), 1))  # Intensity is amortized by the indegree
+    loc = random.sample(loc_list, min(num, len(loc_list)))
+    # loc = random.sample(loc_list, num)
+    for i in loc:
+        node_id = node_list[i]
+        data.x[node_id] = th.add(noise, data.x[node_id])
 
 
 def main(args):
@@ -219,7 +215,8 @@ def main(args):
     in_degree_max = th.max(in_degree)
     degree_list = degree_distribute(in_degree)
 
-    plt_graph.plot_degree_distribution(vertex_num, degree_list, args.dataset)
+    # # Plot vertex degree distribution
+    # plt_graph.plot_degree_distribution(vertex_num, degree_list, args.dataset)
 
     task_round = args.n_round
     acc_task = [0] * task_round
@@ -295,19 +292,19 @@ if __name__ == '__main__':
     parser.set_defaults(self_loop=False)
     args = parser.parse_args()
 
-    # args.dataset = 'Cora'
+    args.dataset = 'Cora'
     # args.dataset = 'CiteSeer'
-    args.dataset = 'WikiCS'
+    # args.dataset = 'WikiCS'
     # args.dataset = 'Actor'
     # args.dataset = 'FacebookPagePage'
     # args.dataset = 'GitHub'
 
-    args.degree_type = 'indeg'
+    args.degree_type = 'outdeg'
     args.gpu = 1
     args.noise_intensity = 0.2
-    args.node_ratio = 0.6
-    args.deg_begin = 3
-    args.deg_end = 4
+    args.node_ratio = 0.02
+    args.deg_begin = 2
+    args.deg_end = 3
 
     # print(args)
     main(args)
