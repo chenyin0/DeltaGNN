@@ -179,10 +179,7 @@ def main(args):
     edge_index_evo_delta = edge_index_init.clone().detach()
     train_delta(args, model_delta, train_loader, valid_loader, device, checkpt_file_delta, lr,
                 weight_decay)
-    # train(args, model_delta, train_loader, valid_loader, device, checkpt_file_delta, lr,
-    #             weight_decay)
     acc_delta = test_delta(model_delta, test_loader, device, checkpt_file_delta)
-    # acc_delta = test(model_delta, test_loader, device, checkpt_file_delta)
     # acc_delta = 0
 
     accuracy.append([0, acc_wo_retrain * 100, acc_retrain * 100, acc_delta * 100])
@@ -213,17 +210,12 @@ def main(args):
         print('### Model_wo_retrain:')
         # edge_index_wo_retrain = insert_edges(edge_index_wo_retrain, inserted_edge_index)
         print('Edges_wo_retrain: ', edge_index_evo.shape)
-        # if (i % 1) == 0:
-        #     train(args, model_wo_retrain, train_loader, valid_loader, device,
-        #           checkpt_file_wo_retrain, lr, weight_decay)
         acc_wo_retrain = test(model_wo_retrain, test_loader, device, checkpt_file_wo_retrain)
 
         print('### Model_retrain:')
         # edge_index_retrain = insert_edges(edge_index_retrain, inserted_edge_index)
         print('Edges_retrain: ', edge_index_evo.shape)
-        if (i % 1) == 0:
-            # train(args, model_retrain, train_loader, valid_loader, device, checkpt_file_retrain, lr,
-            #       weight_decay)
+        if i <= 0:
             train(args, model_retrain, train_loader, valid_loader, device, checkpt_file_retrain, lr,
                   weight_decay)
         acc_retrain = test(model_retrain, test_loader, device, checkpt_file_retrain)
@@ -232,9 +224,6 @@ def main(args):
         threshold = args.threshold
         edge_dict_delta, edge_index_evo_delta, v_sen, v_insen, comp_total, comp_delta, access_total, access_delta = insert_edges_delta(
             edge_index_evo_delta, edge_dict_delta, inserted_edge_index, threshold, n_layers)
-
-        # edge_dict, edge_index_evo_delta, v_sen, v_insen, comp_total, comp_delta, access_total, access_delta = insert_edges_delta(
-        #     edge_index_evo_delta, edge_dict, inserted_edge_index, threshold, n_layers)
 
         print('Node_num: ', len(v_sen), len(v_insen))
         sensitive_ratio.append(round(len(v_sen) * 100 / (len(v_sen) + len(v_insen)), 2))
@@ -254,38 +243,17 @@ def main(args):
         print('Computation reduction: {:d}/{:d} = {:.2f}%'.format(comp_delta, comp_total,
                                                                   comp_reduction))
 
-        # v_sen.update(set(train_idx))
-
-        # train_loader_delta, valid_loader_delta, test_loader_delta = gen_dataloader_delta(
-        #     edge_index_evolved, train_idx, val_idx, test_idx, features, labels, num_nghs,
-        #     batch_size)
-        # train_loader_delta, valid_loader_delta, test_loader_delta = gen_dataloader(
-        #     edge_index_evo_delta, train_idx, val_idx, test_idx, features, labels, num_nghs,
-        #     batch_size)
         train_loader_delta, valid_loader_delta, test_loader_delta = gen_dataloader(
             edge_index_evo_delta, train_idx, val_idx, test_idx, features, labels, num_nghs,
             batch_size)
         print('Edges_delta: ', edge_index_evo_delta.shape)
         # train_delta(args, model_delta, train_loader_delta, valid_loader_delta, device,
         #                 checkpt_file_delta, lr, weight_decay, v_sen, v_insen)
-        if (i % 1) == 0:
-            # train_delta(args, model_delta, train_loader_delta, valid_loader_delta, device,
-            #             checkpt_file_delta, lr, weight_decay, v_sen.union(v_insen), set())
+        if i <= 0:
             train_delta(args, model_delta, train_loader_delta, valid_loader_delta, device,
                         checkpt_file_delta, lr, weight_decay, v_sen, v_insen)
-            # train(args, model_delta, train_loader_delta, valid_loader_delta, device,
-            #       checkpt_file_delta, lr, weight_decay)
-            # acc_delta = test_delta(model_delta, test_loader_delta, device, checkpt_file_delta,
-            #                        v_sen.union(v_insen), set())
-            # train_delta(args, model_delta, train_loader_delta, valid_loader_delta, device,
-            #             checkpt_file_delta, lr, weight_decay, v_sen, v_insen)
-            acc_delta = test_delta(model_delta, test_loader_delta, device, checkpt_file_delta,
-                                   v_sen, v_insen)
-            # acc_delta = test(model_delta, test_loader_delta, device, checkpt_file_delta)
-        else:
-            acc_delta = test_delta(model_delta, test_loader_delta, device, checkpt_file_delta,
-                                   v_sen, v_insen)
-        # acc_delta = 0
+        acc_delta = test_delta(model_delta, test_loader_delta, device, checkpt_file_delta, v_sen,
+                               v_insen)
 
         accuracy.append([i + 1, acc_wo_retrain * 100, acc_retrain * 100, acc_delta * 100])
 
@@ -371,7 +339,7 @@ def train(args, model, train_loader, valid_loader, device, checkpt_file, lr, wei
     print("--------------------------")
     print("Training...")
 
-    args.epochs = 200
+    args.epochs = 1000
 
     for epoch in range(args.epochs):
         if args.model == 'gcn':
@@ -545,26 +513,21 @@ if __name__ == '__main__':
     parser.add_argument('--gpu', type=int, default=-1, help='gpu')
     args = parser.parse_args()
 
-    # args.model = 'gcn'
+    args.model = 'gcn'
     # args.model = 'graphsage'
     # args.model = 'gat'
-    args.model = 'gin'
+    # args.model = 'gin'
 
-    # args.dataset = 'Cora'
-    args.dataset = 'CiteSeer'
+    args.dataset = 'Cora'
+    # args.dataset = 'CiteSeer'
     # args.dataset = 'arxiv'
     # args.dataset = 'mag'
 
     # args.dataset = 'PubMed'
     # args.dataset = 'products'
 
-    args.threshold = 4
+    args.threshold = 5
 
-    # args.layer = 2
-    # args.hidden = 128
-    # args.lr = 1e-2
-    # args.weight_decay = 0
-    # args.dropout = 0.5
     # args.epochs = 1
     args.gpu = 0
     # args.batch_size = pow(2, 13)

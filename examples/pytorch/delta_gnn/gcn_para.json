@@ -14,14 +14,14 @@
     "--dropout": 0.5
   },
   "CiteSeer": {
-    "--n-hidden": 16,
+    "--n-hidden": 32,
     "--n-layers": 2,
     "--weight-decay": 0.0005,
     "--lr": 0.01,
     "--dropout": 0.5
   },
   "citeseer": {
-    "--n-hidden": 16,
+    "--n-hidden": 32,
     "--n-layers": 2,
     "--weight-decay": 0.0005,
     "--lr": 0.01,
