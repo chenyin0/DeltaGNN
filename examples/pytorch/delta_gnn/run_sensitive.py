@@ -8,19 +8,26 @@ deg_interval_citeseer = [[0, 1], [1, 2], [2, 3], [3, 4], [4, 5], [5, 6], [6, 7],
                          [9, 11], [11, 16], [16, 99]]
 deg_interval_actor = [[0, 1], [1, 2], [2, 3], [3, 4], [4, 5], [5, 6], [6, 7], [7, 8], [8, 9],
                       [9, 11], [11, 16], [16, 73]]
+# deg_interval_facebook = [[0, 3], [3, 6], [6, 9], [9, 12], [12, 15], [15, 18], [18, 27], [27, 36],
+#                          [36, 54], [54, 72], [72, 90], [90, 710]]
+deg_interval_facebook = [[0, 2], [2, 4], [4, 6], [6, 8], [8, 10], [10, 12], [12, 14], [14, 20],
+                         [20, 26], [26, 32], [32, 50], [50, 710]]
 deg_interval_wikics = [[0, 10], [10, 20], [20, 30], [30, 40], [40, 50], [50, 60], [60, 70],
                        [70, 80], [80, 90], [90, 110], [110, 160], [160, 3324]]
 
 # dataset_list = ['Cora', 'CiteSeer']
-dataset_list = ['Actor', 'WikiCS']
+dataset_list = ['FacebookPagePage', 'WikiCS']
+# dataset_list = ['WikiCS']
+# dataset_list = ['FacebookPagePage']
 degree_type_list = ['outdeg', 'indeg']
 # degree_type_list = ['outdeg']
 
 # noise_intensity = [0.1, 0.5, 1, 2, 5]
 # noise_intensity = [0.1, 0.5, 1]
-noise_intensity = [1, 2, 5]
+# noise_intensity = [1, 2, 5]
+# noise_intensity = [8, 10]
 # node_ratio = [0.1, 0.2, 0.5, 1]
-node_ratio = [0.02]
+# node_ratio = [0.05]
 epoch = 200
 # task_num = len(deg_interval) * len(noise_intensity)
 
@@ -47,12 +54,21 @@ for dataset in dataset_list:
         deg_interval = deg_interval_actor
     elif dataset == 'WikiCS':
         deg_interval = deg_interval_wikics
+    elif dataset == 'FacebookPagePage':
+        deg_interval = deg_interval_facebook
 
-    for degree_type in degree_type_list:
-        for deg_region in deg_interval:
-            deg_begin = deg_region[0]
-            deg_end = deg_region[1]
-            for intensity in noise_intensity:
+    if dataset == 'Cora' or dataset == 'CiteSeer' or dataset == 'WikiCS':
+        node_ratio = [0.02]
+        noise_intensity = [1, 2, 5]
+    elif dataset == 'FacebookPagePage':
+        node_ratio = [0.05]
+        noise_intensity = [5, 8, 10]
+
+    for intensity in noise_intensity:
+        for degree_type in degree_type_list:
+            for deg_region in deg_interval:
+                deg_begin = deg_region[0]
+                deg_end = deg_region[1]
                 for ratio in node_ratio:
                     # Task batch
                     print(dataset)
