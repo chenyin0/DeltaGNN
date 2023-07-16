@@ -14,6 +14,8 @@ from model.gat_t import GAT, GAT_delta
 import model.gat_t as gat
 from model.gin_t import GIN, GIN_delta
 import model.gin_t as gin
+from model.deepergcn_t import DeeperGCN, DeeperGCN_delta
+import model.deepergcn_t as deepergcn
 
 from utils import *
 from glob import glob
@@ -84,6 +86,17 @@ def main(args):
             lr = para[dataset_name]['--lr']
             weight_decay = para[dataset_name]['--weight-decay']
             dropout = para[dataset_name]['--dropout']
+    elif model_name == 'deepergcn':
+        # path = os.getcwd()
+        # print(path)
+        # with open('./examples/pytorch/delta_gnn/gin_para.json', 'r') as f:
+        with open('./deepergcn_para.json', 'r') as f:
+            para = json.load(f)
+            n_hidden = para[dataset_name]['--n-hidden']
+            n_layers = para[dataset_name]['--n-layers']
+            lr = para[dataset_name]['--lr']
+            weight_decay = para[dataset_name]['--weight-decay']
+            dropout = para[dataset_name]['--dropout']
     else:
         assert ('Not define GNN model')
 
@@ -138,6 +151,11 @@ def main(args):
         model_retrain = GIN(in_feats, n_hidden, n_classes, n_layers, dropout).to(device)
         model_delta = GIN_delta(in_feats, n_hidden, n_classes, n_layers, dropout,
                                 features.shape[0]).to(device)
+    elif model_name == 'deepergcn':
+        model_wo_retrain = DeeperGCN(in_feats, n_hidden, n_classes, n_layers, dropout).to(device)
+        model_retrain = DeeperGCN(in_feats, n_hidden, n_classes, n_layers, dropout).to(device)
+        model_delta = DeeperGCN_delta(in_feats, n_hidden, n_classes, n_layers, dropout,
+                                      features.shape[0]).to(device)
 
     # model_wo_retrain = GCN(in_feats, n_hidden, n_classes, n_layers, dropout).cuda(device)
     # model_retrain = GCN(in_feats, n_hidden, n_classes, n_layers, dropout).cuda(device)
@@ -215,7 +233,7 @@ def main(args):
         print('### Model_retrain:')
         # edge_index_retrain = insert_edges(edge_index_retrain, inserted_edge_index)
         print('Edges_retrain: ', edge_index_evo.shape)
-        if i <= 0:
+        if i <= 100:
             train(args, model_retrain, train_loader, valid_loader, device, checkpt_file_retrain, lr,
                   weight_decay)
         acc_retrain = test(model_retrain, test_loader, device, checkpt_file_retrain)
@@ -249,7 +267,7 @@ def main(args):
         print('Edges_delta: ', edge_index_evo_delta.shape)
         # train_delta(args, model_delta, train_loader_delta, valid_loader_delta, device,
         #                 checkpt_file_delta, lr, weight_decay, v_sen, v_insen)
-        if i <= 0:
+        if i <= 100:
             train_delta(args, model_delta, train_loader_delta, valid_loader_delta, device,
                         checkpt_file_delta, lr, weight_decay, v_sen, v_insen)
         acc_delta = test_delta(model_delta, test_loader_delta, device, checkpt_file_delta, v_sen,
@@ -350,6 +368,8 @@ def train(args, model, train_loader, valid_loader, device, checkpt_file, lr, wei
             loss_tra, train_ep = gat.train(model, device, train_loader, lr, weight_decay)
         elif args.model == 'gin':
             loss_tra, train_ep = gin.train(model, device, train_loader, lr, weight_decay)
+        elif args.model == 'deepergcn':
+            loss_tra, train_ep = deepergcn.train(model, device, train_loader, lr)
 
         t_st = time.time()
 
@@ -361,6 +381,8 @@ def train(args, model, train_loader, valid_loader, device, checkpt_file, lr, wei
             f1_val = gat.validate(model, device, valid_loader)
         elif args.model == 'gin':
             f1_val = gin.validate(model, device, valid_loader)
+        elif args.model == 'deepergcn':
+            f1_val = deepergcn.validate(model, device, valid_loader)
 
         train_time += train_ep
         if (epoch + 1) % 20 == 0:
@@ -391,6 +413,8 @@ def test(model, test_loader, device, checkpt_file):
         test_acc = gat.test(model, device, test_loader, checkpt_file)
     elif args.model == 'gin':
         test_acc = gin.test(model, device, test_loader, checkpt_file)
+    elif args.model == 'deepergcn':
+        test_acc = deepergcn.test(model, device, test_loader, checkpt_file)
     print('Test accuracy:{:.2f}%'.format(100 * test_acc))
     return test_acc
 
@@ -437,6 +461,10 @@ def train_delta(args,
             loss_tra, train_ep = gin.train_delta(model, device, train_loader, lr, weight_decay,
                                                  v_sen_feat_loc_train, v_insen_feat_loc_train,
                                                  v_sen_train, v_insen_train)
+        elif args.model == 'deepergcn':
+            loss_tra, train_ep = deepergcn.train_delta(model, device, train_loader, lr,
+                                                       v_sen_feat_loc_train, v_insen_feat_loc_train,
+                                                       v_sen_train, v_insen_train)
 
         t_st = time.time()
 
@@ -452,6 +480,9 @@ def train_delta(args,
         elif args.model == 'gin':
             f1_val = gin.validate_delta(model, device, valid_loader, v_sen_feat_loc_val,
                                         v_insen_feat_loc_val, v_sen_val, v_insen_val)
+        elif args.model == 'deepergcn':
+            f1_val = deepergcn.validate_delta(model, device, valid_loader, v_sen_feat_loc_val,
+                                              v_insen_feat_loc_val, v_sen_val, v_insen_val)
 
         train_time += train_ep
         if (epoch + 1) % 20 == 0:
@@ -482,6 +513,8 @@ def test_delta(model, test_loader, device, checkpt_file, v_sen=None, v_insen=Non
         test_acc = gat.test_delta(model, device, test_loader, checkpt_file, v_sen, v_insen)
     elif args.model == 'gin':
         test_acc = gin.test_delta(model, device, test_loader, checkpt_file, v_sen, v_insen)
+    elif args.model == 'deepergcn':
+        test_acc = deepergcn.test_delta(model, device, test_loader, checkpt_file, v_sen, v_insen)
     print('Test accuracy:{:.2f}%'.format(100 * test_acc))
     return test_acc
 
@@ -495,7 +528,7 @@ if __name__ == '__main__':
                         type=str,
                         default=None,
                         help="Model name ('gcn', 'graphsage', 'gin', 'gat').")
-    parser.add_argument('--dataset', default='papers100M', help='dateset.')
+    parser.add_argument('--dataset', default='Cora', help='dateset.')
     # Algorithm parameters
     parser.add_argument('--alpha', type=float, default=0.2, help='alpha.')
     parser.add_argument('--rmax', type=float, default=1e-7, help='threshold.')
@@ -513,10 +546,11 @@ if __name__ == '__main__':
     parser.add_argument('--gpu', type=int, default=-1, help='gpu')
     args = parser.parse_args()
 
-    args.model = 'gcn'
+    # args.model = 'gcn'
     # args.model = 'graphsage'
     # args.model = 'gat'
     # args.model = 'gin'
+    args.model = 'deepergcn'
 
     args.dataset = 'Cora'
     # args.dataset = 'CiteSeer'
