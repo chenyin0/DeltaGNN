@@ -17,7 +17,8 @@ import random
 # import util
 
 from torch_geometric.nn import GCNConv
-from torch_geometric.datasets import Planetoid, WikiCS, GitHub, FacebookPagePage, Actor
+from torch_geometric.datasets import Planetoid, WikiCS, GitHub, FacebookPagePage, Actor, Amazon
+from dgl.data import AmazonCoBuyComputerDataset
 import copy as cp
 
 import plt.plt_graph as plt_graph
@@ -187,20 +188,43 @@ def add_noise_in_deg(data, degree_list, deg_begin, deg_end, intensity, node_rati
         data.x[node_id] = th.add(noise, data.x[node_id])
 
 
+def dataset_split(data, train_ratio, val_ratio, test_ratio):
+    v_num = data.num_nodes
+    train_num = round(v_num * train_ratio)
+    val_num = round(v_num * val_ratio)
+
+    train_mask, val_mask, test_mask = th.zeros(v_num).bool(), th.zeros(v_num).bool(), th.zeros(
+        v_num).bool()
+    train_mask[0:train_num] = True
+    val_mask[train_num:train_num + val_num] = True
+    test_mask[train_num + val_num:] = True
+
+    data.train_mask = train_mask
+    data.val_mask = val_mask
+    data.test_mask = test_mask
+
+    return data
+
+
 def main(args):
     # Load and preprocess dataset
-    if args.dataset == 'Cora' or args.dataset == 'CiteSeer':
+    if args.dataset == 'Cora' or args.dataset == 'CiteSeer' or args.dataset == 'PubMed':
         dataset = Planetoid('./dataset', args.dataset)
     if args.dataset == 'WikiCS':
-        dataset = WikiCS('./dataset')
+        dataset = WikiCS('./dataset/' + args.dataset)
     if args.dataset == 'GitHub':
-        dataset = GitHub('./dataset' + args.dataset)
+        dataset = GitHub('./dataset/' + args.dataset)
     if args.dataset == 'FacebookPagePage':
-        dataset = FacebookPagePage('./dataset' + args.dataset)
+        dataset = FacebookPagePage('./dataset/' + args.dataset)
     if args.dataset == 'Actor':
         dataset = Actor('./dataset/' + args.dataset)
+    if args.dataset == 'Amazon':
+        dataset = Amazon('./dataset/' + args.dataset, 'Computers')
+        # dataset_t = AmazonCoBuyComputerDataset('./dataset/')
 
     data = dataset[0]
+    if args.dataset == 'Amazon' or args.dataset == 'FacebookPagePage':
+        data = dataset_split(data, 0.2, 0.3, 0.5)
 
     if args.gpu < 0:
         cuda = False
@@ -292,19 +316,22 @@ if __name__ == '__main__':
     parser.set_defaults(self_loop=False)
     args = parser.parse_args()
 
-    args.dataset = 'Cora'
-    # args.dataset = 'CiteSeer'
+    # # args.dataset = 'Cora'
+    # # args.dataset = 'CiteSeer'
+    # # args.dataset = 'FacebookPagePage'
     # args.dataset = 'WikiCS'
-    # args.dataset = 'Actor'
-    # args.dataset = 'FacebookPagePage'
-    # args.dataset = 'GitHub'
 
-    args.degree_type = 'outdeg'
-    args.gpu = 1
-    args.noise_intensity = 0.2
-    args.node_ratio = 0.02
-    args.deg_begin = 2
-    args.deg_end = 3
+    # # args.dataset = 'PubMed'
+    # # args.dataset = 'Amazon'
+    # # args.dataset = 'Actor'
+    # # args.dataset = 'GitHub'
+
+    # args.degree_type = 'outdeg'
+    # args.gpu = 0
+    # args.noise_intensity = 0
+    # args.node_ratio = 0.02
+    # args.deg_begin = 1
+    # args.deg_end = 2
 
     # print(args)
     main(args)
