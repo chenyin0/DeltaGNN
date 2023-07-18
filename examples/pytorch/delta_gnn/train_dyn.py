@@ -554,17 +554,18 @@ if __name__ == '__main__':
 
     # args.dataset = 'Cora'
     # args.dataset = 'CiteSeer'
-    args.dataset = 'Facebook'
+    # args.dataset = 'Facebook'
+    args.dataset = 'WikiCS'
     # args.dataset = 'arxiv'
     # args.dataset = 'mag'
 
     # args.dataset = 'PubMed'
     # args.dataset = 'products'
 
-    args.threshold = 4
+    args.threshold = 20
 
     # args.epochs = 1
-    args.gpu = 1
+    args.gpu = 0
     # args.batch_size = pow(2, 13)
 
     print('\n************ {:s} ************'.format(args.dataset))
