@@ -357,7 +357,7 @@ def train(args, model, train_loader, valid_loader, device, checkpt_file, lr, wei
     print("--------------------------")
     print("Training...")
 
-    args.epochs = 1000
+    args.epochs = 200
 
     for epoch in range(args.epochs):
         if args.model == 'gcn':
@@ -437,7 +437,7 @@ def train_delta(args,
     print("--------------------------")
     print("Training...")
 
-    args.epochs = 1000
+    args.epochs = 200
 
     v_sen_feat_loc_train, v_insen_feat_loc_train, v_sen_train, v_insen_train = util.feature_merge_preprocess(
         train_loader, device, v_sen, v_insen)
@@ -552,18 +552,19 @@ if __name__ == '__main__':
     # args.model = 'gin'
     args.model = 'deepergcn'
 
-    args.dataset = 'Cora'
+    # args.dataset = 'Cora'
     # args.dataset = 'CiteSeer'
+    args.dataset = 'Facebook'
     # args.dataset = 'arxiv'
     # args.dataset = 'mag'
 
     # args.dataset = 'PubMed'
     # args.dataset = 'products'
 
-    args.threshold = 5
+    args.threshold = 4
 
     # args.epochs = 1
-    args.gpu = 0
+    args.gpu = 1
     # args.batch_size = pow(2, 13)
 
     print('\n************ {:s} ************'.format(args.dataset))

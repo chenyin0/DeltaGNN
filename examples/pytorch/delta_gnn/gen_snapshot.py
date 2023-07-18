@@ -4,12 +4,13 @@ import numpy as np
 import random
 import scipy.sparse as sp
 import torch
+import torch as th
 import torch.nn.functional as F
 from torch_sparse import SparseTensor
 from torch_geometric.utils import to_undirected
 from ogb.nodeproppred import PygNodePropPredDataset
 from ogb.nodeproppred import DglNodePropPredDataset
-from torch_geometric.datasets import Planetoid
+from torch_geometric.datasets import Planetoid, FacebookPagePage
 from torch_geometric.datasets import Reddit
 import sklearn.preprocessing
 import tracemalloc
@@ -102,6 +103,23 @@ def filter_adj(row, col, edge_attr, mask):
     return row[mask], col[mask], None if edge_attr is None else edge_attr[mask]
 
 
+def dataset_split(data, train_ratio, val_ratio, test_ratio):
+    v_num = data.num_nodes
+    train_num = round(v_num * train_ratio)
+    val_num = round(v_num * val_ratio)
+
+    train_mask, val_mask, test_mask = th.zeros(v_num).bool(), th.zeros(v_num).bool(), th.zeros(
+        v_num).bool()
+    train_mask[0:train_num] = True
+    val_mask[train_num:train_num + val_num] = True
+    test_mask[train_num + val_num:] = True
+
+    data.train_mask = train_mask
+    data.val_mask = val_mask
+    data.test_mask = test_mask
+
+    return data
+
 def gen_dataset_snapshot(dataset_name, num_snap):
     if dataset_name == 'Cora' or dataset_name == 'CiteSeer' or dataset_name == 'PubMed':
         planetoid(dataset_name, num_snap)
@@ -115,6 +133,8 @@ def gen_dataset_snapshot(dataset_name, num_snap):
         products(num_snap)
     elif dataset_name == 'arpapers100Mxiv':
         papers100M(num_snap)
+    elif dataset_name == 'Facebook':
+        facebook(num_snap)
 
 
 def planetoid(dataset_name, num_snap):
@@ -212,6 +232,7 @@ def planetoid(dataset_name, num_snap):
         v_to = col_drop[k]
         f.write('%d %d\n' % (v_from, v_to))
         f.write('%d %d\n' % (v_to, v_from))
+
     f.close()
 
     row, col = data.edge_index
@@ -222,6 +243,118 @@ def planetoid(dataset_name, num_snap):
     # # Write edge_idx (src_edge, dst_edge)
     # write_packed_edges('./data/arxiv/arxiv_init_src_edge.txt', 'I', row)
     # write_packed_edges('./data/arxiv/arxiv_init_dst_edge.txt', 'I', col)
+
+    # Write edge_idx (src_edge, dst_edge)
+    write_packed_edges(base_path + '_init_edges.txt', row, col)
+
+    # save_adj(row, col, N=data.num_nodes, dataset_name='arxiv', savename='arxiv_init', snap='init')
+    snapshot = math.floor(row_drop.shape[0] / num_snap)
+    print('num_snap: ', num_snap)
+
+    for sn in range(num_snap):
+        print(sn)
+        row_sn = row_drop[sn * snapshot:(sn + 1) * snapshot]
+        col_sn = col_drop[sn * snapshot:(sn + 1) * snapshot]
+        if sn == 0:
+            row_tmp = row
+            col_tmp = col
+
+        row_tmp = np.concatenate((row_tmp, row_sn))
+        col_tmp = np.concatenate((col_tmp, col_sn))
+        row_tmp = np.concatenate((row_tmp, col_sn))
+        col_tmp = np.concatenate((col_tmp, row_sn))
+        # if (sn + 1) % 20 == 0 or (sn + 1) == num_snap:
+        # save_adj(row_tmp,
+        #         col_tmp,
+        #         N=data.num_nodes,
+        #         dataset_name='arxiv',
+        #         savename='arxiv_snap' + str(sn + 1),
+        #         snap=(sn + 1))
+
+        with open(base_path + '_Edgeupdate_snap' + str(sn + 1) + '.txt', 'w') as f:
+            for i, j in zip(row_sn, col_sn):
+                f.write("%d %d\n" % (i, j))
+                f.write("%d %d\n" % (j, i))
+    print(dataset_name + ' -- save snapshots finish')
+
+
+def facebook(num_snap):
+    dataset = FacebookPagePage('./dataset/FacebookPagePage')
+    data = dataset[0]
+    data = dataset_split(data, 0.2, 0.3, 0.5)
+    n_classes = np.array(dataset.num_classes, dtype=np.int32)
+    train_idx = torch.nonzero(data.train_mask).squeeze()
+    val_idx = torch.nonzero(data.val_mask).squeeze()
+    test_idx = torch.nonzero(data.test_mask).squeeze()
+    # all_idx = torch.cat([train_idx, val_idx, test_idx])
+
+    dataset_name = 'Facebook'
+    base_path = './data/' + dataset_name + '/' + dataset_name
+    # Feature normalization
+    feat = data.x.numpy()
+    feat = np.array(feat, dtype=np.float64)
+    scaler = sklearn.preprocessing.StandardScaler()
+    scaler.fit(feat)
+    feat = scaler.transform(feat)
+    np.save(base_path + '_feat.npy', feat)
+
+    #get labels
+    labels = data.y
+    labels = torch.unsqueeze(labels, 1)
+    # train_labels = labels.data[train_idx]
+    # val_labels = labels.data[val_idx]
+    # test_labels = labels.data[test_idx]
+    labels = np.array(labels, dtype=np.int32)
+
+    # train_idx = train_idx.numpy()
+    # val_idx = val_idx.numpy()
+    # test_idx = test_idx.numpy()
+    train_idx = np.array(train_idx, dtype=np.int32)
+    val_idx = np.array(val_idx, dtype=np.int32)
+    test_idx = np.array(test_idx, dtype=np.int32)
+
+    np.savez(base_path + '_labels.npz',
+             train_idx=train_idx,
+             val_idx=val_idx,
+             test_idx=test_idx,
+             labels=labels,
+             n_classes=n_classes)
+
+    data.edge_index = to_undirected(data.edge_index, data.num_nodes)
+
+    # Load vertex sorted by timestamp
+    idx_with_time_seq = dataset_bfs_sort(dataset[0], dataset_name)
+    init_ratio = 0.35
+
+    init_num = round(len(idx_with_time_seq) * init_ratio)
+    drop_idx = idx_with_time_seq[init_num:]
+
+    data.edge_index, drop_edge_index, _ = dropout_adj(data.edge_index,
+                                                      drop_idx,
+                                                      num_nodes=data.num_nodes)
+
+    data.edge_index = to_undirected(data.edge_index, data.num_nodes)
+
+    # r_indexes = np.arange(len(drop_edge_index[0]))
+    # np.random.shuffle(r_indexes)
+    # drop_edge_index[0] = drop_edge_index[0][r_indexes]
+    # drop_edge_index[1] = drop_edge_index[1][r_indexes]
+
+    row_drop, col_drop = np.array(drop_edge_index)
+
+    f = open(base_path + '_update_full.txt', 'w+')
+    for k in range(row_drop.shape[0]):
+        v_from = row_drop[k]
+        v_to = col_drop[k]
+        f.write('%d %d\n' % (v_from, v_to))
+        f.write('%d %d\n' % (v_to, v_from))
+        
+    f.close()
+
+    row, col = data.edge_index
+    print(row_drop.shape)
+    row = row.numpy()
+    col = col.numpy()
 
     # Write edge_idx (src_edge, dst_edge)
     write_packed_edges(base_path + '_init_edges.txt', row, col)
@@ -975,7 +1108,8 @@ if __name__ == "__main__":
     # arxiv()
 
     # gen_dataset_snapshot('Cora', 10)
-    gen_dataset_snapshot('CiteSeer', 10)
+    # gen_dataset_snapshot('CiteSeer', 10)
+    gen_dataset_snapshot('Facebook', 10)
     # gen_dataset_snapshot('PubMed', 10)
     # gen_dataset_snapshot('arxiv', 16)
     # gen_dataset_snapshot('reddit', 16)
