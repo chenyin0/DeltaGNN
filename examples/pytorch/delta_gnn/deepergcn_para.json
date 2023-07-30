@@ -1,7 +1,7 @@
 {
     "Cora": {
-      "--n-hidden": 64,
-      "--n-layers": 28,
+      "--n-hidden": 32,
+      "--n-layers": 14,
       "--weight-decay": 0.0005,
       "--lr": 0.01,
       "--dropout": 0.5
@@ -14,7 +14,7 @@
       "--dropout": 0.5
     },
     "CiteSeer": {
-      "--n-hidden": 64,
+      "--n-hidden": 32,
       "--n-layers": 28,
       "--weight-decay": 0.0005,
       "--lr": 0.01,
@@ -23,6 +23,27 @@
     "citeseer": {
       "--n-hidden": 32,
       "--n-layers": 2,
+      "--weight-decay": 0.0005,
+      "--lr": 0.01,
+      "--dropout": 0.5
+    },
+    "Twitch": {
+      "--n-hidden": 32,
+      "--n-layers": 7,
+      "--weight-decay": 0.0005,
+      "--lr": 0.01,
+      "--dropout": 0.5
+    },
+    "Facebook": {
+      "--n-hidden": 32,
+      "--n-layers": 14,
+      "--weight-decay": 0.0005,
+      "--lr": 0.01,
+      "--dropout": 0.5
+    },
+    "WikiCS": {
+      "--n-hidden": 32,
+      "--n-layers": 14,
       "--weight-decay": 0.0005,
       "--lr": 0.01,
       "--dropout": 0.5

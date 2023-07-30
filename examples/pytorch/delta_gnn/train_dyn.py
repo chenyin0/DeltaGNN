@@ -329,21 +329,29 @@ def gen_dataloader(edge_index, train_idx, val_idx, test_idx, features, labels, n
     gc.collect()
 
     vertex_num_total = labels.size()[0]
-    train_loader = NeighborLoader(data,
-                                  input_nodes=train_idx,
-                                  num_neighbors=num_nghs,
-                                  shuffle=False,
-                                  batch_size=vertex_num_total)
-    valid_loader = NeighborLoader(data,
-                                  input_nodes=val_idx,
-                                  num_neighbors=num_nghs,
-                                  shuffle=False,
-                                  batch_size=vertex_num_total)
-    test_loader = NeighborLoader(data,
-                                 input_nodes=test_idx,
-                                 num_neighbors=num_nghs,
-                                 shuffle=False,
-                                 batch_size=vertex_num_total)
+    train_loader = NeighborLoader(
+        data,
+        input_nodes=train_idx,
+        num_neighbors=num_nghs,
+        shuffle=False,
+        #   batch_size=vertex_num_total)
+        batch_size=pow(2, 10))
+
+    valid_loader = NeighborLoader(
+        data,
+        input_nodes=val_idx,
+        num_neighbors=num_nghs,
+        shuffle=False,
+        #   batch_size=vertex_num_total)
+        batch_size=pow(2, 10))
+
+    test_loader = NeighborLoader(
+        data,
+        input_nodes=test_idx,
+        num_neighbors=num_nghs,
+        shuffle=False,
+        #  batch_size=vertex_num_total)
+        batch_size=pow(2, 10))
 
     return train_loader, valid_loader, test_loader
 
@@ -554,15 +562,16 @@ if __name__ == '__main__':
 
     # args.dataset = 'Cora'
     # args.dataset = 'CiteSeer'
+    args.dataset = 'Twitch'
     # args.dataset = 'Facebook'
-    args.dataset = 'WikiCS'
+    # args.dataset = 'WikiCS'
     # args.dataset = 'arxiv'
     # args.dataset = 'mag'
 
     # args.dataset = 'PubMed'
     # args.dataset = 'products'
 
-    args.threshold = 20
+    args.threshold = 50
 
     # args.epochs = 1
     args.gpu = 0
