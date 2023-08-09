@@ -11,6 +11,7 @@ import copy as cp
 from collections import Counter
 import time
 import math
+import random
 
 
 def load_aminer_init(datastr, rmax, alpha):
@@ -74,6 +75,36 @@ def load_dataset_init(datastr):
     return features, labels, train_idx, val_idx, test_idx, n_classes, edge_index
 
 
+def load_dataset_full(datastr):
+    print("Load %s!" % datastr)
+
+    # py_alg = InstantGNN()
+    features = np.load('./data/' + datastr + '/' + datastr + '_feat.npy')
+
+    data = np.load('./data/' + datastr + '/' + datastr + '_labels.npz')
+    train_idx = torch.LongTensor(data['train_idx'])
+    val_idx = torch.LongTensor(data['val_idx'])
+    test_idx = torch.LongTensor(data['test_idx'])
+    labels = torch.LongTensor(data['labels'])
+    n_classes = data['n_classes']
+
+    # src_edges = read_packed_edges('./data/' + datastr + '/' + datastr + '_init_src_edge.txt', 'I')
+    # dst_edges = read_packed_edges('./data/' + datastr + '/' + datastr + '_init_dst_edge.txt', 'I')
+
+    edges = np.loadtxt('./data/' + datastr + '/' + datastr + '_update_full.txt', dtype=int)
+    src_edges = edges[:, 0]
+    dst_edges = edges[:, 1]
+
+    src_edges = torch.LongTensor(src_edges)
+    dst_edges = torch.LongTensor(dst_edges)
+
+    edge_index = torch.stack(
+        [torch.cat([src_edges, dst_edges], dim=0),
+         torch.cat([dst_edges, src_edges], dim=0)], dim=0)
+
+    return features, labels, train_idx, val_idx, test_idx, n_classes, edge_index
+
+
 def load_updated_edges(datastr, snapshot_id):
     edges = np.loadtxt('./data/' + datastr + '/' + datastr + '_Edgeupdate_snap' + str(snapshot_id) +
                        '.txt')
@@ -100,11 +131,37 @@ def gen_edge_dict(edge_index):
     return edge_dict
 
 
+def gen_edge_index(edge_dict):
+    """
+    Key, val = edge_src, edge_dst
+    """
+    edge_src = []
+    edge_dst = []
+    for key, val in edge_dict.items():
+        edge_src.extend([key for i in range(len(val))])
+        edge_dst.extend(val)
+
+    edge_index = torch.tensor([edge_src, edge_dst])
+
+    return edge_index
+
+
 def insert_edge_dict(edge_dict, edge_index_inserted):
     for i in range(edge_index_inserted.shape[-1]):
         edge_src = edge_index_inserted[0][i].item()
         edge_dst = edge_index_inserted[1][i].item()
         edge_dict.setdefault(edge_src, {edge_dst}).add(edge_dst)
+    return edge_dict
+
+
+def delete_edge_dict(edge_dict, edge_index_deleted):
+    for i in range(edge_index_deleted.shape[-1]):
+        edge_src = edge_index_deleted[0][i].item()
+        edge_dst = edge_index_deleted[1][i].item()
+        if edge_src in edge_dict and edge_dst in edge_dict[edge_src]:
+            edge_dict[edge_src].remove(edge_dst)
+        if edge_dst in edge_dict and edge_src in edge_dict[edge_dst]:
+            edge_dict[edge_dst].remove(edge_src)
     return edge_dict
 
 
@@ -275,6 +332,128 @@ def insert_edges_delta(edge_index_evo_delta, edge_dict, edge_index_inserted, thr
     # return edge_dict, edge_index_evo_delta, v_sen, v_insen, v_deg_total, v_deg_delta, e_num_total, e_num_delta
     return edge_dict, edge_index_evo_delta, v_sen, v_insen, comp_total, comp_delta, len(
         access_total), len(access_delta)
+
+
+def delete_edges_evo(edge_dict, edge_index_inserted, threshold, layer_num):
+
+    edge_dict, edge_index, *tmp = delete_edges_delta(edge_dict, edge_index_inserted,
+                                                     threshold, layer_num)
+    return edge_dict, edge_index
+
+
+def delete_edges_delta(edge_dict, edge_index_delete, threshold, layer_num):
+    """
+    edge_dict: key,val = edge_src, edge_dst
+    edge_index_inserted: new inserted edges, format edge_src, edge_dst
+    edge_index_delta: to represent delta-msg propagating
+    """
+    v_sen = set()
+    v_insen = set()
+    v_total = set()
+    edge_index_delta = []
+    edge_src_insen = []
+    edge_dst_insen = []
+    edge_src_sen = []
+    edge_dst_sen = []
+
+    # Aggregation reduction
+    e_num_total = 0
+
+    # Combination reduction
+    v_deg_total = 0
+    v_deg_delta = 0
+
+    # Access reduction
+    access_total = set()
+    access_delta = set()
+
+    # Computation reduction
+    comp_total = 0
+    comp_delta = 0
+    has_visited = set()  # Record vertices has been counted
+
+    for i in range(edge_index_delete.shape[-1]):
+        edge_src = edge_index_delete[0][i].item()
+        edge_dst = edge_index_delete[1][i].item()
+        if edge_dst in edge_dict:
+            deg_v = len(edge_dict[edge_dst])
+            # v_deg_total += deg_v
+            v_total.add(edge_dst)
+            if deg_v > threshold:
+                v_sen.add(edge_dst)
+                v_deg_delta += deg_v
+                if edge_dst not in has_visited:
+                    # comp_delta += deg_v
+                    # access_delta.update(edge_dict[edge_dst])
+                    has_visited.add(edge_dst)
+            else:
+                v_insen.add(edge_dst)
+                edge_src_insen.append(edge_src)
+                edge_dst_insen.append(edge_dst)
+                v_deg_delta += 1
+                if edge_dst not in has_visited:
+                    comp_delta += 1
+                    access_delta.add(edge_dst)
+                    has_visited.add(edge_dst)
+
+    # Update edge_dict
+    edge_dict = delete_edge_dict(edge_dict, edge_index_delete)
+    # Gen edge_index_delta
+    nodes_q = cp.deepcopy(v_sen)
+    ngh_per_layer = set()
+    # Traverse L-hops nghs of sensitive nodes
+    for i in range(layer_num):
+        for node in nodes_q:
+            nghs = edge_dict[node]  # For graph is undirected, we can obtain src_v by dst_v
+            for ngh in nghs:
+                deg_v = len(edge_dict[ngh])
+                if deg_v > threshold:
+                    ngh_per_layer.add(ngh)
+            # ngh_per_layer.update(nghs)
+            src_v = list(nghs)
+            dst_v = [node for i in range(len(nghs))]
+            edge_src_sen.extend(src_v)
+            edge_dst_sen.extend(dst_v)
+            comp_delta += len(nghs)
+            access_delta.update(nghs)
+        nodes_q = cp.deepcopy(ngh_per_layer)
+        ngh_per_layer.clear()
+
+    # Gen edge_index_delta
+    nodes_q = cp.deepcopy(v_total)
+    ngh_per_layer = set()
+    # Traverse L-hops nghs of deleted nodes
+    for i in range(layer_num):
+        for node in nodes_q:
+            nghs = edge_dict[node]  # For graph is undirected, we can obtain src_v by dst_v
+            ngh_per_layer.update(nghs)
+            e_num_total += len(nghs)
+            v_deg_total += len(nghs)
+            comp_total += len(nghs)
+            access_total.update(nghs)
+        nodes_q = cp.deepcopy(ngh_per_layer)
+        ngh_per_layer.clear()
+
+    edge_index_sen = torch.LongTensor([edge_src_sen, edge_dst_sen])
+    edge_index_insen = torch.LongTensor([edge_src_insen, edge_dst_insen])
+    # edge_index_delta = insert_edges(edge_index_sen, edge_index_insen)
+    # edge_index_evo_delta = insert_edges(edge_index_evo_delta, edge_index_delta)
+    edge_index_evo_delta = gen_edge_index(edge_dict)  # Gen edge_index from edge_dict after deletion
+
+    # e_num_delta = edge_index_delta.shape[-1]
+
+    # return edge_dict, edge_index_evo_delta, v_sen, v_insen, v_deg_total, v_deg_delta, e_num_total, e_num_delta
+    return edge_dict, edge_index_evo_delta, v_sen, v_insen, comp_total, comp_delta, len(
+        access_total), len(access_delta)
+
+
+def delete_edges_random(edge_index, delete_ratio):
+    edge_num = edge_index[0].shape[0]
+    edge_delete_num = round(edge_num * delete_ratio)
+    delete_index = torch.tensor(random.sample(range(edge_num), edge_delete_num))
+    edge_index_deleted = torch.index_select(edge_index, 1, delete_index)
+
+    return edge_index_deleted
 
 
 def load_sbm_init(datastr, rmax, alpha):
