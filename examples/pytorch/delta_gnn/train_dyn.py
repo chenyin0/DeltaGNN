@@ -554,15 +554,15 @@ if __name__ == '__main__':
     parser.add_argument('--gpu', type=int, default=-1, help='gpu')
     args = parser.parse_args()
 
-    # args.model = 'gcn'
+    args.model = 'gcn'
     # args.model = 'graphsage'
     # args.model = 'gat'
     # args.model = 'gin'
-    args.model = 'deepergcn'
+    # args.model = 'deepergcn'
 
-    # args.dataset = 'Cora'
+    args.dataset = 'Cora'
     # args.dataset = 'CiteSeer'
-    args.dataset = 'Twitch'
+    # args.dataset = 'Twitch'
     # args.dataset = 'Facebook'
     # args.dataset = 'WikiCS'
     # args.dataset = 'arxiv'
@@ -571,7 +571,7 @@ if __name__ == '__main__':
     # args.dataset = 'PubMed'
     # args.dataset = 'products'
 
-    args.threshold = 50
+    args.threshold = 5
 
     # args.epochs = 1
     args.gpu = 0
