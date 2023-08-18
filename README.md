@@ -12,6 +12,6 @@
 [Website](https://www.dgl.ai) | [A Blitz Introduction to DGL](https://docs.dgl.ai/tutorials/blitz/index.html) | Documentation ([Latest](https://docs.dgl.ai/en/latest/) | [Stable](https://docs.dgl.ai)) | [Official Examples](examples/README.md) | [Discussion Forum](https://discuss.dgl.ai) | [Slack Channel](https://join.slack.com/t/deep-graph-library/shared_invite/zt-eb4ict1g-xcg3PhZAFAB8p6dtKuP6xQ)
 
 
-## DeltaGNN
+# DeltaGNN
 
-Our work **DeltaGNN** has been integrated in DGL at [here](https://github.com/chenyin0/dgl/tree/main/examples/pytorch/delta_gnn).
+Our work **DeltaGNN** has been integrated in **DGL** at [here](https://github.com/chenyin0/dgl/tree/main/examples/pytorch/delta_gnn).
