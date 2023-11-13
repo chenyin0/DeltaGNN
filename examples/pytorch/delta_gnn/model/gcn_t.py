@@ -17,7 +17,9 @@ from torch.optim import Adam
 # import torch_geometric.transforms as T
 import numpy as np
 import time
-import examples.pytorch.delta_gnn.model.model_utils as model_utils
+# import examples.pytorch.delta_gnn.model.model_utils as model_utils
+# import model_utils as model_utils
+from . import model_utils
 import torch_geometric.nn.inits as inits
 
 # from tqdm import tqdm

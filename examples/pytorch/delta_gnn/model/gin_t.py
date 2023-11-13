@@ -6,7 +6,9 @@ import torch.nn.functional as F
 from torch.optim import Adam
 import numpy as np
 import time
-import examples.pytorch.delta_gnn.model.model_utils as model_utils
+# import examples.pytorch.delta_gnn.model.model_utils as model_utils
+# import model_utils as model_utils
+from . import model_utils
 import torch_geometric.nn.inits as inits
 # from tqdm import tqdm
 
@@ -225,12 +227,15 @@ def test_delta(model,
     model.eval()
     y_pred, y_true = [], []
     for step, batch in enumerate(data_loader):
-        x, edge_index, y = batch.x.to(device), batch.edge_index.to(device), batch.y
+        x, edge_index, y = batch.x.to(device), batch.edge_index.to(
+            device), batch.y
         n_id = batch.n_id
         out = model(x, edge_index)
         if v_sen is not None or v_insen is not None:
-            out, embedding = model_utils.feature_merge(model.embedding, out, n_id, v_sen_feat_loc,
-                                                       v_insen_feat_loc, v_sen, v_insen)
+            out, embedding = model_utils.feature_merge(model.embedding, out,
+                                                       n_id, v_sen_feat_loc,
+                                                       v_insen_feat_loc, v_sen,
+                                                       v_insen)
             model.embedding = torch.nn.Parameter(embedding)
         out = out.log_softmax(dim=-1)
         y_pred.append(torch.argmax(out, dim=-1, keepdim=True).cpu())
