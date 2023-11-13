@@ -53,7 +53,8 @@ def dataset_timestamp_sort(dataset, dataset_name):
     if file_.exists():
         node_q = np.loadtxt(file_, dtype=int).tolist()
     else:
-        node_q = util.sort_node_by_timestamp('./dataset/' + dataset_name + '_node_year.csv')
+        node_q = util.sort_node_by_timestamp('./dataset/' + dataset_name +
+                                             '_node_year.csv')
 
         with open(file_, 'w') as f:
             for i in node_q:
@@ -62,7 +63,11 @@ def dataset_timestamp_sort(dataset, dataset_name):
     return node_q
 
 
-def dropout_adj(edge_index, rmnode_idx, edge_attr=None, force_undirected=True, num_nodes=None):
+def dropout_adj(edge_index,
+                rmnode_idx,
+                edge_attr=None,
+                force_undirected=True,
+                num_nodes=None):
 
     N = int(edge_index.max()) + 1 if num_nodes is None else num_nodes
     row, col = edge_index
@@ -77,7 +82,8 @@ def dropout_adj(edge_index, rmnode_idx, edge_attr=None, force_undirected=True, n
 
     row_mask = np.isin(row, rmnode_idx)
     col_mask = np.isin(col, rmnode_idx)
-    drop_mask = torch.from_numpy(np.logical_or(row_mask, col_mask)).to(torch.bool)
+    drop_mask = torch.from_numpy(np.logical_or(row_mask,
+                                               col_mask)).to(torch.bool)
 
     mask = ~drop_mask
 
@@ -86,15 +92,18 @@ def dropout_adj(edge_index, rmnode_idx, edge_attr=None, force_undirected=True, n
     print('init:', len(new_row), ', drop:', len(drop_row))
 
     if force_undirected:
-        edge_index = torch.stack(
-            [torch.cat([new_row, new_col], dim=0),
-             torch.cat([new_col, new_row], dim=0)], dim=0)
+        edge_index = torch.stack([
+            torch.cat([new_row, new_col], dim=0),
+            torch.cat([new_col, new_row], dim=0)
+        ],
+                                 dim=0)
         if edge_attr is not None:
             edge_attr = torch.cat([edge_attr, edge_attr], dim=0)
         # edge_index, edge_attr = coalesce(edge_index, edge_attr, N, N)
     else:
         edge_index = torch.stack([new_row, new_col], dim=0)
-    drop_edge_index = torch.stack([drop_row, drop_col], dim=0)  ### only u->v (no v->u)
+    drop_edge_index = torch.stack([drop_row, drop_col],
+                                  dim=0)  ### only u->v (no v->u)
 
     return edge_index, drop_edge_index, edge_attr
 
@@ -108,8 +117,8 @@ def dataset_split(data, train_ratio, val_ratio, test_ratio):
     train_num = round(v_num * train_ratio)
     val_num = round(v_num * val_ratio)
 
-    train_mask, val_mask, test_mask = th.zeros(v_num).bool(), th.zeros(v_num).bool(), th.zeros(
-        v_num).bool()
+    train_mask, val_mask, test_mask = th.zeros(v_num).bool(), th.zeros(
+        v_num).bool(), th.zeros(v_num).bool()
     train_mask[0:train_num] = True
     val_mask[train_num:train_num + val_num] = True
     test_mask[train_num + val_num:] = True
@@ -276,7 +285,8 @@ def planetoid(dataset_name, num_snap):
         #         savename='arxiv_snap' + str(sn + 1),
         #         snap=(sn + 1))
 
-        with open(base_path + '_Edgeupdate_snap' + str(sn + 1) + '.txt', 'w') as f:
+        with open(base_path + '_Edgeupdate_snap' + str(sn + 1) + '.txt',
+                  'w') as f:
             for i, j in zip(row_sn, col_sn):
                 f.write("%d %d\n" % (i, j))
                 f.write("%d %d\n" % (j, i))
@@ -388,7 +398,8 @@ def facebook(num_snap):
         #         savename='arxiv_snap' + str(sn + 1),
         #         snap=(sn + 1))
 
-        with open(base_path + '_Edgeupdate_snap' + str(sn + 1) + '.txt', 'w') as f:
+        with open(base_path + '_Edgeupdate_snap' + str(sn + 1) + '.txt',
+                  'w') as f:
             for i, j in zip(row_sn, col_sn):
                 f.write("%d %d\n" % (i, j))
                 f.write("%d %d\n" % (j, i))
@@ -499,7 +510,8 @@ def wikics(num_snap):
         #         savename='arxiv_snap' + str(sn + 1),
         #         snap=(sn + 1))
 
-        with open(base_path + '_Edgeupdate_snap' + str(sn + 1) + '.txt', 'w') as f:
+        with open(base_path + '_Edgeupdate_snap' + str(sn + 1) + '.txt',
+                  'w') as f:
             for i, j in zip(row_sn, col_sn):
                 f.write("%d %d\n" % (i, j))
                 f.write("%d %d\n" % (j, i))
@@ -611,7 +623,8 @@ def twitch(num_snap):
         #         savename='arxiv_snap' + str(sn + 1),
         #         snap=(sn + 1))
 
-        with open(base_path + '_Edgeupdate_snap' + str(sn + 1) + '.txt', 'w') as f:
+        with open(base_path + '_Edgeupdate_snap' + str(sn + 1) + '.txt',
+                  'w') as f:
             for i, j in zip(row_sn, col_sn):
                 f.write("%d %d\n" % (i, j))
                 f.write("%d %d\n" % (j, i))
@@ -724,7 +737,8 @@ def reddit(num_snap):
         #         savename='arxiv_snap' + str(sn + 1),
         #         snap=(sn + 1))
 
-        with open(base_path + '_Edgeupdate_snap' + str(sn + 1) + '.txt', 'w') as f:
+        with open(base_path + '_Edgeupdate_snap' + str(sn + 1) + '.txt',
+                  'w') as f:
             for i, j in zip(row_sn, col_sn):
                 f.write("%d %d\n" % (i, j))
                 f.write("%d %d\n" % (j, i))
@@ -736,7 +750,8 @@ def arxiv(num_snap):
     data = dataset[0]
     n_classes = np.array(dataset.meta_info['num classes'], dtype=np.int32)
     split_idx = dataset.get_idx_split()
-    train_idx, val_idx, test_idx = split_idx['train'], split_idx['valid'], split_idx['test']
+    train_idx, val_idx, test_idx = split_idx['train'], split_idx[
+        'valid'], split_idx['test']
     all_idx = torch.cat([train_idx, val_idx, test_idx])
 
     # Feature normalization
@@ -828,7 +843,8 @@ def arxiv(num_snap):
         #          savename='arxiv_snap' + str(sn + 1),
         #          snap=(sn + 1))
 
-        with open('./data/arxiv/arxiv_Edgeupdate_snap' + str(sn + 1) + '.txt', 'w') as f:
+        with open('./data/arxiv/arxiv_Edgeupdate_snap' + str(sn + 1) + '.txt',
+                  'w') as f:
             for i, j in zip(row_sn, col_sn):
                 f.write("%d %d\n" % (i, j))
                 f.write("%d %d\n" % (j, i))
@@ -841,8 +857,8 @@ def mag(num_snap):
     data, labels = dataset[0]
     n_classes = np.array(dataset.meta_info['num classes'], dtype=np.int32)
     split_idx = dataset.get_idx_split()
-    train_idx, val_idx, test_idx = split_idx['train']['paper'], split_idx['valid'][
-        'paper'], split_idx['test']['paper']
+    train_idx, val_idx, test_idx = split_idx['train']['paper'], split_idx[
+        'valid']['paper'], split_idx['test']['paper']
     all_idx = torch.cat([train_idx, val_idx, test_idx])
 
     # Feature normalization
@@ -887,7 +903,9 @@ def mag(num_snap):
     drop_idx = idx_with_time_seq[init_num:]
 
     edge_index = to_undirected(edge_index, num_nodes)
-    edge_index, drop_edge_index, _ = dropout_adj(edge_index, drop_idx, num_nodes=num_nodes)
+    edge_index, drop_edge_index, _ = dropout_adj(edge_index,
+                                                 drop_idx,
+                                                 num_nodes=num_nodes)
     edge_index = to_undirected(edge_index, num_nodes)
 
     row_drop, col_drop = np.array(drop_edge_index)
@@ -937,7 +955,8 @@ def mag(num_snap):
         #          savename='arxiv_snap' + str(sn + 1),
         #          snap=(sn + 1))
 
-        with open('./data/mag/mag_Edgeupdate_snap' + str(sn + 1) + '.txt', 'w') as f:
+        with open('./data/mag/mag_Edgeupdate_snap' + str(sn + 1) + '.txt',
+                  'w') as f:
             for i, j in zip(row_sn, col_sn):
                 f.write("%d %d\n" % (i, j))
                 f.write("%d %d\n" % (j, i))
@@ -949,7 +968,8 @@ def products(num_snap):
     data = dataset[0]
     n_classes = np.array(dataset.meta_info['num classes'], dtype=np.int32)
     split_idx = dataset.get_idx_split()
-    train_idx, val_idx, test_idx = split_idx['train'], split_idx['valid'], split_idx['test']
+    train_idx, val_idx, test_idx = split_idx['train'], split_idx[
+        'valid'], split_idx['test']
     all_idx = torch.cat([train_idx, val_idx, test_idx])
 
     #save feat
@@ -962,7 +982,8 @@ def products(num_snap):
 
     #get labels
     print("save labels.....")
-    train_idx, val_idx, test_idx = split_idx['train'], split_idx['valid'], split_idx['test']
+    train_idx, val_idx, test_idx = split_idx['train'], split_idx[
+        'valid'], split_idx['test']
 
     labels = data.y
     train_labels = labels.data[train_idx]
@@ -1052,7 +1073,9 @@ def products(num_snap):
         #          savename='products_snap' + str(sn + 1),
         #          snap=(sn + 1))
 
-        with open('./data/products/products_Edgeupdate_snap' + str(sn + 1) + '.txt', 'w') as f:
+        with open(
+                './data/products/products_Edgeupdate_snap' + str(sn + 1) +
+                '.txt', 'w') as f:
             for i, j in zip(row_sn, col_sn):
                 f.write("%d %d\n" % (i, j))
                 f.write("%d %d\n" % (j, i))
@@ -1080,7 +1103,8 @@ def papers100M(num_snap):
     gc.collect()
 
     #get labels
-    train_idx, val_idx, test_idx = split_idx['train'], split_idx['valid'], split_idx['test']
+    train_idx, val_idx, test_idx = split_idx['train'], split_idx[
+        'valid'], split_idx['test']
     all_idx = torch.cat([train_idx, val_idx, test_idx])
 
     labels = data.y
@@ -1161,7 +1185,9 @@ def papers100M(num_snap):
 
         #save_adj(row_tmp, col_tmp, N=data.num_nodes, dataset_name='papers100M', savename='papers100M_snap'+str(st), snap=st)
 
-        with open('./data/papers100M/papers100M_Edgeupdate_snap' + str(st) + '.txt', 'w') as f:
+        with open(
+                './data/papers100M/papers100M_Edgeupdate_snap' + str(st) +
+                '.txt', 'w') as f:
             for i, j in zip(row_sn, col_sn):
                 f.write("%d %d\n" % (i, j))
                 f.write("%d %d\n" % (j, i))
@@ -1222,6 +1248,23 @@ def write_packed_edges(f_path, edge_src, edge_dst):
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    # Dataset and Algorithom
+    parser.add_argument('--dataset',
+                        type=str,
+                        default=None,
+                        help='Dataset name ..')
+    parser.add_argument("--snapshot-num",
+                        type=int,
+                        default=None,
+                        help="the number of total snapshot")
+    args = parser.parse_args()
+
+    # args.dataset = 'Cora'
+    # args.snapshot_num = 10
+
+    gen_dataset_snapshot(args.dataset, args.snapshot_num)
+
     # papers100M()
     # products()
     # arxiv()
@@ -1230,7 +1273,7 @@ if __name__ == "__main__":
     # gen_dataset_snapshot('CiteSeer', 10)
     # gen_dataset_snapshot('Facebook', 10)
     # gen_dataset_snapshot('WikiCS', 10)
-    gen_dataset_snapshot('Twitch', 10)
+    # gen_dataset_snapshot('Twitch', 10)
     # gen_dataset_snapshot('PubMed', 10)
     # gen_dataset_snapshot('arxiv', 16)
     # gen_dataset_snapshot('reddit', 16)
